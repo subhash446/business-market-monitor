@@ -1,5 +1,11 @@
 # 📊 Business Market Monitor
 
+![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-Backend-000000?logo=express&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1?logo=mysql&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6%2B-F7DF1E?logo=javascript&logoColor=black)
+![Nodemailer](https://img.shields.io/badge/Nodemailer-Email%20Alerts-2C3E50)
+
 > A full-stack business intelligence platform for monitoring raw-material prices, managing price alerts, tracking market signals, and turning important price changes into actionable business notifications.
 
 ---
@@ -487,19 +493,24 @@ Screenshots of the application can be added here as the UI continues to evolve.
 
 ### Dashboard
 
-_Add dashboard screenshot here._
+<img width="1920" height="1028" alt="image" src="https://github.com/user-attachments/assets/cd6978aa-bbcb-4bba-a0df-ab39a535fc85" />
+
+
 
 ### Alert Rules
 
-_Add alert-rules screenshot here._
+<img width="1920" height="1027" alt="image" src="https://github.com/user-attachments/assets/a27722f2-81bb-4b62-bab1-9495e4990e85" />
+
 
 ### Alert History
 
-_Add alert-history screenshot here._
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/b5b02ad8-58f3-4e8d-b21b-7792c2eaafd5" />
+
 
 ### Email Notification
 
-_Add email notification screenshot here._
+<img width="959" height="1600" alt="WhatsApp Image 2026-08-26 at 4 34 16 PM" src="https://github.com/user-attachments/assets/b3e9faf7-2388-4aae-9933-3636de508d4d" />
+
 
 ---
 
@@ -618,14 +629,14 @@ The broader vision is to turn raw market data into **timely, business-relevant i
 
 ---
 
-# 👨‍💻 Author
+## 👨‍💻 Author
 
 **Subhash Kumar Yadav**
 
 B.Tech Information Technology
 
-GitHub:  
-https://github.com/subhash446
+- **GitHub:** [subhash446](https://github.com/subhash446)
+- **LinkedIn:** [Subhash Kumar Yadav](https://www.linkedin.com/in/subhash-kumar-yadav-062111266/)
 
 ---
 
