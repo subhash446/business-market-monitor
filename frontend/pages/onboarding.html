@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Set up your business profile to start monitoring your market.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Set Up Your Business — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS (Doc 3 §2.1 load order) -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+  <link rel="stylesheet" href="/css/pages/onboarding.css">
+
+  <!-- Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="app-layout">
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Navigation sidebar — injected by nav.js (sole approved innerHTML) -->
+  <div id="nav-placeholder"></div>
+
+  <!-- App shell wrapper -->
+  <div class="app-shell">
+
+    <!-- Page header -->
+    <header class="page-header" role="banner">
+      <div class="page-header__inner">
+        <h1 class="page-header__title">Set Up Your Business</h1>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="main-content" role="main">
+      <div class="onboarding-container">
+
+        <!-- Step indicator (Doc 4 §3.1) -->
+        <nav class="onboarding-progress" aria-label="Setup progress">
+          <div class="step-indicator__item step-indicator__item--active" id="indicator-1" aria-current="step">
+            <div class="step-indicator__circle" aria-hidden="true">1</div>
+            <span class="step-indicator__label">Industry</span>
+          </div>
+          <div class="step-indicator__item" id="indicator-2">
+            <div class="step-indicator__circle" aria-hidden="true">2</div>
+            <span class="step-indicator__label">Details</span>
+          </div>
+          <div class="step-indicator__item" id="indicator-3">
+            <div class="step-indicator__circle" aria-hidden="true">
+              <i class="fa-solid fa-check" style="font-size:0.75rem;" aria-hidden="true"></i>
+            </div>
+            <span class="step-indicator__label">Done</span>
+          </div>
+        </nav>
+
+        <!-- ── Step 1 — Industry Selection ────────────────────── -->
+        <div class="onboarding-step onboarding-step--active" id="step-1" role="region" aria-labelledby="step1-heading">
+
+          <h2 class="onboarding-step__heading" id="step1-heading">Select Your Industry</h2>
+          <p class="onboarding-step__body">Choose the industry that best matches your business.</p>
+
+          <!-- Industry cards injected here by onboarding.js -->
+          <div
+            id="industry-grid"
+            class="industry-grid"
+            role="group"
+            aria-label="Available industries">
+          </div>
+
+          <!-- Step 1 error (API load failure) -->
+          <div
+            id="step1-error"
+            class="form-alert form-alert--error"
+            role="alert"
+            aria-live="assertive"
+            style="display:none;">
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <span class="form-alert__message"></span>
+          </div>
+
+          <div class="onboarding-actions">
+            <button
+              type="button"
+              id="step1-continue-btn"
+              class="btn btn--primary"
+              disabled
+              aria-describedby="step1-heading">
+              Continue
+              <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- ── Step 2 — Business Details ──────────────────────── -->
+        <div class="onboarding-step" id="step-2" role="region" aria-labelledby="step2-heading">
+
+          <h2 class="onboarding-step__heading" id="step2-heading">Tell Us About Your Business</h2>
+
+          <!-- Form-level error (409 conflict, network) -->
+          <div
+            id="ob-form-error"
+            class="form-alert form-alert--error"
+            role="alert"
+            aria-live="assertive">
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <span class="form-alert__message"></span>
+          </div>
+
+          <form id="ob-form" novalidate autocomplete="on">
+
+            <!-- Business Name — required; backend field is `name` (NEVER `businessName`) -->
+            <div class="form-group">
+              <label class="form-label form-label--required" for="ob-business-name">
+                Business name
+              </label>
+              <input
+                type="text"
+                id="ob-business-name"
+                name="name"
+                class="form-control"
+                placeholder="e.g. Acme Manufacturing Ltd."
+                autocomplete="organization"
+                maxlength="150"
+                required
+                aria-required="true"
+                aria-describedby="ob-business-name-error">
+              <p id="ob-business-name-error"
+                 class="form-error"
+                 role="alert"
+                 aria-live="polite"></p>
+            </div>
+
+            <!-- Contact Email — optional -->
+            <div class="form-group">
+              <label class="form-label" for="ob-contact-email">
+                Contact email <span class="form-label__optional">(optional)</span>
+              </label>
+              <input
+                type="email"
+                id="ob-contact-email"
+                name="contactEmail"
+                class="form-control"
+                placeholder="business@example.com"
+                autocomplete="email"
+                inputmode="email"
+                aria-describedby="ob-contact-email-error">
+              <p id="ob-contact-email-error"
+                 class="form-error"
+                 role="alert"
+                 aria-live="polite"></p>
+            </div>
+
+            <!-- Contact Phone — optional, no format restriction -->
+            <div class="form-group">
+              <label class="form-label" for="ob-contact-phone">
+                Contact phone <span class="form-label__optional">(optional)</span>
+              </label>
+              <input
+                type="tel"
+                id="ob-contact-phone"
+                name="contactPhone"
+                class="form-control"
+                placeholder="+1 555 000 0000"
+                autocomplete="tel">
+            </div>
+
+            <!-- Address — optional, textarea -->
+            <div class="form-group">
+              <label class="form-label" for="ob-address">
+                Address <span class="form-label__optional">(optional)</span>
+              </label>
+              <textarea
+                id="ob-address"
+                name="address"
+                class="form-control form-control--textarea"
+                placeholder="123 Main Street, Suite 4, City, Country"
+                rows="3"
+                maxlength="500"
+                autocomplete="street-address"></textarea>
+            </div>
+
+            <div class="onboarding-actions">
+              <button type="button" id="step2-back-btn" class="btn btn--ghost">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                Back
+              </button>
+              <button type="submit" id="ob-create-btn" class="btn btn--primary">
+                Create Business
+              </button>
+            </div>
+
+          </form>
+
+        </div>
+
+        <!-- ── Step 3 — Confirmation ───────────────────────────── -->
+        <div class="onboarding-step" id="step-3" role="region" aria-labelledby="step3-heading">
+
+          <div class="onboarding-success">
+
+            <div class="onboarding-success__icon" aria-hidden="true">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+
+            <h2 class="onboarding-success__title" id="step3-heading">You're all set!</h2>
+
+            <div class="onboarding-success__details" aria-live="polite">
+              <p class="onboarding-success__detail">
+                <strong id="ob-created-name"></strong> has been created.
+              </p>
+              <p class="onboarding-success__detail">
+                <strong id="ob-materials-count"></strong> materials have been pre-loaded from your industry template.
+              </p>
+            </div>
+
+            <p class="onboarding-success__body">
+              We've set up your workspace. Click below to refresh your session and go to your dashboard.
+            </p>
+
+            <!-- Step 3 error (refresh token failure) -->
+            <div
+              id="ob-step3-error"
+              class="form-alert form-alert--error"
+              role="alert"
+              aria-live="assertive"
+              style="display:none;">
+              <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+              <span class="form-alert__message"></span>
+            </div>
+
+            <button
+              type="button"
+              id="ob-goto-dashboard-btn"
+              class="btn btn--primary btn--full btn--lg">
+              Go to Dashboard
+            </button>
+
+          </div>
+
+        </div>
+
+      </div><!-- /.onboarding-container -->
+    </main>
+
+  </div><!-- /.app-shell -->
+
+  <!-- Page module (Doc 3 §2.2) -->
+  <script type="module" src="/js/pages/onboarding.js"></script>
+
+</body>
+</html>

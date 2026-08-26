@@ -1,0 +1,278 @@
+/**
+ * Onboarding page — industry grid and multi-step form styles
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §5.3, Doc 4 §3.1 — pages/onboarding.html
+ * App Shell layout (sidebar present). No auth-card centering.
+ */
+
+/* ── Onboarding container ─────────────────────────────────────── */
+.onboarding-container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* ── Step indicator ───────────────────────────────────────────── */
+.onboarding-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: var(--space-8);
+}
+
+.step-indicator__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+  flex: 1;
+  max-width: 120px;
+}
+
+/* Connecting line between steps */
+.step-indicator__item + .step-indicator__item::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  right: calc(50% + 20px);
+  left: calc(-50% + 20px);
+  height: 1px;
+  background-color: var(--color-border);
+  transition: background-color var(--transition-base);
+}
+
+.step-indicator__item--complete + .step-indicator__item::before {
+  background-color: var(--color-primary);
+}
+
+.step-indicator__circle {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border-strong);
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--transition-base),
+              background-color var(--transition-base),
+              color var(--transition-base);
+  position: relative;
+  z-index: 1;
+}
+
+.step-indicator__item--active .step-indicator__circle {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.step-indicator__item--complete .step-indicator__circle {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.step-indicator__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.step-indicator__item--active .step-indicator__label {
+  color: var(--color-primary);
+}
+
+.step-indicator__item--complete .step-indicator__label {
+  color: var(--color-text-secondary);
+}
+
+/* ── Onboarding step sections ─────────────────────────────────── */
+.onboarding-step {
+  display: none;
+}
+
+.onboarding-step--active {
+  display: block;
+}
+
+.onboarding-step__heading {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.onboarding-step__body {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-6);
+}
+
+/* ── Industry card grid ───────────────────────────────────────── */
+.industry-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 540px) {
+  .industry-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .industry-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Skeleton cards while industries load */
+.industry-grid-skeleton {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 540px) {
+  .industry-grid-skeleton {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .industry-grid-skeleton {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.industry-card-skeleton {
+  height: 120px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+/* Individual industry card */
+.industry-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background-color: var(--color-bg-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color var(--transition-fast),
+              background-color var(--transition-fast),
+              transform var(--transition-fast);
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-sans);
+}
+
+.industry-card:hover {
+  border-color: var(--color-border-strong);
+  background-color: var(--color-bg-hover);
+  transform: translateY(-1px);
+}
+
+.industry-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.industry-card--selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-subtle);
+}
+
+.industry-card--selected:hover {
+  border-color: var(--color-primary-hover);
+  background-color: var(--color-primary-subtle);
+}
+
+.industry-card__icon {
+  font-size: 1.75rem;
+  color: var(--color-primary);
+  margin-bottom: var(--space-1);
+}
+
+.industry-card--selected .industry-card__icon {
+  color: var(--color-primary);
+}
+
+.industry-card__name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.industry-card__description {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Step actions row ─────────────────────────────────────────── */
+.onboarding-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: var(--space-6);
+}
+
+.onboarding-actions .btn {
+  min-width: 120px;
+}
+
+/* ── Step 3 — success / confirmation ─────────────────────────── */
+.onboarding-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-4);
+}
+
+.onboarding-success__icon {
+  font-size: 4rem;
+  color: var(--color-success);
+}
+
+.onboarding-success__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+}
+
+.onboarding-success__details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.onboarding-success__detail {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.onboarding-success__body {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  max-width: 400px;
+}

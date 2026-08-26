@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Log a price entry for a tracked raw material — Business Market Monitor.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Log Price — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS (Doc 3 §2.1 load order) -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+  <link rel="stylesheet" href="/css/pages/prices.css">
+
+  <!-- Font Awesome (icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="app-layout">
+
+  <!-- Sidebar injected by nav.js -->
+  <div id="nav-placeholder"></div>
+
+  <div class="app-body">
+
+    <!-- Top header bar -->
+    <header class="app-header">
+      <button
+        class="app-header__hamburger"
+        id="sidebar-toggle"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded="false"
+        aria-controls="sidebar">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <h1 class="app-header__page-title" id="page-title"></h1>
+      <div class="app-header__actions">
+        <span class="app-header__user-badge" id="header-user-initials" aria-label="Signed in"></span>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="app-main">
+      <a href="#main-content" class="skip-link">Skip to main content</a>
+
+      <div class="page-container">
+
+        <!-- Back link (Doc 4 §5.1) -->
+        <a href="/pages/materials.html" class="btn btn--ghost price-back-link">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          Back to Materials
+        </a>
+
+        <!-- ── Not-found state (hidden by default; shown by JS) ──────────── -->
+        <!--
+          Shown when materialId is absent from the list returned by GET /materials.
+          Doc 4 §5.1: "Material not found. It may have been removed or doesn't
+          belong to your business." + back link
+        -->
+        <div class="price-not-found" id="price-not-found" hidden>
+          <div class="card">
+            <div class="card__body price-not-found__body">
+              <i class="fa-solid fa-circle-exclamation price-not-found__icon" aria-hidden="true"></i>
+              <h2 class="price-not-found__title">Material Not Found</h2>
+              <p class="price-not-found__message">
+                Material not found. It may have been removed or doesn't belong to your business.
+              </p>
+              <a href="/pages/materials.html" class="btn btn--secondary">
+                ← Back to Materials
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Main page content (hidden until data loads) ───────────────── -->
+        <!--
+          Revealed by prices.js once materials list + latest price are fetched.
+          Stays hidden on not-found state.
+        -->
+        <div id="price-page-content" hidden>
+
+          <!-- Material header card (Doc 4 §5.1) -->
+          <!--
+            price-material-name: populated with material.name (textContent)
+            price-unit-badge:    populated with material.unit (textContent)
+                                 Unit comes from GET /materials, NOT from price response
+          -->
+          <div class="material-header-card" aria-label="Selected material">
+            <h2 class="material-header-card__name" id="price-material-name"></h2>
+            <span class="badge badge--info material-header-card__unit" id="price-unit-badge"></span>
+          </div>
+
+          <!-- Current price panel (Doc 4 §5.1) -->
+          <!--
+            Shows latest price from GET /materials/:id/prices/latest
+            Response: { price, recordedAt, source } — NO unit field.
+            If 404 → null → show current-price-no-data notice (not error-state component).
+            Loading: skeleton rows shown while API call is in flight.
+          -->
+          <div class="card price-current-panel" id="current-price-panel" aria-live="polite">
+            <div class="card__header">
+              <h2 class="card__title">Current Price</h2>
+            </div>
+            <div class="card__body price-current-panel__body">
+
+              <!-- Populated when a price exists -->
+              <div id="current-price-value" class="price-current-panel__value font-mono" hidden></div>
+              <div id="current-price-date" class="price-current-panel__date" hidden></div>
+
+              <!-- Shown when no price recorded yet (semantic 404 — NOT error-state) -->
+              <p
+                id="current-price-no-data"
+                class="price-current-panel__no-data"
+                hidden>
+                <!-- text set by JS: "No price recorded yet for this material." -->
+              </p>
+
+            </div>
+          </div>
+
+          <!-- Price entry form (Doc 4 §5.1) -->
+          <!--
+            POST /api/v1/materials/:materialId/prices
+            Body: { price: number, recordedAt: string }
+            Both fields are required.
+            pe-date is pre-populated with today's date.
+
+            Success:
+              1. showToast "Price logged successfully."
+              2. Update current price panel in-place
+              3. Reset pe-price; keep pe-date at today
+          -->
+          <div class="card">
+            <div class="card__header">
+              <h2 class="card__title">Log a Price</h2>
+            </div>
+            <div class="card__body">
+
+              <!-- Page-level form alert -->
+              <div class="form-alert form-alert--error" id="pe-form-error" role="alert">
+                <p class="form-alert__message"></p>
+              </div>
+
+              <form id="price-entry-form" novalidate>
+
+                <!-- Price -->
+                <div class="form-group">
+                  <label class="form-label form-label--required" for="pe-price">
+                    Price
+                  </label>
+                  <input
+                    class="form-control font-mono"
+                    type="number"
+                    id="pe-price"
+                    name="price"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="e.g. 1250.00"
+                    aria-required="true"
+                    aria-describedby="pe-price-error">
+                  <p class="form-error" id="pe-price-error" role="alert"></p>
+                </div>
+
+                <!-- Date (defaults to today) -->
+                <div class="form-group">
+                  <label class="form-label form-label--required" for="pe-date">
+                    Date
+                  </label>
+                  <input
+                    class="form-control"
+                    type="date"
+                    id="pe-date"
+                    name="recordedAt"
+                    aria-required="true"
+                    aria-describedby="pe-date-error">
+                  <p class="form-error" id="pe-date-error" role="alert"></p>
+                </div>
+
+                <!-- Submit -->
+                <div class="form-actions">
+                  <button type="submit" class="btn btn--primary" id="pe-submit-btn">
+                    Log Price
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+
+        </div>
+        <!-- /#price-page-content -->
+
+      </div>
+      <!-- /.page-container -->
+    </main>
+
+  </div>
+  <!-- /.app-body -->
+
+  <script type="module" src="/js/pages/prices.js"></script>
+</body>
+</html>

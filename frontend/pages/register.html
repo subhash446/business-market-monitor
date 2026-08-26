@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Create your Business Market Monitor account and start tracking market prices today.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Create Account — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS (Doc 3 §2.1 load order) -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+  <link rel="stylesheet" href="/css/pages/auth.css">
+
+  <!-- Font Awesome (icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="auth-layout">
+
+  <!-- Skip to main content (Doc 3 §10.2) -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <main id="main-content" class="auth-container">
+
+    <!-- Brand -->
+    <div class="auth-brand">
+      <div class="auth-logo-mark" aria-hidden="true">
+        <i class="fa-solid fa-chart-column"></i>
+      </div>
+      <span class="auth-brand__name">Market Monitor</span>
+    </div>
+
+    <!-- Registration Card -->
+    <div class="auth-card" role="main">
+
+      <div class="auth-card__header">
+        <h1 class="auth-card__title">Create Your Account</h1>
+        <p class="auth-card__subtitle">Start monitoring your market in minutes.</p>
+      </div>
+
+      <!-- Form-level error (409 conflict, 429, network) -->
+      <div
+        id="reg-form-error"
+        class="form-alert form-alert--error"
+        role="alert"
+        aria-live="assertive">
+        <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+        <span class="form-alert__message"></span>
+      </div>
+
+      <!-- Registration Form -->
+      <form id="reg-form" novalidate autocomplete="on">
+
+        <!-- Full Name -->
+        <div class="form-group">
+          <label class="form-label form-label--required" for="reg-fullname">
+            Full name
+          </label>
+          <input
+            type="text"
+            id="reg-fullname"
+            name="fullName"
+            class="form-control"
+            placeholder="Jane Smith"
+            autocomplete="name"
+            autocapitalize="words"
+            required
+            aria-required="true"
+            aria-describedby="reg-fullname-error">
+          <p id="reg-fullname-error"
+             class="form-error"
+             role="alert"
+             aria-live="polite"></p>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label class="form-label form-label--required" for="reg-email">
+            Email address
+          </label>
+          <input
+            type="email"
+            id="reg-email"
+            name="email"
+            class="form-control"
+            placeholder="your@email.com"
+            autocomplete="email"
+            inputmode="email"
+            required
+            aria-required="true"
+            aria-describedby="reg-email-error">
+          <p id="reg-email-error"
+             class="form-error"
+             role="alert"
+             aria-live="polite"></p>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label class="form-label form-label--required" for="reg-password">
+            Password
+          </label>
+          <input
+            type="password"
+            id="reg-password"
+            name="password"
+            class="form-control"
+            placeholder="Create a password"
+            autocomplete="new-password"
+            required
+            aria-required="true"
+            aria-describedby="reg-password-hint reg-password-error">
+          <!-- Password hint always visible (Doc 4 §2.2) -->
+          <p class="form-hint" id="reg-password-hint">
+            Min. 8 characters &middot; at least one letter and one number
+          </p>
+          <p id="reg-password-error"
+             class="form-error"
+             role="alert"
+             aria-live="polite"></p>
+        </div>
+
+        <!-- Submit -->
+        <div class="auth-form__actions">
+          <button
+            type="submit"
+            id="reg-submit-btn"
+            class="btn btn--primary btn--full btn--lg">
+            Create Account
+          </button>
+        </div>
+
+      </form>
+
+      <!-- Sign-in link -->
+      <div class="auth-card__footer">
+        Already have an account?
+        <a href="/pages/login.html" class="font-medium">Sign in</a>
+      </div>
+
+    </div>
+
+    <p class="auth-footer">
+      &copy; 2026 Business Market Monitor
+    </p>
+
+  </main>
+
+  <!-- Page module -->
+  <script type="module" src="/js/pages/register.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,664 @@
+/**
+ * Layout — App shell, sidebar, header, main content, auth layout
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §1.3, §1.4, §5.2, §6, §9.2
+ * Responsive breakpoints: mobile (base) → tablet 768px → laptop 1024px → desktop 1280px
+ */
+
+/* ================================================================
+ * AUTH SHELL LAYOUT (Doc 3 §1.2, §5.2)
+ * Pages: login, register, forgot-password, reset-password, onboarding
+ * ================================================================ */
+
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg-base);
+  padding: var(--space-6) var(--space-4);
+}
+
+.auth-container {
+  width: 100%;
+  max-width: var(--auth-card-max-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Brand at top of auth pages */
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.auth-brand__logo {
+  width: 48px;
+  height: 48px;
+}
+
+.auth-brand__name {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.auth-brand__tagline {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* The card */
+.auth-card {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+}
+
+.auth-card__header {
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+
+.auth-card__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.auth-card__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.auth-card__footer {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.auth-footer {
+  font-size: var(--text-xs);
+  color: var(--color-text-disabled);
+  text-align: center;
+}
+
+/* ================================================================
+ * APP SHELL LAYOUT (Doc 3 §1.3, §6)
+ * Pages: onboarding, dashboard, materials, prices, alerts, news, trends
+ * ================================================================ */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-bg-base);
+}
+
+/* ================================================================
+ * SIDEBAR (Doc 3 §6.2, §6.5, §6.6)
+ * ================================================================ */
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: var(--sidebar-width-expanded);
+  background-color: var(--color-bg-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-sidebar);
+  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  transition: transform var(--transition-slow), width var(--transition-slow);
+}
+
+/* Brand area */
+.sidebar__brand {
+  padding: var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.sidebar__logo-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+}
+
+.sidebar__logo-link:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.sidebar__logo-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.sidebar__logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.sidebar__app-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* User info area */
+.sidebar__user {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.sidebar__avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.sidebar__user-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar__business-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.sidebar__industry-name {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Navigation links */
+.sidebar__nav {
+  flex: 1;
+  padding: var(--space-3) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-y: auto;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-link:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.nav-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.nav-link--active,
+.nav-link[aria-current="page"] {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.nav-link--active:hover,
+.nav-link[aria-current="page"]:hover {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.nav-link__icon {
+  width: 18px;
+  min-width: 18px;
+  font-size: var(--text-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-link__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Divider inside nav */
+.sidebar__nav-divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: var(--space-2) 0;
+}
+
+/* Footer actions: Settings + Logout */
+.sidebar__footer {
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.sidebar__action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar__action-btn:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.sidebar__action-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.sidebar__action-btn--danger:hover {
+  background-color: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.sidebar__action-icon {
+  width: 18px;
+  min-width: 18px;
+  font-size: var(--text-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile overlay backdrop */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+  z-index: calc(var(--z-sidebar) - 1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-slow);
+}
+
+.sidebar-overlay--visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ================================================================
+ * APP BODY (content area to the right of sidebar)
+ * ================================================================ */
+
+.app-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin-left: var(--sidebar-width-expanded);
+  min-width: 0;
+  transition: margin-left var(--transition-slow);
+}
+
+/* ================================================================
+ * HEADER (Doc 3 §6.4)
+ * ================================================================ */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  height: var(--header-height);
+  background-color: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  z-index: var(--z-header);
+  flex-shrink: 0;
+}
+
+/* Hamburger button (mobile only) */
+.header__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--text-lg);
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.header__hamburger:hover {
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.header__hamburger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Page title (centre-ish) */
+.header__title {
+  flex: 1;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* User initials badge (right) */
+.header__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.header__user-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: default;
+  user-select: none;
+}
+
+/* ================================================================
+ * MAIN CONTENT AREA (Doc 3 §9.2)
+ * ================================================================ */
+
+.app-main {
+  flex: 1;
+  padding: var(--space-8) var(--space-6);
+  min-width: 0;
+}
+
+.page-container {
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Page heading row (title + optional action button) */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.page-header__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+}
+
+.page-header__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+/* ================================================================
+ * NAV PLACEHOLDER — sizing prevents layout shift (Doc 3 §6.6)
+ * ================================================================ */
+
+#nav-placeholder {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  width: var(--sidebar-width-expanded);
+  pointer-events: none; /* Before nav.html loads */
+  z-index: var(--z-sidebar);
+  transition: width var(--transition-slow);
+}
+
+#nav-placeholder:has(.sidebar) {
+  pointer-events: auto;
+}
+
+/* Sidebar "ready" fade-in */
+.sidebar--ready {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar {
+  opacity: 0;
+  transition: opacity var(--transition-slow),
+              transform var(--transition-slow),
+              width var(--transition-slow);
+}
+
+.sidebar--ready {
+  opacity: 1;
+}
+
+/* ================================================================
+ * RESPONSIVE — Laptop: icon-only sidebar (Doc 3 §9.2)
+ * ================================================================ */
+
+@media (max-width: 1279px) {
+  .sidebar {
+    width: var(--sidebar-width-collapsed);
+  }
+
+  .app-body {
+    margin-left: var(--sidebar-width-collapsed);
+  }
+
+  #nav-placeholder {
+    width: var(--sidebar-width-collapsed);
+  }
+
+  /* Hide text labels — show icon only */
+  .sidebar__app-name,
+  .sidebar__user-info,
+  .nav-link__label,
+  .sidebar__action-btn span:last-child,
+  .sidebar__brand .sidebar__app-name {
+    display: none;
+  }
+
+  .sidebar__user {
+    justify-content: center;
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .nav-link {
+    justify-content: center;
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .sidebar__action-btn {
+    justify-content: center;
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .sidebar__logo-link {
+    justify-content: center;
+  }
+}
+
+/* ================================================================
+ * RESPONSIVE — Mobile/Tablet: hamburger drawer (Doc 3 §9.2)
+ * ================================================================ */
+
+@media (max-width: 1023px) {
+  /* Sidebar becomes a slide-in drawer */
+  .sidebar {
+    width: var(--sidebar-width-expanded);
+    transform: translateX(-100%);
+  }
+
+  /* Show all text labels in drawer mode */
+  .sidebar__app-name,
+  .sidebar__user-info,
+  .nav-link__label,
+  .sidebar__brand .sidebar__app-name {
+    display: block;
+  }
+
+  .sidebar__user {
+    justify-content: flex-start;
+    padding: var(--space-4);
+  }
+
+  .nav-link {
+    justify-content: flex-start;
+    padding: var(--space-3) var(--space-3);
+  }
+
+  .sidebar__action-btn {
+    justify-content: flex-start;
+    padding: var(--space-3) var(--space-3);
+  }
+
+  .sidebar__logo-link {
+    justify-content: flex-start;
+  }
+
+  /* Open state */
+  .sidebar--open {
+    transform: translateX(0);
+  }
+
+  /* App body takes full width */
+  .app-body {
+    margin-left: 0;
+  }
+
+  #nav-placeholder {
+    width: 0;
+    pointer-events: none;
+  }
+
+  /* Show hamburger in header */
+  .header__hamburger {
+    display: flex;
+  }
+
+  /* Less padding on mobile */
+  .app-main {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+/* ================================================================
+ * RESPONSIVE — Small mobile adjustments
+ * ================================================================ */
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .app-main {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .app-header {
+    padding: 0 var(--space-4);
+  }
+}

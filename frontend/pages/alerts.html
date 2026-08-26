@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Manage price alert rules and view alert history — Business Market Monitor.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Alerts — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+   <link rel="stylesheet" href="/css/pages/trends.css">
+  <link rel="stylesheet" href="/css/pages/alerts.css">
+
+  <!-- Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="app-layout">
+
+  <!-- Sidebar injected by nav.js -->
+  <div id="nav-placeholder"></div>
+
+  <div class="app-body">
+
+    <!-- Top header bar -->
+    <header class="app-header">
+      <button
+        class="app-header__hamburger"
+        id="sidebar-toggle"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded="false"
+        aria-controls="sidebar">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <h1 class="app-header__page-title" id="page-title"></h1>
+      <div class="app-header__actions">
+        <span class="app-header__user-badge" id="header-user-initials" aria-label="Signed in"></span>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="app-main">
+      <a href="#main-content" class="skip-link">Skip to main content</a>
+
+      <div class="page-container">
+
+        <!-- ── Tab bar (Doc 4 §7.1) ──────────────────────────────────── -->
+        <div class="tab-bar" role="tablist" aria-label="Alert views">
+          <button
+            type="button"
+            class="tab-btn tab-btn--active"
+            role="tab"
+            id="tab-rules"
+            aria-selected="true"
+            aria-controls="panel-rules">
+            Alert Rules
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            role="tab"
+            id="tab-events"
+            aria-selected="false"
+            aria-controls="panel-events">
+            Alert History
+          </button>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════════
+             TAB 1 — ALERT RULES
+             ════════════════════════════════════════════════════════════ -->
+        <!--
+          API:
+            GET  /api/v1/alerts/rules
+              → [{ id, trackedMaterialId, conditionType, thresholdPrice, isActive }]
+            POST /api/v1/alerts/rules
+              body: { trackedMaterialId, conditionType, thresholdPrice }
+            PATCH /api/v1/alerts/rules/:ruleId
+              body: { isActive: boolean }  (toggle only)
+            DELETE /api/v1/alerts/rules/:ruleId
+              → soft delete { id, deletedAt }
+
+          Material name: looked up from GET /materials by trackedMaterialId.
+          conditionType: 'PRICE_ABOVE' → "Price Above" | 'PRICE_BELOW' → "Price Below"
+          isActive: true → badge--success "Active" | false → badge--neutral "Paused"
+        -->
+        <div
+          class="tab-panel"
+          id="panel-rules"
+          role="tabpanel"
+          aria-labelledby="tab-rules">
+
+          <!-- Toolbar -->
+          <div class="alerts-toolbar" id="rules-toolbar">
+            <h2 class="alerts-toolbar__title">Alert Rules</h2>
+            <button
+              type="button"
+              class="btn btn--primary"
+              id="create-rule-btn">
+              + Create Alert Rule
+            </button>
+          </div>
+
+          <!-- Rules list (skeleton → table → empty/error) -->
+          <div id="rules-container" aria-live="polite" aria-label="Alert rules list">
+            <!-- Populated by alerts.js -->
+          </div>
+
+        </div>
+        <!-- /#panel-rules -->
+
+
+        <!-- ════════════════════════════════════════════════════════════
+             TAB 2 — ALERT HISTORY (lazy loaded on first click)
+             ════════════════════════════════════════════════════════════ -->
+        <!--
+          API:
+            GET /api/v1/alerts/events?page=1&limit=20
+            Response: [{
+              id, triggeredPrice, thresholdPriceSnapshot, conditionTypeSnapshot,
+              notificationChannel, deliveryStatus, triggeredAt
+            }]
+            meta: { page, limit, total, totalPages }
+
+          Columns: Triggered At | Condition | Triggered Price | Delivery Status
+          deliveryStatus: PENDING → badge--warning | SENT → badge--success | FAILED → badge--danger
+          conditionTypeSnapshot: 'PRICE_ABOVE' | 'PRICE_BELOW' (same formatting as rules)
+
+          NOTE: Event objects do NOT include materialId or materialName.
+                Dashboard events subset (GET /dashboard) has only { id, triggeredAt } — different endpoint.
+        -->
+        <div
+          class="tab-panel tab-panel--hidden"
+          id="panel-events"
+          role="tabpanel"
+          aria-labelledby="tab-events">
+
+          <!-- Events list (skeleton → table → empty/error) -->
+          <div id="events-container" aria-live="polite" aria-label="Alert event history">
+            <!-- Populated by alerts.js on first tab open -->
+          </div>
+
+          <!-- Pagination -->
+          <div id="events-pagination" class="alerts-pagination" aria-label="Alert events pagination">
+          </div>
+
+        </div>
+        <!-- /#panel-events -->
+
+      </div>
+      <!-- /.page-container -->
+    </main>
+
+  </div>
+  <!-- /.app-body -->
+
+  <!--
+    Create Alert Rule modal is built entirely in JS (alerts.js) using modal.js.
+    Form fields:
+      #ar-material          — <select> tracked materials only
+      #ar-material-error    — field error
+      #ar-condition-above   — <input type="radio" value="PRICE_ABOVE">
+      #ar-condition-below   — <input type="radio" value="PRICE_BELOW">
+      #ar-condition-error   — condition error
+      #ar-threshold         — <input type="number"> threshold price
+      #ar-threshold-error   — field error
+      #ar-form-error        — form-level error (409, network)
+      #ar-submit-btn        — submit button
+  -->
+
+  <script type="module" src="/js/pages/alerts.js"></script>
+</body>
+</html>

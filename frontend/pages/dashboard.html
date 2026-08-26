@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Dashboard — Business Market Monitor. View your tracked materials, market news, active alert rules, and sync status.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Dashboard — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS (Doc 3 §2.1 load order) -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+  <link rel="stylesheet" href="/css/pages/dashboard.css">
+
+  <!-- Font Awesome (icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="app-layout">
+
+  <!-- Sidebar — injected by nav.js; sole innerHTML use (Doc 4 §1.4, §10.17) -->
+  <div id="nav-placeholder"></div>
+
+  <div class="app-body">
+
+    <!-- Top header bar (Doc 4 §1.5) -->
+    <header class="app-header">
+      <button
+        class="app-header__hamburger"
+        id="sidebar-toggle"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded="false"
+        aria-controls="sidebar">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+
+      <h1 class="app-header__page-title" id="page-title"></h1>
+
+      <div class="app-header__actions">
+        <span class="app-header__user-badge" id="header-user-initials" aria-label="Signed in"></span>
+      </div>
+    </header>
+
+    <!-- Main content area (Doc 4 §1.6) -->
+    <main id="main-content" class="app-main">
+      <a href="#main-content" class="skip-link">Skip to main content</a>
+
+      <div class="page-container">
+
+        <!-- ═══════════════════════════════════════════════════════
+             Dashboard grid — 5 panels (Doc 4 §8.1)
+             Responsive: 1-col (mobile) → 2-col (tablet) → 3-col (desktop)
+             ═══════════════════════════════════════════════════════ -->
+        <div class="dashboard-grid" id="dashboard-grid">
+
+          <!-- Panel 1 — Tracked Materials
+               Fields used: trackedMaterials[].{ id, name, latestPrice: number|null }
+               latestPrice is scalar — not an object. No unit suffix.
+               significantChange is absent — not referenced anywhere. -->
+          <section class="card dashboard-panel" aria-labelledby="panel-materials-heading">
+            <div class="card__header dashboard-panel__header">
+              <h2 class="card__title" id="panel-materials-heading">Tracked Materials</h2>
+              <a href="/pages/materials.html" class="card__header-link">
+                Manage <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </a>
+            </div>
+            <div class="card__body dashboard-panel__body">
+              <!-- Populated by dashboard.js _renderMaterials() -->
+              <div id="panel-materials-list" role="status" aria-label="Loading tracked materials…"></div>
+            </div>
+          </section>
+
+          <!-- Panel 2 — Recent News
+               Fields used: recentNews[].{ id, title } — no url, source, or date -->
+          <section class="card dashboard-panel" aria-labelledby="panel-news-heading">
+            <div class="card__header dashboard-panel__header">
+              <h2 class="card__title" id="panel-news-heading">Recent News</h2>
+              <a href="/pages/news.html" class="card__header-link">
+                View All <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </a>
+            </div>
+            <div class="card__body dashboard-panel__body">
+              <!-- Populated by dashboard.js _renderNews() -->
+              <div id="panel-news-list" role="status" aria-label="Loading recent news…"></div>
+            </div>
+          </section>
+
+          <!-- Panel 3 — Active Alert Rules
+               Fields used: activeAlertRules[].{ id, conditionType, thresholdPrice }
+               No materialName in this endpoint's response. -->
+          <section class="card dashboard-panel" aria-labelledby="panel-alert-rules-heading">
+            <div class="card__header dashboard-panel__header">
+              <h2 class="card__title" id="panel-alert-rules-heading">Active Alert Rules</h2>
+              <a href="/pages/alerts.html" class="card__header-link">
+                Manage <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </a>
+            </div>
+            <div class="card__body dashboard-panel__body">
+              <!-- Populated by dashboard.js _renderAlertRules() -->
+              <div id="panel-alert-rules-list" role="status" aria-label="Loading alert rules…"></div>
+            </div>
+          </section>
+
+          <!-- Panel 4 — Recent Alert Events
+               Fields used: recentAlertEvents[].{ id, triggeredAt }
+               Only triggeredAt is shown — no materialName, no conditionType here. -->
+          <section class="card dashboard-panel" aria-labelledby="panel-alert-events-heading">
+            <div class="card__header dashboard-panel__header">
+              <h2 class="card__title" id="panel-alert-events-heading">Recent Alert Events</h2>
+              <a href="/pages/alerts.html" class="card__header-link">
+                View History <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </a>
+            </div>
+            <div class="card__body dashboard-panel__body">
+              <!-- Populated by dashboard.js _renderAlertEvents() -->
+              <div id="panel-alert-events-list" role="status" aria-label="Loading alert events…"></div>
+            </div>
+          </section>
+
+          <!-- Panel 5 — Sync Status
+               sync.lastPriceSyncAt and sync.lastNewsSyncAt are both null in v1.
+               Null displays as "Never" — not an error. Use secondary text colour.
+               Spans full width at bottom of grid (dashboard-panel--full). -->
+          <section
+            class="card dashboard-panel dashboard-panel--full"
+            aria-labelledby="panel-sync-heading">
+            <div class="card__header dashboard-panel__header">
+              <h2 class="card__title" id="panel-sync-heading">Data Sync Status</h2>
+              <i
+                class="fa-solid fa-circle-info dashboard-panel__info-icon"
+                aria-hidden="true"
+                title="Automated data sync is pending activation. Prices are entered manually.">
+              </i>
+            </div>
+            <div class="card__body">
+              <div class="sync-bar">
+                <!-- Price sync -->
+                <div class="sync-bar__item">
+                  <span class="sync-bar__dot" aria-hidden="true"></span>
+                  <span>Last price update:</span>
+                  <strong id="sync-price-time" class="sync-bar__value">—</strong>
+                </div>
+                <!-- News sync -->
+                <div class="sync-bar__item">
+                  <span class="sync-bar__dot" aria-hidden="true"></span>
+                  <span>Last news update:</span>
+                  <strong id="sync-news-time" class="sync-bar__value">—</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+        <!-- /.dashboard-grid -->
+
+      </div>
+      <!-- /.page-container -->
+    </main>
+
+  </div>
+  <!-- /.app-body -->
+
+  <!-- Dashboard page module — loaded after DOM (Doc 3 §3) -->
+  <script type="module" src="/js/pages/dashboard.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Manage your tracked raw materials — Business Market Monitor.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Materials — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS (Doc 3 §2.1 load order) -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+  <link rel="stylesheet" href="/css/pages/materials.css">
+
+  <!-- Font Awesome (icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="app-layout">
+
+  <!-- Sidebar injected by nav.js -->
+  <div id="nav-placeholder"></div>
+
+  <div class="app-body">
+
+    <!-- Top header bar -->
+    <header class="app-header">
+      <button
+        class="app-header__hamburger"
+        id="sidebar-toggle"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded="false"
+        aria-controls="sidebar">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <h1 class="app-header__page-title" id="page-title"></h1>
+      <div class="app-header__actions">
+        <span class="app-header__user-badge" id="header-user-initials" aria-label="Signed in"></span>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="app-main">
+      <a href="#main-content" class="skip-link">Skip to main content</a>
+
+      <div class="page-container">
+
+        <!-- ── Toolbar: filter + add button ─────────────────────────────── -->
+        <div class="materials-toolbar" id="materials-toolbar">
+
+          <!-- Filter group -->
+          <div class="filter-group" role="group" aria-label="Material filter">
+            <button
+              type="button"
+              class="filter-btn filter-btn--active"
+              id="filter-all-btn">
+              All
+            </button>
+            <button
+              type="button"
+              class="filter-btn"
+              id="filter-tracked-btn">
+              Tracked Only
+            </button>
+          </div>
+
+          <!-- Add custom material toggle -->
+          <button
+            type="button"
+            class="btn btn--secondary"
+            id="add-material-toggle-btn">
+            + Add Custom Material
+          </button>
+        </div>
+
+        <!-- ── Add Custom Material collapsible panel ─────────────────────── -->
+        <!--
+          Fields (Doc 4 §4.1):
+            cm-name    — customName (1–150 chars)
+            cm-unit    — unitId from GET /units-of-measurement
+
+          POST /api/v1/materials body: { customName, unitId }
+          NOT { name, unitId } — backend uses customName field.
+          409 CONFLICT → "A material with this name already exists."
+        -->
+        <div class="add-panel add-panel--hidden" id="add-material-panel" aria-live="polite">
+          <div class="card">
+            <div class="card__header">
+              <h2 class="card__title">Add Custom Material</h2>
+            </div>
+            <div class="card__body">
+
+              <!-- Page-level form error -->
+              <div class="form-alert form-alert--error" id="cm-form-error" role="alert">
+                <p class="form-alert__message"></p>
+              </div>
+
+              <form id="add-material-form" novalidate>
+                <div class="form-row">
+
+                  <!-- Material Name -->
+                  <div class="form-group">
+                    <label class="form-label form-label--required" for="cm-name">
+                      Material Name
+                    </label>
+                    <input
+                      class="form-control"
+                      type="text"
+                      id="cm-name"
+                      name="customName"
+                      maxlength="150"
+                      autocomplete="off"
+                      placeholder="e.g. Recycled Steel"
+                      aria-required="true"
+                      aria-describedby="cm-name-error">
+                    <p class="form-error" id="cm-name-error" role="alert"></p>
+                  </div>
+
+                  <!-- Unit of Measurement -->
+                  <div class="form-group">
+                    <label class="form-label form-label--required" for="cm-unit">
+                      Unit of Measurement
+                    </label>
+                    <select
+                      class="form-control"
+                      id="cm-unit"
+                      name="unitId"
+                      aria-required="true"
+                      aria-describedby="cm-unit-error">
+                      <option value="" disabled selected>Select a unit…</option>
+                      <!-- Populated by materials.js from GET /units-of-measurement -->
+                    </select>
+                    <p class="form-error" id="cm-unit-error" role="alert"></p>
+                  </div>
+
+                </div>
+
+                <!-- Submit -->
+                <div class="form-actions">
+                  <button type="submit" class="btn btn--primary" id="cm-submit-btn">
+                    Add Material
+                  </button>
+                </div>
+              </form>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Materials list/table ──────────────────────────────────────── -->
+        <!--
+          Populated by materials.js.
+          Table (tablet+) and card list (mobile) both rendered by JS.
+          Columns: Name | Unit | Source | Tracking | Actions
+          Source badge: isCustom → "Custom" badge--neutral | else "Industry" badge--info
+          Tracking: PATCH /api/v1/materials/:id { isTracked: boolean } ONLY
+          Actions (tracked only): Log Price → /pages/prices.html | History → /pages/trends.html
+        -->
+        <div id="materials-list-container" aria-live="polite" aria-label="Materials list">
+          <!-- Skeleton shown on load; replaced by JS -->
+        </div>
+
+      </div>
+      <!-- /.page-container -->
+    </main>
+
+  </div>
+  <!-- /.app-body -->
+
+  <script type="module" src="/js/pages/materials.js"></script>
+</body>
+</html>

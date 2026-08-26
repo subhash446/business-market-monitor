@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="View price trends and compare materials — Business Market Monitor.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>Price Trends — Business Market Monitor</title>
+
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS (Doc 3 §2.1 load order) -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/reset.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/utilities.css">
+
+  <!-- Page-specific CSS -->
+  <link rel="stylesheet" href="/css/pages/trends.css">
+
+  <!-- Font Awesome (icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkWQ=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer">
+</head>
+<body class="app-layout">
+
+  <!-- Sidebar injected by nav.js -->
+  <div id="nav-placeholder"></div>
+
+  <div class="app-body">
+
+    <!-- Top header bar -->
+    <header class="app-header">
+      <button
+        class="app-header__hamburger"
+        id="sidebar-toggle"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded="false"
+        aria-controls="sidebar">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+      <h1 class="app-header__page-title" id="page-title"></h1>
+      <div class="app-header__actions">
+        <span class="app-header__user-badge" id="header-user-initials" aria-label="Signed in"></span>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main id="main-content" class="app-main">
+      <a href="#main-content" class="skip-link">Skip to main content</a>
+
+      <div class="page-container">
+
+        <!-- ── Tab bar (Doc 4 §9.1 — same pattern as Alerts) ─────────────── -->
+        <div class="tab-bar" role="tablist" aria-label="Trend views">
+          <button
+            type="button"
+            class="tab-btn tab-btn--active"
+            role="tab"
+            id="tab-history"
+            aria-selected="true"
+            aria-controls="panel-history">
+            Price History
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            role="tab"
+            id="tab-compare"
+            aria-selected="false"
+            aria-controls="panel-compare">
+            Compare Materials
+          </button>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════════════
+             TAB 1 — PRICE HISTORY (single material, paginated)
+             ════════════════════════════════════════════════════════════════ -->
+        <!--
+          Endpoint: GET /api/v1/materials/:materialId/prices/history
+          Query:    { page, limit: 50, from?, to? }
+          Response: data: [{price, recordedAt}], meta: {page,limit,total,totalPages}
+          Unit: from material.unit (GET /materials), NOT from history response
+        -->
+        <div
+          class="tab-panel"
+          id="panel-history"
+          role="tabpanel"
+          aria-labelledby="tab-history">
+
+          <!-- Controls row -->
+          <div class="trends-controls">
+            <div class="form-group trends-controls__material">
+              <label class="form-label" for="ph-material">Material</label>
+              <select
+                class="form-control"
+                id="ph-material"
+                name="ph-material"
+                aria-label="Select material for price history">
+                <option value="" disabled selected>Select a material…</option>
+                <!-- Populated by trends.js (tracked materials only) -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ph-from">From</label>
+              <input
+                class="form-control"
+                type="date"
+                id="ph-from"
+                name="ph-from"
+                aria-label="Start date for price history">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ph-to">To</label>
+              <input
+                class="form-control"
+                type="date"
+                id="ph-to"
+                name="ph-to"
+                aria-label="End date for price history">
+            </div>
+
+            <div class="form-group trends-controls__action">
+              <label class="form-label" aria-hidden="true">&nbsp;</label>
+              <button
+                type="button"
+                class="btn btn--primary"
+                id="ph-apply-btn"
+                disabled>
+                Apply
+              </button>
+            </div>
+          </div>
+
+          <!-- Chart + data area (skeleton / chart / empty / error) -->
+          <div id="ph-chart-area" aria-live="polite">
+
+            <!-- Chart container -->
+            <div class="chart-container" id="ph-chart-container">
+              <canvas
+                id="ph-chart"
+                role="img"
+                aria-label="Price history chart">
+              </canvas>
+            </div>
+
+            <!-- Accessible data table toggle -->
+            <div class="chart-data-table-toggle">
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                id="ph-show-table-btn">
+                Show data table
+              </button>
+            </div>
+
+            <!-- Accessible data table -->
+            <div class="chart-data-table" id="ph-data-table" hidden>
+              <!-- Table rendered by trends.js -->
+            </div>
+
+          </div>
+          <!-- /#ph-chart-area -->
+
+          <!-- Pagination below chart -->
+          <div id="ph-pagination" class="trends-pagination" aria-label="Price history pagination"></div>
+
+        </div>
+        <!-- /#panel-history -->
+
+
+        <!-- ════════════════════════════════════════════════════════════════
+             TAB 2 — COMPARE MATERIALS (up to 5 materials)
+             ════════════════════════════════════════════════════════════════ -->
+        <!--
+          Endpoint: GET /api/v1/materials/prices/compare
+          Query:    { materialIds: "1,2,3", from?, to? }
+          Response: [{ materialId, name, series: [{price, recordedAt}] }]
+          name: used directly as chart legend label
+        -->
+        <div
+          class="tab-panel tab-panel--hidden"
+          id="panel-compare"
+          role="tabpanel"
+          aria-labelledby="tab-compare">
+
+          <!-- Controls row -->
+          <div class="trends-controls">
+
+            <!-- Checkbox list of tracked materials (1–5 allowed) -->
+            <div class="cmp-material-section">
+              <p class="form-label">Select Materials (1–5)</p>
+              <div
+                class="cmp-material-list"
+                id="cmp-material-list"
+                role="group"
+                aria-label="Materials to compare">
+                <!-- Populated by trends.js -->
+              </div>
+              <p
+                class="cmp-counter"
+                id="cmp-counter"
+                role="status"
+                aria-live="polite">
+                0 / 5 selected
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="cmp-from">From</label>
+              <input
+                class="form-control"
+                type="date"
+                id="cmp-from"
+                name="cmp-from"
+                aria-label="Start date for comparison">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="cmp-to">To</label>
+              <input
+                class="form-control"
+                type="date"
+                id="cmp-to"
+                name="cmp-to"
+                aria-label="End date for comparison">
+            </div>
+
+            <div class="form-group trends-controls__action">
+              <label class="form-label" aria-hidden="true">&nbsp;</label>
+              <button
+                type="button"
+                class="btn btn--primary"
+                id="cmp-apply-btn"
+                disabled>
+                Compare
+              </button>
+            </div>
+          </div>
+
+          <!-- Chart + data area -->
+          <div id="cmp-chart-area" aria-live="polite">
+
+            <div class="chart-container" id="cmp-chart-container">
+              <canvas
+                id="cmp-chart"
+                role="img"
+                aria-label="Price comparison chart">
+              </canvas>
+            </div>
+
+            <div class="chart-data-table-toggle">
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                id="cmp-show-table-btn">
+                Show data table
+              </button>
+            </div>
+
+            <div class="chart-data-table" id="cmp-data-table" hidden>
+              <!-- Table rendered by trends.js -->
+            </div>
+
+          </div>
+          <!-- /#cmp-chart-area -->
+
+        </div>
+        <!-- /#panel-compare -->
+
+      </div>
+      <!-- /.page-container -->
+    </main>
+
+  </div>
+  <!-- /.app-body -->
+
+  <!--
+    Chart.js 4 — loaded via CDN before the page module script (Doc 4 §9.1).
+    UMD build exposes window.Chart.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script type="module" src="/js/pages/trends.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!--
+  nav.html — Sidebar navigation fragment
+  Business Market Monitor — Frontend v1.0
+
+  Doc 3 §6.6, §7.14 — components/nav.html
+
+  IMPORTANT CONSTRAINTS (Doc 3 §11.2 Rule 2):
+    - This file is the ONLY source that nav.js may inject via innerHTML.
+    - This file must NEVER contain user-controlled or API-supplied data.
+    - All dynamic content (business name, initials, etc.) is populated by
+      nav.js using textContent after injection — never written here.
+    - This fragment has NO <html>, <head>, or <body> tags.
+    - It is fetched as a static asset from /components/nav.html.
+-->
+
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+
+  <!-- ── Brand / Logo ─────────────────────────────────────── -->
+  <div class="sidebar__brand">
+    <a href="/pages/dashboard.html" class="sidebar__logo-link" aria-label="Business Market Monitor — Dashboard">
+      <span class="sidebar__logo" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#3b82f6"/>
+          <path d="M8 22 L8 14 L13 14 L13 22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M14 22 L14 10 L19 10 L19 22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20 22 L20 17 L25 17 L25 22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="6" y1="22" x2="27" y2="22" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="sidebar__app-name">Market Monitor</span>
+    </a>
+  </div>
+
+  <!-- ── User / Business Info ──────────────────────────────── -->
+  <div class="sidebar__user">
+    <div class="sidebar__avatar" aria-hidden="true">
+      <!--
+        nav.js sets textContent of #nav-user-initials after injection.
+        Never use innerHTML here. Content is derived from email — not API data displayed directly.
+      -->
+      <span id="nav-user-initials">?</span>
+    </div>
+    <div class="sidebar__user-info">
+      <span class="sidebar__business-name" id="nav-business-name">Loading…</span>
+      <span class="sidebar__industry-name"  id="nav-industry-name"></span>
+    </div>
+  </div>
+
+  <!-- ── Navigation Links ──────────────────────────────────── -->
+  <nav class="sidebar__nav" aria-label="Main menu">
+    <ul role="list">
+
+      <li>
+        <a href="/pages/dashboard.html"
+           class="nav-link"
+           id="nav-link-dashboard">
+          <span class="nav-link__icon" aria-hidden="true">
+            <i class="fa-solid fa-house"></i>
+          </span>
+          <span class="nav-link__label">Dashboard</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="/pages/materials.html"
+           class="nav-link"
+           id="nav-link-materials">
+          <span class="nav-link__icon" aria-hidden="true">
+            <i class="fa-solid fa-cubes"></i>
+          </span>
+          <span class="nav-link__label">Materials</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="/pages/news.html"
+           class="nav-link"
+           id="nav-link-news">
+          <span class="nav-link__icon" aria-hidden="true">
+            <i class="fa-solid fa-newspaper"></i>
+          </span>
+          <span class="nav-link__label">News</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="/pages/alerts.html"
+           class="nav-link"
+           id="nav-link-alerts">
+          <span class="nav-link__icon" aria-hidden="true">
+            <i class="fa-solid fa-bell"></i>
+          </span>
+          <span class="nav-link__label">Alerts</span>
+        </a>
+      </li>
+
+      <li>
+        <a href="/pages/trends.html"
+           class="nav-link"
+           id="nav-link-trends">
+          <span class="nav-link__icon" aria-hidden="true">
+            <i class="fa-solid fa-chart-line"></i>
+          </span>
+          <span class="nav-link__label">Trends</span>
+        </a>
+      </li>
+
+    </ul>
+  </nav>
+
+  <!-- ── Footer Actions ────────────────────────────────────── -->
+  <div class="sidebar__footer">
+
+    <!-- Business Settings (opens modal — Phase 9) -->
+    <button
+      type="button"
+      class="sidebar__action-btn"
+      id="nav-settings-btn"
+      aria-label="Business settings">
+      <span class="sidebar__action-icon" aria-hidden="true">
+        <i class="fa-solid fa-gear"></i>
+      </span>
+      <span>Settings</span>
+    </button>
+
+    <!-- Log Out -->
+    <button
+      type="button"
+      class="sidebar__action-btn sidebar__action-btn--danger"
+      id="nav-logout-btn"
+      aria-label="Log out of your account">
+      <span class="sidebar__action-icon" aria-hidden="true">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </span>
+      <span>Log Out</span>
+    </button>
+
+  </div>
+
+</aside>
+
+<!-- Overlay backdrop — appears behind sidebar on mobile -->
+<div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>

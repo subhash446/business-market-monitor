@@ -1,0 +1,8 @@
+.DS_Store
+.vscode/
+*.log
+
+# Environment / secrets — never commit
+.env
+*.env
+backend/.env

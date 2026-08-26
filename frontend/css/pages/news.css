@@ -1,0 +1,144 @@
+/**
+ * News page styles
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §5.7, Doc 4 §6.1 — css/pages/news.css
+ *
+ * Only news-page-specific layout and card rules.
+ * Global component styles (btn, empty-state, error-state,
+ * pagination, skeleton) come from components.css.
+ */
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+
+.news-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.news-toolbar__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.page-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ── News list grid ──────────────────────────────────────────────── */
+
+.news-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .news-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── News card ───────────────────────────────────────────────────── */
+
+.news-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: border-color var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+.news-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Card title ──────────────────────────────────────────────────── */
+
+.news-card__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: var(--leading-snug);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.news-card__title a {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.news-card__title a:hover,
+.news-card__title a:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.news-card__link-icon {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+/* ── Card meta (source + date) ───────────────────────────────────── */
+
+.news-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.news-card__source {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-primary);
+  background: rgba(59, 130, 246, 0.08);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.news-card__date {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Pagination ──────────────────────────────────────────────────── */
+
+.news-pagination {
+  margin-top: var(--space-6);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+  .news-card {
+    padding: var(--space-4);
+  }
+
+  .news-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

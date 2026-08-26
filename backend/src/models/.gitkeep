@@ -1,0 +1,2 @@
+Model files will be added one per Document 4 table as repositories are implemented,
+starting with `users` and `user_tokens` in the Authentication phase.
