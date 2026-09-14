@@ -53,4 +53,48 @@ function validateCreateMaterial(body) {
   return errors;
 }
 
-module.exports = { validateUpdateMaterial, validateCreateMaterial };
+// Added in Phase B (External Symbol Management) — purely additive.
+//
+// Validates the body of PATCH /api/v1/materials/:materialId/external-symbol.
+// Allowed body shapes:
+//   { "externalSymbol": "WTI" }
+//   { "externalSymbol": "BRENT" }
+//   { "externalSymbol": null }
+//
+// The allowed values are driven by SUPPORTED_SYMBOLS — the single source of
+// truth for which commodities the application can ingest automatically.
+// Any string value not in that set is rejected here, before it ever reaches
+// the service or database.
+const { SUPPORTED_SYMBOLS } = require('../config/commodityMapping');
+const ALLOWED_SYMBOLS = Object.values(SUPPORTED_SYMBOLS);
+const ALLOWED_BODY_FIELDS = ['externalSymbol'];
+
+function validateSetExternalSymbol(body) {
+  const errors = [];
+  const providedFields = Object.keys(body || {});
+
+  const disallowed = providedFields.filter((f) => !ALLOWED_BODY_FIELDS.includes(f));
+  disallowed.forEach((f) => errors.push({ field: f, issue: 'cannot be set here' }));
+
+  if (!providedFields.includes('externalSymbol')) {
+    errors.push({ field: 'externalSymbol', issue: 'is required' });
+    return errors; // no point type-checking a missing field
+  }
+
+  const { externalSymbol } = body;
+
+  if (externalSymbol !== null) {
+    if (typeof externalSymbol !== 'string') {
+      errors.push({ field: 'externalSymbol', issue: 'must be a string or null' });
+    } else if (!ALLOWED_SYMBOLS.includes(externalSymbol)) {
+      errors.push({
+        field: 'externalSymbol',
+        issue: `must be one of: ${ALLOWED_SYMBOLS.join(', ')} or null`,
+      });
+    }
+  }
+
+  return errors;
+}
+
+module.exports = { validateUpdateMaterial, validateCreateMaterial, validateSetExternalSymbol };

@@ -29,9 +29,12 @@ if (env.nodeEnv === 'production') {
 app.use(cors({ origin: env.cors.allowedOrigin }));
 app.use(express.json());
 
-// Serve the static frontend from this same Express app (Document 3 §15 —
+// Serve the React production build from this same Express app (Document 3 §15 —
 // single Express deployment decision for V1).
-app.use(express.static(path.join(__dirname, '../../frontend')));
+// CUTOVER (2026-09-13): switched from frontend/ (old Vanilla JS) to
+// frontend-react/dist (React + Vite). The old frontend/ directory remains on
+// disk untouched for rollback reference.
+app.use(express.static(path.join(__dirname, '../../frontend-react/dist')));
 
 // All API routes live under /api/v1 (Document 5 §1.4 — URI versioning).
 app.use('/api/v1', routes);
@@ -41,6 +44,18 @@ app.use('/api/v1', routes);
 // standard envelope (Document 5 §3.4, §6), including ones with no route.
 app.use('/api/v1', (req, res, next) => {
   next(new AppError(404, 'NOT_FOUND', 'Route not found'));
+});
+
+// SPA fallback — React Router deep links (e.g. /dashboard, /materials).
+// Returns React index.html for any GET request that:
+//   • has not already been served by express.static (known asset files)
+//   • is NOT under /api/* (those must never be intercepted here)
+// Any method other than GET reaches Express's normal 404 → errorHandler.
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+    return res.sendFile(path.join(__dirname, '../../frontend-react/dist/index.html'));
+  }
+  next();
 });
 
 // Centralized error handler — must be registered last (Document 3 §12).

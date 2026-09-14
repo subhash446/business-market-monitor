@@ -1,0 +1,133 @@
+/**
+ * Auth pages — centred card layout overrides
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §5.2, §9.2 — auth pages: login, register, forgot-password, reset-password
+ * No sidebar. Single centred card. Max-width 480px.
+ */
+
+/* Ensure auth pages get the centred layout (augments layout.css) */
+
+/* Full-height gradient background for visual polish */
+.auth-layout {
+  background: var(--color-bg-base);
+  background-image:
+    radial-gradient(
+      ellipse 80% 60% at 50% -10%,
+      rgba(59, 130, 246, 0.10) 0%,
+      transparent 70%
+    );
+  background-attachment: fixed;
+}
+
+/* Card hover glow (subtle) */
+.auth-card {
+  position: relative;
+}
+
+.auth-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.15) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Logo placeholder circle */
+.auth-logo-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #6366f1 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+/* Form action row */
+.auth-form__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+/* Link below form */
+.auth-card__footer a {
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+}
+
+.auth-card__footer a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* Divider with text */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-disabled);
+  font-size: var(--text-xs);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-border);
+}
+
+/* Success state (forgot password / reset success) */
+.auth-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-4);
+  padding: var(--space-6) 0;
+}
+
+.auth-success__icon {
+  font-size: 3rem;
+  color: var(--color-success);
+}
+
+.auth-success__title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.auth-success__message {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  max-width: 340px;
+}
+
+/* Session expired banner on login page */
+.session-expired-banner {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-warning-subtle);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+  text-align: center;
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}

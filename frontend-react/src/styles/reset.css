@@ -1,0 +1,123 @@
+/**
+ * Minimal cross-browser reset
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Intentionally minimal: establishes consistent defaults without
+ * overriding browser accessibility behaviours.
+ */
+
+/* Box model */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Remove default margin / padding */
+html, body,
+h1, h2, h3, h4, h5, h6,
+p, figure, blockquote, dl, dd,
+ul, ol, li,
+fieldset, legend, pre {
+  margin:  0;
+  padding: 0;
+}
+
+/* Set core defaults */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  tab-size: 4;
+}
+
+/* Body inherits font from variables */
+body {
+  line-height: var(--leading-normal, 1.5);
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Images & media */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Form controls inherit font */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Buttons are interactive by default */
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+/* Remove list styles on ul/ol elements */
+ul[role="list"],
+ol[role="list"] {
+  list-style: none;
+}
+
+/* Remove default list-style where reset is expected */
+nav ul,
+nav ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Anchors: no underline by default; colour inherited from context */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Typography elements */
+p {
+  overflow-wrap: break-word;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+  font-weight: var(--weight-bold, 700);
+  line-height: var(--leading-tight, 1.25);
+}
+
+/* Code elements */
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.875em;
+}
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Hidden utility */
+[hidden] {
+  display: none !important;
+}
+
+/* Avoid orphan content in long words */
+p,
+li,
+h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}

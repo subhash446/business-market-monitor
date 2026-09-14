@@ -161,6 +161,32 @@ async function findSeriesForMaterials(trackedMaterialIds, { from, to }) {
   return rows;
 }
 
+// Added in Phase A (Automatic Price Ingestion) — purely additive, nothing
+// above changed.
+//
+// Application-layer duplicate check: returns true if a price_point for this
+// (tracked_material_id, recorded_at, source) already exists.
+//
+// Used as a belt-and-suspenders guard before calling create() so that
+// repeated ingestion runs on the same day silently skip already-stored
+// prices rather than hitting the DB unique constraint added in migration
+// 019 and propagating a constraint-violation error up the call stack.
+// Both layers (app check + DB constraint) are intentional: the app check
+// makes the normal case fast and log-friendly; the DB constraint is the
+// safety net for concurrent processes or future workers.
+//
+// recorded_at is compared as a DATE-only match because automatic ingestion
+// always stores prices at midnight (YYYY-MM-DD 00:00:00).
+async function existsByMaterialDateSource(trackedMaterialId, recordedAt, source) {
+  const [rows] = await pool.execute(
+    `SELECT 1 FROM price_points
+     WHERE tracked_material_id = ? AND recorded_at = ? AND source = ?
+     LIMIT 1`,
+    [trackedMaterialId, recordedAt, source]
+  );
+  return rows.length > 0;
+}
+
 module.exports = {
   findLatestByMaterialId,
   create,
@@ -168,4 +194,6 @@ module.exports = {
   findHistoryForMaterial,
   countHistoryForMaterial,
   findSeriesForMaterials,
+  existsByMaterialDateSource,
 };
+

@@ -1,0 +1,250 @@
+/**
+ * Base styles — typography, body, global element defaults
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Applies design tokens from variables.css to actual HTML elements.
+ * Dark-mode only (v1). Doc 3 §15.
+ */
+
+/* ================================================================
+ * GLOBAL BASE
+ * ================================================================ */
+
+/* ── Universal box-sizing ─────────────────────────────────────────
+ * Ensures padding and border are included inside width/height
+ * calculations for ALL elements. Without this, percentage-width
+ * elements with padding can overflow their container on narrow
+ * viewports. This is the single most impactful global responsive fix.
+ * ─────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  /* Prevent page-level horizontal scroll on narrow viewports.
+   * Individual wide components (tables, code blocks) may still scroll
+   * inside their own overflow-x: auto containers. */
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-normal);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+}
+
+/* ================================================================
+ * SKIP TO MAIN CONTENT (Doc 3 §10.2 — first DOM element on every page)
+ * ================================================================ */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  z-index: calc(var(--z-toast) + 1);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  text-decoration: none;
+  transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ================================================================
+ * HEADINGS
+ * ================================================================ */
+
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-primary);
+}
+
+h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-primary);
+}
+
+h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-primary);
+}
+
+h4, h5, h6 {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--color-text-primary);
+}
+
+/* ================================================================
+ * BODY TEXT
+ * ================================================================ */
+
+p {
+  color: var(--color-text-primary);
+  line-height: var(--leading-relaxed);
+}
+
+small {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+strong, b {
+  font-weight: var(--weight-semibold);
+}
+
+em, i {
+  font-style: italic;
+}
+
+/* ================================================================
+ * LINKS
+ * ================================================================ */
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ================================================================
+ * CODE / MONOSPACE
+ * ================================================================ */
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--color-primary);
+  background-color: var(--color-primary-subtle);
+  padding: 0.125em 0.375em;
+  border-radius: var(--radius-sm);
+}
+
+pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  overflow-x: auto;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  color: var(--color-text-primary);
+}
+
+/* Numeric / price display — monospace (Doc 3 §15.3) */
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+ * HORIZONTAL RULE
+ * ================================================================ */
+
+hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-6) 0;
+}
+
+/* ================================================================
+ * TEXT SELECTION
+ * ================================================================ */
+
+::selection {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-text-primary);
+}
+
+/* ================================================================
+ * SCROLLBAR (webkit — optional visual polish)
+ * ================================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-disabled);
+}
+
+/* ================================================================
+ * FOCUS — GLOBAL VISIBLE FOCUS RING (Doc 3 §10.2)
+ * Applied to all focusable elements as a safety net.
+ * Component-specific :focus-visible rules may override.
+ * ================================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Remove focus ring for mouse users (only visible for keyboard) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ================================================================
+ * REDUCED MOTION (Doc 3 §10.8)
+ * Applied at the base level; component transitions also wrap this.
+ * ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

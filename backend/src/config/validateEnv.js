@@ -14,6 +14,9 @@
  * only need database configuration, not JWT secrets, and forcing JWT
  * secrets to exist just to run a migration would be a new, unrequested
  * constraint on database setup.
+ *
+ * Phase A addition: EIA_API_KEY is required only when PRICE_INGESTION_ENABLED
+ * is true — opt-out deployments are completely unaffected.
  */
 const env = require('./env');
 
@@ -31,6 +34,13 @@ function validateEnv() {
     missing.push('JWT_REFRESH_SECRET');
   }
 
+  // Phase A: EIA API key is only required when automatic price ingestion
+  // is explicitly enabled. Keeping ingestion disabled (the default) means
+  // existing deployments without a provider key can continue to start normally.
+  if (env.priceIngestion.enabled && isBlank(env.eia.apiKey)) {
+    missing.push('EIA_API_KEY (required when PRICE_INGESTION_ENABLED=true)');
+  }
+
   if (missing.length > 0) {
     console.error('[boot] Refusing to start — required environment variable(s) missing:');
     missing.forEach((name) => console.error(`[boot]   - ${name}`));
@@ -40,3 +50,4 @@ function validateEnv() {
 }
 
 module.exports = validateEnv;
+

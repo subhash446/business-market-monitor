@@ -1,0 +1,251 @@
+/**
+ * Materials page styles
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §5.5, Doc 4 §4.1 — css/pages/materials.css
+ *
+ * All component base styles (card, table, badge, btn, form-*)
+ * come from components.css. Only materials-page-specific
+ * layout rules are defined here.
+ */
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+
+.materials-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+/* ── Filter button group ─────────────────────────────────────────── */
+
+.filter-group {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.filter-btn {
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+.filter-btn + .filter-btn {
+  border-left: 1px solid var(--color-border);
+}
+
+.filter-btn:hover {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.filter-btn--active {
+  background-color: var(--color-primary);
+  color: var(--color-white, #fff);
+}
+
+.filter-btn--active:hover {
+  background-color: var(--color-primary);
+  color: var(--color-white, #fff);
+}
+
+/* ── Add Custom Material collapsible panel ───────────────────────── */
+
+.add-panel {
+  margin-bottom: var(--space-5);
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 600px;
+  opacity: 1;
+}
+
+.add-panel--hidden {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  margin-bottom: 0;
+}
+
+/* Form row: two fields side by side on tablet+ */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* ── Materials list container ────────────────────────────────────── */
+
+#materials-list-container {
+  min-height: 120px;
+}
+
+/* ── Responsive table / card switching ───────────────────────────── */
+
+/* Mobile: hide table, show cards */
+.materials-table-wrap {
+  display: none;
+}
+
+.materials-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Tablet+: show table, hide cards */
+@media (min-width: 640px) {
+  .materials-table-wrap {
+    display: block;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .materials-cards {
+    display: none;
+  }
+}
+
+/* ── Material card (mobile) ──────────────────────────────────────── */
+
+.material-card {
+  padding: var(--space-4);
+}
+
+.material-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.material-card__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-card__unit {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+}
+
+.material-card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ── Action links in row/card ────────────────────────────────────── */
+
+.materials-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── External symbol select ──────────────────────────────────────── */
+
+/* Wrapper provides relative positioning for the spinner overlay */
+.symbol-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Compact select — narrower than the default form-control */
+.symbol-select {
+  min-width: 9rem;
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+/* Dim the select while the API call is in flight */
+.symbol-select--loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Inline spinner: a small rotating ring next to the select */
+.symbol-select__spinner {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: symbol-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes symbol-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Mobile card: symbol row below the footer buttons */
+.material-card__symbol {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── Responsive overrides ────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+  /* Stack toolbar filters and add-button vertically */
+  .materials-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #add-material-toggle-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Symbol select expands to fill card width on mobile */
+  .material-card__symbol .symbol-select-wrap {
+    width: 100%;
+  }
+
+  .material-card__symbol .symbol-select {
+    width: 100%;
+    min-width: unset;
+  }
+}

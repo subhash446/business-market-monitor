@@ -55,6 +55,26 @@ async function createCustomMaterial(businessId, { customName, unitId }) {
   return toPublicMaterial(material);
 }
 
+// Added in Phase B (External Symbol Management) — purely additive.
+//
+// Sets or clears the external_symbol for a tracked material owned by this
+// business. Accepts a string symbol (e.g. 'WTI') or null (clears the link).
+// Ownership validation follows the same pattern as updateMaterial() above —
+// findByIdForBusiness() returns null for any material that doesn't belong to
+// this business, which the service turns into a 404.
+//
+// externalSymbol validation (allowed values, type) is done by the validator
+// layer before this is called — the service does not re-validate that here.
+async function setExternalSymbol(businessId, materialId, externalSymbol) {
+  const existing = await materialRepository.findByIdForBusiness(materialId, businessId);
+  if (!existing) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
+  }
+
+  const updated = await materialRepository.updateExternalSymbol(materialId, externalSymbol);
+  return toPublicMaterial(updated);
+}
+
 function toPublicMaterial(row) {
   return {
     id: row.id,
@@ -63,8 +83,9 @@ function toPublicMaterial(row) {
     unit: row.unit_abbreviation,
     isTracked: !!row.is_tracked,
     isCustom: row.raw_material_id === null,
+    externalSymbol: row.external_symbol || null,
     createdAt: row.created_at,
   };
 }
 
-module.exports = { listMaterials, updateMaterial, createCustomMaterial };
+module.exports = { listMaterials, updateMaterial, createCustomMaterial, setExternalSymbol };

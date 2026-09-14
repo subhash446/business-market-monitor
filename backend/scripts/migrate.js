@@ -47,7 +47,13 @@ async function run() {
 
     try {
       console.log(`[migrate] RUN   ${file}`);
-      await pool.query(migration.up);
+      if (typeof migration.up === 'function') {
+        // Phase A+: async function migrations receive the pool directly
+        // and are responsible for their own idempotency / multi-statement logic.
+        await migration.up(pool);
+      } else {
+        await pool.query(migration.up);
+      }
       console.log(`[migrate] OK    ${file}`);
       applied += 1;
     } catch (err) {

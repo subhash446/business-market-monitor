@@ -70,6 +70,29 @@ const env = {
   passwordReset: {
     tokenExpiryMinutes: parseInt(process.env.PASSWORD_RESET_TOKEN_EXPIRY_MINUTES, 10) || 60,
   },
+
+  // Automatic price ingestion (Phase A).
+  // Opt-in: disabled by default so existing deployments without provider
+  // credentials continue to start cleanly with no provider errors.
+  priceIngestion: {
+    enabled: (process.env.PRICE_INGESTION_ENABLED || 'false').toLowerCase() === 'true',
+    // Timeout (ms) for outbound HTTP calls to external price providers.
+    // 15 s is generous for a JSON REST API over HTTPS; prevents the job
+    // from hanging indefinitely if the provider is slow/unreachable.
+    timeoutMs: parseInt(process.env.PRICE_PROVIDER_TIMEOUT_MS, 10) || 15000,
+  },
+
+  // EIA (U.S. Energy Information Administration) API v2 — Primary provider.
+  // Register free: https://www.eia.gov/opendata/register.php
+  // No `|| ''` default for apiKey — same reasoning as jwt.accessSecret:
+  // validateEnv.js rejects a missing key only when ingestion is enabled,
+  // so an empty/undefined value is the honest state for opt-out deployments.
+  eia: {
+    apiKey: process.env.EIA_API_KEY,
+    baseUrl: process.env.EIA_API_BASE_URL || 'https://api.eia.gov/v2',
+    // Convenience alias so the provider reads one field, not two.
+    get timeoutMs() { return env.priceIngestion.timeoutMs; },
+  },
 };
 
 module.exports = env;

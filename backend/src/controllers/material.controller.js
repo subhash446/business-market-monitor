@@ -50,4 +50,20 @@ async function addMaterial(req, res, next) {
   }
 }
 
-module.exports = { listMaterials, updateMaterial, addMaterial };
+// PATCH /api/v1/materials/:materialId/external-symbol — Phase B
+async function setExternalSymbol(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const { externalSymbol } = req.body;   // null | 'WTI' | 'BRENT' — already validated
+    const material = await materialTrackingService.setExternalSymbol(
+      businessId,
+      req.params.materialId,
+      externalSymbol
+    );
+    sendSuccess(res, material);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listMaterials, updateMaterial, addMaterial, setExternalSymbol };

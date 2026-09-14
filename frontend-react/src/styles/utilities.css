@@ -1,0 +1,234 @@
+/**
+ * Utility classes — single-purpose helpers
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §2.1 — utility classes for flex, spacing, visibility, text.
+ * Use sparingly; prefer component classes for anything complex.
+ */
+
+/* ================================================================
+ * DISPLAY
+ * ================================================================ */
+
+.d-none    { display: none !important; }
+.d-block   { display: block !important; }
+.d-flex    { display: flex !important; }
+.d-inline  { display: inline !important; }
+.d-inline-flex { display: inline-flex !important; }
+.d-grid    { display: grid !important; }
+
+/* Visibility (keeps layout space) */
+.invisible { visibility: hidden !important; }
+.visible   { visibility: visible !important; }
+
+/* Visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ================================================================
+ * FLEX UTILITIES
+ * ================================================================ */
+
+.flex-row    { flex-direction: row !important; }
+.flex-col    { flex-direction: column !important; }
+.flex-1      { flex: 1 !important; }
+.flex-auto   { flex: auto !important; }
+.flex-none   { flex: none !important; }
+.flex-shrink-0 { flex-shrink: 0 !important; }
+.flex-wrap   { flex-wrap: wrap !important; }
+.flex-nowrap { flex-wrap: nowrap !important; }
+
+/* Align */
+.items-start    { align-items: flex-start !important; }
+.items-center   { align-items: center !important; }
+.items-end      { align-items: flex-end !important; }
+.items-stretch  { align-items: stretch !important; }
+
+/* Justify */
+.justify-start   { justify-content: flex-start !important; }
+.justify-center  { justify-content: center !important; }
+.justify-end     { justify-content: flex-end !important; }
+.justify-between { justify-content: space-between !important; }
+
+/* Gap */
+.gap-1  { gap: var(--space-1) !important; }
+.gap-2  { gap: var(--space-2) !important; }
+.gap-3  { gap: var(--space-3) !important; }
+.gap-4  { gap: var(--space-4) !important; }
+.gap-5  { gap: var(--space-5) !important; }
+.gap-6  { gap: var(--space-6) !important; }
+.gap-8  { gap: var(--space-8) !important; }
+
+/* ================================================================
+ * GRID UTILITIES
+ * ================================================================ */
+
+.grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* ================================================================
+ * SPACING — MARGIN
+ * ================================================================ */
+
+.m-0    { margin: 0 !important; }
+.mt-0   { margin-top: 0 !important; }
+.mb-0   { margin-bottom: 0 !important; }
+.mt-2   { margin-top: var(--space-2) !important; }
+.mt-3   { margin-top: var(--space-3) !important; }
+.mt-4   { margin-top: var(--space-4) !important; }
+.mt-6   { margin-top: var(--space-6) !important; }
+.mt-8   { margin-top: var(--space-8) !important; }
+.mb-2   { margin-bottom: var(--space-2) !important; }
+.mb-3   { margin-bottom: var(--space-3) !important; }
+.mb-4   { margin-bottom: var(--space-4) !important; }
+.mb-6   { margin-bottom: var(--space-6) !important; }
+.mb-8   { margin-bottom: var(--space-8) !important; }
+.ml-auto { margin-left: auto !important; }
+.mr-auto { margin-right: auto !important; }
+.mx-auto { margin-left: auto !important; margin-right: auto !important; }
+
+/* ================================================================
+ * SPACING — PADDING
+ * ================================================================ */
+
+.p-0  { padding: 0 !important; }
+.p-2  { padding: var(--space-2) !important; }
+.p-4  { padding: var(--space-4) !important; }
+.p-6  { padding: var(--space-6) !important; }
+.px-4 { padding-left: var(--space-4) !important; padding-right: var(--space-4) !important; }
+.py-4 { padding-top: var(--space-4) !important; padding-bottom: var(--space-4) !important; }
+
+/* ================================================================
+ * TEXT UTILITIES
+ * ================================================================ */
+
+.text-xs   { font-size: var(--text-xs) !important; }
+.text-sm   { font-size: var(--text-sm) !important; }
+.text-base { font-size: var(--text-base) !important; }
+.text-lg   { font-size: var(--text-lg) !important; }
+.text-xl   { font-size: var(--text-xl) !important; }
+.text-2xl  { font-size: var(--text-2xl) !important; }
+
+.font-normal   { font-weight: var(--weight-normal) !important; }
+.font-medium   { font-weight: var(--weight-medium) !important; }
+.font-semibold { font-weight: var(--weight-semibold) !important; }
+.font-bold     { font-weight: var(--weight-bold) !important; }
+.font-mono     { font-family: var(--font-mono) !important; font-variant-numeric: tabular-nums; }
+
+.text-left    { text-align: left !important; }
+.text-center  { text-align: center !important; }
+.text-right   { text-align: right !important; }
+
+.text-primary   { color: var(--color-text-primary) !important; }
+.text-secondary { color: var(--color-text-secondary) !important; }
+.text-disabled  { color: var(--color-text-disabled) !important; }
+.text-accent    { color: var(--color-primary) !important; }
+.text-success   { color: var(--color-success) !important; }
+.text-warning   { color: var(--color-warning) !important; }
+.text-danger    { color: var(--color-danger) !important; }
+.text-info      { color: var(--color-info) !important; }
+
+.text-truncate {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.text-break {
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+.text-uppercase { text-transform: uppercase !important; }
+.text-lowercase { text-transform: lowercase !important; }
+
+.leading-tight   { line-height: var(--leading-tight) !important; }
+.leading-normal  { line-height: var(--leading-normal) !important; }
+.leading-relaxed { line-height: var(--leading-relaxed) !important; }
+
+/* ================================================================
+ * BORDER / RADIUS
+ * ================================================================ */
+
+.rounded-sm   { border-radius: var(--radius-sm) !important; }
+.rounded-md   { border-radius: var(--radius-md) !important; }
+.rounded-lg   { border-radius: var(--radius-lg) !important; }
+.rounded-full { border-radius: var(--radius-full) !important; }
+
+/* ================================================================
+ * BACKGROUND COLOURS
+ * ================================================================ */
+
+.bg-base     { background-color: var(--color-bg-base) !important; }
+.bg-surface  { background-color: var(--color-bg-surface) !important; }
+.bg-elevated { background-color: var(--color-bg-elevated) !important; }
+
+/* ================================================================
+ * OVERFLOW
+ * ================================================================ */
+
+.overflow-hidden   { overflow: hidden !important; }
+.overflow-auto     { overflow: auto !important; }
+.overflow-x-auto   { overflow-x: auto !important; }
+.overflow-y-auto   { overflow-y: auto !important; }
+
+/* ================================================================
+ * SIZING
+ * ================================================================ */
+
+.w-full  { width: 100% !important; }
+.h-full  { height: 100% !important; }
+.min-w-0 { min-width: 0 !important; }
+
+/* ================================================================
+ * CURSOR
+ * ================================================================ */
+
+.cursor-pointer { cursor: pointer !important; }
+.cursor-default { cursor: default !important; }
+.cursor-not-allowed { cursor: not-allowed !important; }
+
+/* ================================================================
+ * USER SELECT
+ * ================================================================ */
+
+.select-none { user-select: none !important; }
+.select-all  { user-select: all !important; }
+
+/* ================================================================
+ * POSITION
+ * ================================================================ */
+
+.relative { position: relative !important; }
+.absolute { position: absolute !important; }
+.fixed    { position: fixed !important; }
+.sticky   { position: sticky !important; }
+
+/* ================================================================
+ * BORDERS
+ * ================================================================ */
+
+.border-t { border-top: 1px solid var(--color-border) !important; }
+.border-b { border-bottom: 1px solid var(--color-border) !important; }
+
+/* ================================================================
+ * RESPONSIVE DISPLAY HELPERS
+ * ================================================================ */
+
+@media (max-width: 1023px) {
+  .hide-mobile { display: none !important; }
+}
+
+@media (min-width: 1024px) {
+  .hide-desktop { display: none !important; }
+}

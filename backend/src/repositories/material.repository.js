@@ -12,7 +12,8 @@ const { pool } = require('../database/connection');
 
 const BASE_SELECT = `
   SELECT tm.id, tm.raw_material_id, COALESCE(rm.name, tm.custom_name) AS name,
-         u.abbreviation AS unit_abbreviation, tm.is_tracked, tm.created_at
+         u.abbreviation AS unit_abbreviation, tm.is_tracked, tm.external_symbol,
+         tm.created_at
   FROM tracked_materials tm
   LEFT JOIN raw_materials rm ON rm.id = tm.raw_material_id
   JOIN units_of_measurement u ON u.id = tm.unit_id
@@ -131,6 +132,40 @@ async function bulkCreateFromTemplate(businessId, rawMaterials) {
   }
 }
 
+// Added in Phase A (Automatic Price Ingestion) — purely additive, nothing
+// above changed.
+//
+// Find all actively-tracked materials that have opted into automatic price
+// ingestion for a given external commodity symbol (e.g. 'WTI', 'BRENT').
+// Returns (id, business_id) only — the minimal set needed to call
+// priceRepository.create() and alertEvaluationService.evaluateMaterial().
+//
+// custom materials (raw_material_id IS NULL) are included if they
+// happen to have external_symbol set — this is intentional: a user
+// can track a custom "Crude Oil" material and link it to WTI.
+async function findTrackedByExternalSymbol(symbol) {
+  const [rows] = await pool.execute(
+    `SELECT id, business_id
+     FROM tracked_materials
+     WHERE external_symbol = ? AND is_tracked = TRUE`,
+    [symbol]
+  );
+  return rows;
+}
+
+// Added in Phase B (External Symbol Management) — purely additive.
+//
+// Sets or clears the external_symbol for a tracked material. Ownership MUST
+// have already been confirmed via findByIdForBusiness() before calling this —
+// same contract as updateTrackingStatus(). Never updates a row by id alone.
+async function updateExternalSymbol(materialId, externalSymbol) {
+  await pool.execute(
+    'UPDATE tracked_materials SET external_symbol = ? WHERE id = ?',
+    [externalSymbol, materialId]   // externalSymbol may be null (clears the column)
+  );
+  return findById(materialId);
+}
+
 module.exports = {
   listByBusinessId,
   findByIdForBusiness,
@@ -140,4 +175,7 @@ module.exports = {
   unitExists,
   createCustom,
   bulkCreateFromTemplate,
+  findTrackedByExternalSymbol,
+  updateExternalSymbol,
 };
+

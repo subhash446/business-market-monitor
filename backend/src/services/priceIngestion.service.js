@@ -9,6 +9,11 @@
  * PriceSourceAdapter abstraction is built for a single hardcoded source with
  * no second implementation yet (that pattern belongs to the jobs/ phase,
  * when it actually has more than one source to abstract over).
+ *
+ * Phase A addition: ingestFromProvider() — handles one normalized MarketPrice
+ * for one tracked material. Reuses the same priceRepository.create() +
+ * alertEvaluationService.evaluateMaterial() pipeline as addManualPrice();
+ * no duplication of insertion or alert logic.
  */
 const priceRepository = require('../repositories/price.repository');
 const materialRepository = require('../repositories/material.repository');
@@ -42,4 +47,63 @@ await alertEvaluationService.evaluateMaterial(businessId, materialId);
   };
 }
 
-module.exports = { addManualPrice };
+/**
+ * Ingest a single normalized provider price for one tracked material.
+ *
+ * Called by the price ingestion job for each (tracked_material, marketPrice)
+ * pair. Deliberately does NOT do ownership validation — the job has already
+ * verified that this tracked_material_id exists and belongs to a real
+ * business by querying via findTrackedByExternalSymbol().
+ *
+ * Returns one of:
+ *   { status: 'inserted', trackedMaterialId, businessId }
+ *   { status: 'skipped',  trackedMaterialId, businessId, reason: 'duplicate' }
+ *
+ * Never throws — errors are caught and returned as:
+ *   { status: 'error',    trackedMaterialId, businessId, error: Error }
+ *
+ * This keeps the job loop simple: every material result is one of three
+ * known statuses rather than a mix of values and thrown exceptions.
+ *
+ * @param {{ id: number, business_id: number }} trackedMaterial
+ * @param {{ symbol: string, price: number, recordedAt: string }} marketPrice
+ */
+async function ingestFromProvider(trackedMaterial, marketPrice) {
+  const { id: trackedMaterialId, business_id: businessId } = trackedMaterial;
+  const { price, recordedAt } = marketPrice;
+
+  // recordedAt from provider is 'YYYY-MM-DD'; stored as midnight DATETIME
+  // e.g. '2026-09-09' → '2026-09-09 00:00:00' in MySQL DATETIME column.
+  const recordedAtDateTime = `${recordedAt} 00:00:00`;
+
+  try {
+    // Application-layer dedup check (belt-and-suspenders with DB constraint).
+    const alreadyExists = await priceRepository.existsByMaterialDateSource(
+      trackedMaterialId,
+      recordedAtDateTime,
+      'THIRD_PARTY_API'
+    );
+
+    if (alreadyExists) {
+      return { status: 'skipped', trackedMaterialId, businessId, reason: 'duplicate' };
+    }
+
+    // Reuse the exact same repository method the manual path uses.
+    await priceRepository.create({
+      trackedMaterialId,
+      price,
+      recordedAt: recordedAtDateTime,
+      source: 'THIRD_PARTY_API',
+    });
+
+    // Evaluate alert rules immediately — exactly as addManualPrice() does.
+    await alertEvaluationService.evaluateMaterial(businessId, trackedMaterialId);
+
+    return { status: 'inserted', trackedMaterialId, businessId };
+  } catch (error) {
+    return { status: 'error', trackedMaterialId, businessId, error };
+  }
+}
+
+module.exports = { addManualPrice, ingestFromProvider };
+

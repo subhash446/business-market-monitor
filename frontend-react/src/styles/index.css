@@ -1,0 +1,28 @@
+/**
+ * Design system entry point — Business Market Monitor React frontend
+ *
+ * Import order matches the existing frontend's HTML <link> load order:
+ * variables → reset → base → layout → components → utilities
+ *
+ * External dependencies (Google Fonts: Inter, Font Awesome 6.5.0)
+ * are loaded here via @import so Vite bundles them correctly — they
+ * were previously loaded as <link> tags in each HTML page.
+ *
+ * Page-specific CSS (pages/*.css) is NOT imported here globally.
+ * Each page component imports its own page CSS directly, matching the
+ * original per-page <link rel="stylesheet"> pattern.
+ */
+
+/* ── External: Google Fonts (Inter) ─────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── External: Font Awesome 6.5.0 (icons) ───────────────────────────── */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+
+/* ── Design system: global layers (dependency order) ────────────────── */
+@import './variables.css';   /* 1. CSS custom properties — all tokens */
+@import './reset.css';       /* 2. CSS reset + [hidden]{display:none} */
+@import './base.css';        /* 3. Body, typography, link defaults */
+@import './layout.css';      /* 4. App shell: sidebar, header, main */
+@import './components.css';  /* 5. All shared component styles (30 KB) */
+@import './utilities.css';   /* 6. Utility classes (.d-none, .sr-only, etc.) */

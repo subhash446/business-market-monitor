@@ -1,0 +1,105 @@
+/**
+ * Alerts page styles
+ * Business Market Monitor — Frontend v1.0
+ *
+ * Doc 3 §5.8, Doc 4 §7.1 — css/pages/alerts.css
+ *
+ * Tab bar, tab panel styles are shared with Trends via trends.css.
+ * Only alerts-page-specific layout rules are defined here.
+ *
+ * NOTE: .tab-bar, .tab-btn, .tab-btn--active, .tab-panel, .tab-panel--hidden
+ * are already defined in trends.css. Do NOT redefine them here.
+ */
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+
+.alerts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.alerts-toolbar__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* ── Rules table wrapper ─────────────────────────────────────────── */
+
+#rules-container,
+#events-container {
+  min-height: 120px;
+}
+
+/* ── Action buttons in table rows ────────────────────────────────── */
+
+.alerts-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Radio fieldset (create modal) ──────────────────────────────── */
+
+.radio-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+
+.radio-label input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* ── Modal footer ────────────────────────────────────────────────── */
+
+.modal-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* ── Pagination ──────────────────────────────────────────────────── */
+
+.alerts-pagination {
+  margin-top: var(--space-4);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+  .alerts-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .alerts-toolbar .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Scrollable table on mobile */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
