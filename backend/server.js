@@ -17,6 +17,8 @@ const env = require('./src/config/env');
 const logger = require('./src/utils/logger');
 const { pool, testConnection } = require('./src/database/connection');
 const priceIngestionJob = require('./src/jobs/priceIngestion.job');
+const newsIngestionJob  = require('./src/jobs/newsIngestion.job');
+const aiInsightsJob     = require('./src/jobs/aiInsights.job');
 
 // Production Hardening Phase B, finding H4: graceful shutdown. Captures
 // the http.Server instance returned by app.listen() so it can be closed
@@ -26,7 +28,9 @@ const priceIngestionJob = require('./src/jobs/priceIngestion.job');
 // forever on a stuck shutdown.
 const SHUTDOWN_TIMEOUT_MS = 10000;
 let server;
-let priceJob; // node-cron ScheduledTask — stopped during shutdown
+let priceJob; // node-cron ScheduledTask -- stopped during shutdown
+let newsJob;  // node-cron ScheduledTask -- stopped during shutdown
+let aiJob;    // node-cron ScheduledTask -- stopped during shutdown
 
 function shutdown(signal) {
   logger.info(`[server] Received ${signal}, shutting down gracefully...`);
@@ -38,13 +42,20 @@ function shutdown(signal) {
   }, SHUTDOWN_TIMEOUT_MS);
   forceExitTimer.unref(); // don't let this timer itself keep the process alive
 
-  // Stop the cron job first — prevents a new ingestion tick from starting
-  // during the shutdown window. Any in-progress ingestion run will finish
-  // naturally before the pool closes (both are async and the shutdown
-  // timeout provides the safety net).
+  // Stop the cron jobs first — prevents new ingestion ticks from starting
+  // during the shutdown window. Any in-progress run will finish naturally
+  // before the pool closes (the shutdown timeout provides the safety net).
   if (priceJob) {
     priceJob.stop();
     logger.info('[server] Price ingestion job stopped.');
+  }
+  if (newsJob) {
+    newsJob.stop();
+    logger.info('[server] News ingestion job stopped.');
+  }
+  if (aiJob) {
+    aiJob.stop();
+    logger.info('[server] AI insights job stopped.');
   }
 
   if (!server) {
@@ -82,10 +93,12 @@ async function start() {
     logger.info(`[server] Business Market Monitor API running on port ${env.port} (${env.nodeEnv})`);
     logger.info(`[server] Health check: http://localhost:${env.port}/api/v1/health`);
 
-    // Start the price ingestion cron job after the server is confirmed
-    // listening. This ensures the DB pool is connected and the app is
-    // fully initialised before the first job tick runs.
+    // Start cron jobs after the server is confirmed listening — ensures
+    // the DB pool is connected and the app is fully initialised before
+    // the first job tick runs.
     priceJob = priceIngestionJob.start();
+    newsJob  = newsIngestionJob.start();
+    aiJob    = aiInsightsJob.start();
   });
 }
 

@@ -41,6 +41,18 @@ function validateEnv() {
     missing.push('EIA_API_KEY (required when PRICE_INGESTION_ENABLED=true)');
   }
 
+  // Phase G: GNews API key is only required when automatic news ingestion
+  // is explicitly enabled. Same opt-in reasoning as EIA above.
+  if (env.newsIngestion.enabled && isBlank(env.gnews.apiKey)) {
+    missing.push('GNEWS_API_KEY (required when NEWS_INGESTION_ENABLED=true)');
+  }
+
+  // Phase H: Gemini API key is only required when AI insight generation
+  // is explicitly enabled. Same opt-in reasoning as EIA and GNews above.
+  if (env.aiInsights.enabled && isBlank(env.gemini.apiKey)) {
+    missing.push('GEMINI_API_KEY (required when AI_INSIGHTS_ENABLED=true)');
+  }
+
   if (missing.length > 0) {
     console.error('[boot] Refusing to start — required environment variable(s) missing:');
     missing.forEach((name) => console.error(`[boot]   - ${name}`));
@@ -50,4 +62,3 @@ function validateEnv() {
 }
 
 module.exports = validateEnv;
-

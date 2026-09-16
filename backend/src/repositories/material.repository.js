@@ -166,6 +166,35 @@ async function updateExternalSymbol(materialId, externalSymbol) {
   return findById(materialId);
 }
 
+// Added in Phase H (AI Insights Job) -- purely additive, nothing above changed.
+//
+// Returns ALL actively-tracked materials across ALL businesses, with the
+// minimum columns the AI insights job needs:
+//   id, business_id, name (resolved), industry_id (from the business row).
+//
+// industry_id is joined from `businesses` (not tracked_materials) because
+// materials are categorised by their owner's industry -- the same association
+// the news tagging system uses (news_item_tags.industry_id = businesses.industry_id).
+//
+// Job-only: this method is NOT called from any controller or route.
+// Business isolation for API reads is enforced by findByIdForBusiness() and
+// listByBusinessId() which are the only methods exposed to user requests.
+async function findAllTracked() {
+  const [rows] = await pool.execute(
+    `SELECT tm.id,
+            tm.business_id,
+            tm.raw_material_id,
+            COALESCE(rm.name, tm.custom_name) AS name,
+            b.industry_id
+     FROM tracked_materials tm
+     LEFT JOIN raw_materials rm ON rm.id = tm.raw_material_id
+     JOIN businesses b ON b.id = tm.business_id
+     WHERE tm.is_tracked = TRUE
+     ORDER BY tm.business_id ASC, tm.id ASC`
+  );
+  return rows;
+}
+
 module.exports = {
   listByBusinessId,
   findByIdForBusiness,
@@ -177,5 +206,6 @@ module.exports = {
   bulkCreateFromTemplate,
   findTrackedByExternalSymbol,
   updateExternalSymbol,
+  findAllTracked,
 };
 

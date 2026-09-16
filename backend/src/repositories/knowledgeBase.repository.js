@@ -14,7 +14,10 @@ async function listIndustries() {
 }
 
 async function findIndustryById(industryId) {
-  const [rows] = await pool.execute('SELECT * FROM industries WHERE id = ? LIMIT 1', [industryId]);
+  const [rows] = await pool.execute(
+    'SELECT * FROM industries WHERE id = ? LIMIT 1',
+    [industryId]
+  );
   return rows[0] || null;
 }
 
@@ -32,9 +35,9 @@ async function getRawMaterialsByIndustry(industryId) {
 
 // Added in Phase 5 (Template Generation) — purely additive, no existing
 // function above was changed. Returns the raw default_unit_id (not just its
-// display abbreviation) needed to write tracked_materials.unit_id; the
-// existing getRawMaterialsByIndustry() above stays exactly as Phase 4 left
-// it, for the read-only KB API response shape (Document 5 §4.3).
+// display abbreviation) needed to write tracked_materials.unit_id;
+// the existing getRawMaterialsByIndustry() above stays exactly as Phase 4
+// left it, for the read-only KB API response shape (Document 5 §4.3).
 async function getRawMaterialsForTemplateGeneration(industryId) {
   const [rows] = await pool.execute(
     'SELECT id, default_unit_id FROM raw_materials WHERE industry_id = ? ORDER BY name',
@@ -78,8 +81,47 @@ async function getDependenciesByIndustry(industryId) {
   return rows;
 }
 
+/**
+ * Returns external-factor dependencies for a specific raw material.
+ *
+ * Used by the AI market-intelligence layer to determine which external
+ * factors are relevant to a material before selecting news evidence.
+ *
+ * Only RAW_MATERIAL -> EXTERNAL_FACTOR relationships are returned.
+ * This keeps the query focused on the material-to-market-factor path
+ * required for news relevance.
+ *
+ * The industry_id constraint protects against accidentally resolving a
+ * dependency belonging to another industry.
+ */
+async function getDependenciesForRawMaterial(rawMaterialId, industryId) {
+  const [rows] = await pool.execute(
+    `SELECT
+       kbd.target_entity_type,
+       kbd.target_entity_id,
+       kbd.dependency_type,
+       kbd.description,
+       ef.name AS external_factor_name
+     FROM knowledge_base_dependencies kbd
+     JOIN external_factors ef
+       ON ef.id = kbd.target_entity_id
+      AND kbd.target_entity_type = 'EXTERNAL_FACTOR'
+      AND ef.industry_id = kbd.industry_id
+     WHERE kbd.industry_id = ?
+       AND kbd.source_entity_type = 'RAW_MATERIAL'
+       AND kbd.source_entity_id = ?
+       AND kbd.target_entity_type = 'EXTERNAL_FACTOR'
+     ORDER BY kbd.id`,
+    [industryId, rawMaterialId]
+  );
+
+  return rows;
+}
+
 async function listUnitsOfMeasurement() {
-  const [rows] = await pool.execute('SELECT * FROM units_of_measurement ORDER BY name');
+  const [rows] = await pool.execute(
+    'SELECT * FROM units_of_measurement ORDER BY name'
+  );
   return rows;
 }
 
@@ -92,5 +134,6 @@ module.exports = {
   getExternalFactorsByIndustry,
   getNewsKeywordsByIndustry,
   getDependenciesByIndustry,
+  getDependenciesForRawMaterial,
   listUnitsOfMeasurement,
 };

@@ -14,6 +14,17 @@ const AppError = require('./utils/AppError');
 
 const app = express();
 
+// Security Hardening: disable Express technology fingerprinting
+app.disable('x-powered-by');
+
+// Security Hardening: essential security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 // Production Hardening Phase B, finding H-1: trust the first proxy hop in
 // production only (Document 3 §15 — Render sits in front of the app behind
 // a single reverse-proxy/load-balancer layer). Value `1` trusts exactly
@@ -49,11 +60,14 @@ app.use('/api/v1', (req, res, next) => {
 // SPA fallback — React Router deep links (e.g. /dashboard, /materials).
 // Returns React index.html for any GET request that:
 //   • has not already been served by express.static (known asset files)
-//   • is NOT under /api/* (those must never be intercepted here)
+//   • is NOT under /api (those must never be intercepted here)
 // Any method other than GET reaches Express's normal 404 → errorHandler.
 app.use((req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
-    return res.sendFile(path.join(__dirname, '../../frontend-react/dist/index.html'));
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    const indexPath = path.join(__dirname, '../../frontend-react/dist/index.html');
+    return res.sendFile(indexPath, (err) => {
+      if (err) next(err);
+    });
   }
   next();
 });

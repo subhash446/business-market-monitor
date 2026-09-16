@@ -52,9 +52,12 @@ const env = {
   },
 
   cron: {
-    priceIngestion: process.env.PRICE_INGESTION_CRON || '0 5 * * *',
-    newsIngestion: process.env.NEWS_INGESTION_CRON || '0 * * * *',
+    priceIngestion:  process.env.PRICE_INGESTION_CRON  || '0 5 * * *',
+    newsIngestion:   process.env.NEWS_INGESTION_CRON   || '0 * * * *',
     alertEvaluation: process.env.ALERT_EVALUATION_CRON || '*/15 * * * *',
+    // AI insights run after price ingestion (5 AM UTC) so fresh prices are
+    // available. Default: 6 AM UTC daily.
+    aiInsights: process.env.AI_INSIGHTS_CRON || '0 6 * * *',
   },
 
   govDataApiKey: process.env.GOV_DATA_API_KEY || '',
@@ -92,6 +95,49 @@ const env = {
     baseUrl: process.env.EIA_API_BASE_URL || 'https://api.eia.gov/v2',
     // Convenience alias so the provider reads one field, not two.
     get timeoutMs() { return env.priceIngestion.timeoutMs; },
+  },
+
+  // Automatic news ingestion (Phase G).
+  // Opt-in: disabled by default so existing deployments without a provider
+  // key continue to start cleanly.
+  newsIngestion: {
+    enabled: (process.env.NEWS_INGESTION_ENABLED || 'false').toLowerCase() === 'true',
+    // Timeout (ms) for outbound HTTP calls to the news provider.
+    timeoutMs: parseInt(process.env.NEWS_PROVIDER_TIMEOUT_MS, 10) || 15000,
+  },
+
+  // GNews (gnews.io) API v4 — Primary news provider.
+  // Register free: https://gnews.io (100 requests/day on free tier).
+  // No `|| ''` default for apiKey — same opt-out reasoning as EIA above.
+  gnews: {
+    apiKey: process.env.GNEWS_API_KEY,
+    baseUrl: process.env.GNEWS_API_BASE_URL || 'https://gnews.io/api/v4',
+    get timeoutMs() { return env.newsIngestion.timeoutMs; },
+  },
+
+  // Automatic AI Market Intelligence insights (Phase H).
+  // Opt-in: disabled by default. When enabled, requires GEMINI_API_KEY.
+  // Free-tier limits are project-specific -- check your Google AI Studio
+  // dashboard for exact RPM/TPM/RPD values (do NOT rely on hardcoded figures).
+  aiInsights: {
+    enabled:   (process.env.AI_INSIGHTS_ENABLED || 'false').toLowerCase() === 'true',
+    // Timeout (ms) for Gemini API calls. LLM calls are slower than data APIs;
+    // 30 s is a reasonable upper bound for a 1-2 KB prompt on Flash models.
+    timeoutMs: parseInt(process.env.AI_INSIGHTS_TIMEOUT_MS, 10) || 30000,
+  },
+
+  // Google Gemini API -- Primary LLM provider for AI insights.
+  // Register free (no credit card for AI Studio): https://aistudio.google.com/apikey
+  // No `|| ''` default for apiKey -- same opt-out reasoning as EIA/GNews:
+  // validateEnv.js rejects a missing key only when AI insights are enabled,
+  // so undefined is the honest state for deployments that have not set the key.
+  // To switch providers: replace gemini.provider.js and update this block.
+  gemini: {
+    apiKey:  process.env.GEMINI_API_KEY,
+    model:   process.env.GEMINI_MODEL   || 'gemini-3.6-flash',
+    baseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
+    // Convenience alias used by gemini.provider.js to read one field, not two.
+    get timeoutMs() { return env.aiInsights.timeoutMs; },
   },
 };
 

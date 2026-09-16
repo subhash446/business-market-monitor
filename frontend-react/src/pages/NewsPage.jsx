@@ -115,7 +115,7 @@ export function NewsPage() {
 
 /* ================================================================
  * NEWS CARD
- * Fields: { id, title, url, sourceName, publishedAt }
+ * Fields: { id, title, url, sourceName, publishedAt, summary }
  * url may be null — render plain text title when absent.
  * External links: target="_blank" rel="noopener noreferrer"
  * ================================================================ */
@@ -143,6 +143,11 @@ function NewsCard({ item }) {
           item.title
         )}
       </h3>
+
+      {/* Summary — shown when the provider returns a description */}
+      {item.summary && (
+        <p className="news-card__summary">{item.summary}</p>
+      )}
 
       {/* Meta row: source + date */}
       <div className="news-card__meta">

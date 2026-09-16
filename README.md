@@ -547,14 +547,21 @@ cd business-market-monitor
 
 ## 2. Install Dependencies
 
+Install backend and frontend dependencies:
+
 ```bash
+# Backend
 cd backend
+npm install
+
+# Frontend
+cd ../frontend-react
 npm install
 ```
 
 ## 3. Configure Environment Variables
 
-Create a `.env` file using the project's environment configuration.
+Create a `backend/.env` file using `backend/.env.example` as a template.
 
 Example:
 
@@ -579,13 +586,33 @@ SMTP_FROM_EMAIL=your_email@gmail.com
 
 For Gmail SMTP, use an appropriate **App Password** rather than exposing your normal Gmail password.
 
-## 4. Start the Server
+## 4. Initialize Database
+
+Run migrations to create tables, then seed initial reference data:
 
 ```bash
-node server.js
+cd backend
+npm run migrate
+npm run seed
 ```
 
-The API runs on:
+## 5. Build Frontend (Production)
+
+Build the React frontend into `frontend-react/dist` (served statically by Express):
+
+```bash
+cd backend
+npm run build
+```
+
+## 6. Start the Server
+
+```bash
+cd backend
+npm start
+```
+
+The API and application run on:
 
 ```text
 http://localhost:5000

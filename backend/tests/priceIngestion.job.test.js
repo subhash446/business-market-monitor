@@ -287,4 +287,167 @@ describe('priceIngestion.job — runIngestion()', () => {
       { symbol: 'WTI', price: 67.31, recordedAt: '2026-09-09' }
     );
   });
+
+  // ── Phase F additions ─────────────────────────────────────────────────────────
+
+  // ── 11. Overlap prevention ───────────────────────────────────────────────────
+
+  test('11. concurrent second call while first is running returns SKIPPED/overlap', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia = require('../src/providers/eia.provider');
+
+    let resolveFirstRun;
+    // First call: provider hangs until we resolve it manually
+    eia.fetchLatestPrices.mockReturnValueOnce(
+      new Promise((resolve) => { resolveFirstRun = resolve; })
+    );
+
+    // Start the first run (does NOT await yet — it is in-flight)
+    const firstRun = runIngestion();
+
+    // Give the event loop a tick so the first run has started and set isRunning=true
+    await Promise.resolve();
+
+    // Second call while first is in-flight — must bounce immediately
+    const secondResult = await runIngestion();
+    expect(secondResult).toMatchObject({ status: 'SKIPPED', reason: 'overlap' });
+
+    // Clean up: resolve the first run
+    resolveFirstRun([]);
+    await firstRun;
+  });
+
+  test('12. isRunning is released after first run completes — subsequent call proceeds normally', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia = require('../src/providers/eia.provider');
+
+    eia.fetchLatestPrices.mockResolvedValue([]);
+
+    const first = await runIngestion();
+    expect(first.status).toBe('SUCCESS');
+
+    // Guard must have been released — second run must not be treated as overlap
+    eia.fetchLatestPrices.mockResolvedValue([]);
+    const second = await runIngestion();
+    expect(second.status).toBe('SUCCESS');
+    expect(second).not.toMatchObject({ reason: 'overlap' });
+  });
+
+  // ── 12. Sync status write failure is non-fatal ───────────────────────────────
+
+  test('13. run-end sync status write failure does not crash the job — run resolves SUCCESS', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia      = require('../src/providers/eia.provider');
+    const syncRepo = require('../src/repositories/syncStatus.repository');
+    const logger   = require('../src/utils/logger');
+
+    eia.fetchLatestPrices.mockResolvedValue([]);
+    // First upsert (run-start) succeeds; second (run-end) throws
+    syncRepo.upsert
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('DB gone'));
+
+    const result = await runIngestion();
+
+    expect(result.status).toBe('SUCCESS');
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Could not write run-end'),
+      expect.any(String)
+    );
+  });
+
+  // ── 13. Material-level error marks run FAILED ────────────────────────────────
+
+  test('14. ingestFromProvider returning status=error marks run as FAILED', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia      = require('../src/providers/eia.provider');
+    const matRepo  = require('../src/repositories/material.repository');
+    const svc      = require('../src/services/priceIngestion.service');
+    const syncRepo = require('../src/repositories/syncStatus.repository');
+
+    eia.fetchLatestPrices.mockResolvedValue([
+      { symbol: 'WTI', price: 67.31, recordedAt: '2026-09-09' },
+    ]);
+    matRepo.findTrackedByExternalSymbol.mockResolvedValue([{ id: 1, business_id: 10 }]);
+    svc.ingestFromProvider.mockResolvedValue({
+      status: 'error',
+      trackedMaterialId: 1,
+      businessId: 10,
+      error: new Error('DB constraint violation'),
+    });
+
+    const result = await runIngestion();
+
+    expect(result.status).toBe('FAILED');
+    expect(syncRepo.upsert.mock.calls[1][1]).toMatchObject({ lastStatus: 'FAILED' });
+  });
+
+  // ── 14. PROVIDER_AUTH error is logged at error level ────────────────────────
+
+  test('15. PROVIDER_AUTH error is logged at error level and run marked FAILED', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia    = require('../src/providers/eia.provider');
+    const logger = require('../src/utils/logger');
+
+    // The job uses `instanceof ProviderError` to branch log levels.
+    // Construct the error from the mock class so instanceof passes.
+    const { ProviderError } = eia;
+    const authErr = new ProviderError('PROVIDER_AUTH', 'EIA 401');
+    eia.fetchLatestPrices.mockRejectedValue(authErr);
+
+    const result = await runIngestion();
+
+    expect(result.status).toBe('FAILED');
+    // The job logs auth errors as a single interpolated string at error level
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Provider auth error')
+    );
+  });
+
+  // ── 15. Alert evaluation: exactly once per material, zero on skip ────────────
+
+  test('16. alert evaluation fires exactly once per matched material (3 materials → 3 ingestFromProvider calls)', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia     = require('../src/providers/eia.provider');
+    const matRepo = require('../src/repositories/material.repository');
+    const svc     = require('../src/services/priceIngestion.service');
+
+    eia.fetchLatestPrices.mockResolvedValue([
+      { symbol: 'WTI',   price: 67.31, recordedAt: '2026-09-09' },
+      { symbol: 'BRENT', price: 71.45, recordedAt: '2026-09-09' },
+    ]);
+    matRepo.findTrackedByExternalSymbol.mockImplementation((symbol) => {
+      if (symbol === 'WTI')   return Promise.resolve([{ id: 1, business_id: 10 }, { id: 2, business_id: 11 }]);
+      if (symbol === 'BRENT') return Promise.resolve([{ id: 3, business_id: 10 }]);
+      return Promise.resolve([]);
+    });
+    svc.ingestFromProvider.mockResolvedValue({ status: 'inserted', trackedMaterialId: 1, businessId: 10 });
+
+    await runIngestion();
+
+    // 3 matched materials → 3 calls → alert evaluation fires exactly 3 times
+    expect(svc.ingestFromProvider).toHaveBeenCalledTimes(3);
+  });
+
+  test('17. duplicate price: ingestFromProvider called once, job remains SUCCESS — no double-alert', async () => {
+    const { runIngestion } = require('../src/jobs/priceIngestion.job');
+    const eia     = require('../src/providers/eia.provider');
+    const matRepo = require('../src/repositories/material.repository');
+    const svc     = require('../src/services/priceIngestion.service');
+
+    eia.fetchLatestPrices.mockResolvedValue([
+      { symbol: 'WTI', price: 67.31, recordedAt: '2026-09-09' },
+    ]);
+    matRepo.findTrackedByExternalSymbol.mockResolvedValue([{ id: 1, business_id: 10 }]);
+    svc.ingestFromProvider.mockResolvedValue({
+      status: 'skipped', trackedMaterialId: 1, businessId: 10, reason: 'duplicate',
+    });
+
+    const result = await runIngestion();
+
+    // One call only — no retry on skip
+    expect(svc.ingestFromProvider).toHaveBeenCalledTimes(1);
+    // Skipped duplicate must not mark run as FAILED
+    expect(result.status).toBe('SUCCESS');
+  });
 });

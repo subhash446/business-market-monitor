@@ -98,6 +98,20 @@
   flex-shrink: 0;
 }
 
+/* ── Card summary ────────────────────────────────────────────────── */
+
+.news-card__summary {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+  /* Clamp to 3 lines so tall summaries don't dominate the grid */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ── Card meta (source + date) ───────────────────────────────────── */
 
 .news-card__meta {

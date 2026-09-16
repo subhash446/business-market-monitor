@@ -16,8 +16,10 @@ async function listByBusinessId(businessId, { limit, offset }) {
   // as bound `?` placeholders (Phase 8 finding, ER_WRONG_ARGUMENTS). limit/
   // offset are already validated, server-generated integers from
   // utils/pagination.js, never raw user input — safe to inline.
-  const safeLimit = Number(limit);
-  const safeOffset = Number(offset);
+  const parsedLimit = parseInt(limit, 10);
+  const parsedOffset = parseInt(offset, 10);
+  const safeLimit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 20;
+  const safeOffset = Number.isInteger(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
   const [rows] = await pool.execute(
     `SELECT id, triggered_price, threshold_price_snapshot, condition_type_snapshot,
             notification_channel, delivery_status, triggered_at

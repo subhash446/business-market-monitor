@@ -32,9 +32,30 @@ module.exports = {
     EXTERNAL_FACTOR: 'EXTERNAL_FACTOR',
   },
 
-  JOB_TYPE: { PRICE_INGESTION: 'PRICE_INGESTION', NEWS_INGESTION: 'NEWS_INGESTION' },
+  // Phase A (PRICE_INGESTION), Phase G (NEWS_INGESTION), Phase H (AI_INSIGHTS).
+  JOB_TYPE: {
+    PRICE_INGESTION: 'PRICE_INGESTION',
+    NEWS_INGESTION: 'NEWS_INGESTION',
+    AI_INSIGHTS: 'AI_INSIGHTS',
+  },
 
   JOB_STATUS: { SUCCESS: 'SUCCESS', FAILED: 'FAILED' },
 
   DIGEST_FREQUENCY: { DAILY: 'DAILY', WEEKLY: 'WEEKLY', MONTHLY: 'MONTHLY' },
+
+  // Phase H — AI Market Intelligence Agent.
+  // Mirrors ENUM columns in ai_insights table (migration 020).
+  // Must stay in sync with the DB ENUM definition.
+  OUTLOOK: {
+    BEARISH:  'BEARISH',
+    NEUTRAL:  'NEUTRAL',
+    BULLISH:  'BULLISH',
+    VOLATILE: 'VOLATILE',
+  },
+
+  INSIGHT_CONFIDENCE: {
+    LOW:    'LOW',
+    MEDIUM: 'MEDIUM',
+    HIGH:   'HIGH',
+  },
 };

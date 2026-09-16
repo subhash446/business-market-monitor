@@ -1,26 +1,26 @@
-/**
- * TrendsPage — Price history chart + multi-material comparison
- * Business Market Monitor — React frontend
+﻿/**
+ * TrendsPage â€” Price history chart + multi-material comparison
+ * Business Market Monitor â€” React frontend
  *
  * Ported from: frontend/pages/trends.html + frontend/js/pages/trends.js
  *
  * TABS:
- *   Tab 1 — Price History (single material, paginated, Chart.js line chart)
- *   Tab 2 — Compare Materials (up to 5 materials, checkbox list, multi-line chart)
+ *   Tab 1 â€” Price History (single material, paginated, Chart.js line chart)
+ *   Tab 2 â€” Compare Materials (up to 5 materials, checkbox list, multi-line chart)
  *
  * FLOW (preserved exactly from original):
- *  1. Auth + business guard — handled by ProtectedRoute in App.jsx
- *  2. GET /materials on load → filter isTracked only → populate selectors
- *  3. ?materialId from URL → pre-select in Tab 1 if present and tracked
- *  4. Tab 1 "Apply" → GET /materials/:id/prices/history?page=1&limit=50&from?&to?
- *     → destroy old chart → create new Chart.js line chart (canvas ref)
- *     → render accessible data table → Pagination component
- *  5. Tab 2 "Compare" → GET /materials/prices/compare?materialIds=1,2,3&from?&to?
- *     → response: [{ materialId, name, series:[{price,recordedAt}] }]
- *     → destroy old chart → create multi-line Chart.js chart
+ *  1. Auth + business guard â€” handled by ProtectedRoute in App.jsx
+ *  2. GET /materials on load â†’ filter isTracked only â†’ populate selectors
+ *  3. ?materialId from URL â†’ pre-select in Tab 1 if present and tracked
+ *  4. Tab 1 "Apply" â†’ GET /materials/:id/prices/history?page=1&limit=50&from?&to?
+ *     â†’ destroy old chart â†’ create new Chart.js line chart (canvas ref)
+ *     â†’ render accessible data table â†’ Pagination component
+ *  5. Tab 2 "Compare" â†’ GET /materials/prices/compare?materialIds=1,2,3&from?&to?
+ *     â†’ response: [{ materialId, name, series:[{price,recordedAt}] }]
+ *     â†’ destroy old chart â†’ create multi-line Chart.js chart
  *
  * CHART CONTRACT:
- *   History items:    { price: number, recordedAt: string } — NO unit in series
+ *   History items:    { price: number, recordedAt: string } â€” NO unit in series
  *   Compare response: [{ materialId, name, series: [{price,recordedAt}] }]
  *   Unit comes from material.unit (GET /materials), NOT from series
  *
@@ -31,7 +31,7 @@
  *
  * MATERIAL ID:
  *   material.id from GET /materials = tracked_materials.id
- *   Compare query param: materialIds (plural, comma-separated) — NEVER materialId singular
+ *   Compare query param: materialIds (plural, comma-separated) â€” NEVER materialId singular
  *
  * SECURITY: No userId in requests. No innerHTML. No eval().
  */
@@ -53,14 +53,16 @@ import {
 
 import { getMaterials }                    from '../api/materials.api.js';
 import { getPriceHistory, comparePrices }  from '../api/trends.api.js';
+import { getLatestInsight }               from '../api/aiInsights.api.js';
 import { Skeleton }    from '../components/ui/Skeleton.jsx';
 import { EmptyState }  from '../components/ui/EmptyState.jsx';
 import { ErrorState }  from '../components/ui/ErrorState.jsx';
 import { Pagination }  from '../components/ui/Pagination.jsx';
+import { InsightCard } from '../components/ui/InsightCard.jsx';
 import { formatDate, formatNumber } from '../utils/format.js';
 import '../styles/pages/trends.css';
 
-/* ── Register Chart.js components (required for tree-shaking builds) ── */
+/* â”€â”€ Register Chart.js components (required for tree-shaking builds) â”€â”€ */
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -71,23 +73,23 @@ ChartJS.register(
   Legend,
 );
 
-/* ── Chart colour palette (Doc 4 §9.1) ─────────────────────────── */
+/* â”€â”€ Chart colour palette (Doc 4 Â§9.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4'];
 
-/* ── Load states ────────────────────────────────────────────────── */
+/* â”€â”€ Load states â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const STATUS = { IDLE: 'idle', LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
 
 export function TrendsPage() {
   const [searchParams] = useSearchParams();
 
-  /* ── Materials state ────────────────────────────────────────── */
+  /* â”€â”€ Materials state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [materialsStatus, setMaterialsStatus] = useState(STATUS.LOADING);
   const [trackedMaterials, setTrackedMaterials] = useState([]); // only isTracked=true
 
-  /* ── Tab state — 'history' | 'compare' ─────────────────────── */
+  /* â”€â”€ Tab state â€” 'history' | 'compare' â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [activeTab, setActiveTab] = useState('history');
 
-  /* ── Tab 1 (History) state ──────────────────────────────────── */
+  /* â”€â”€ Tab 1 (History) state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [phMaterialId, setPhMaterialId] = useState('');
   const [phFrom,       setPhFrom]       = useState('');
   const [phTo,         setPhTo]         = useState('');
@@ -98,7 +100,7 @@ export function TrendsPage() {
   const [histApplying, setHistApplying] = useState(false);
   const [showHistTable, setShowHistTable] = useState(false);
 
-  /* ── Tab 2 (Compare) state ──────────────────────────────────── */
+  /* â”€â”€ Tab 2 (Compare) state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [checkedIds,   setCheckedIds]   = useState({}); // { [id]: boolean }
   const [cmpFrom,      setCmpFrom]      = useState('');
   const [cmpTo,        setCmpTo]        = useState('');
@@ -107,13 +109,19 @@ export function TrendsPage() {
   const [cmpApplying,  setCmpApplying]  = useState(false);
   const [showCmpTable, setShowCmpTable] = useState(false);
 
-  /* ── Chart canvas refs ──────────────────────────────────────── */
+  /* â”€â”€ Chart canvas refs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const histCanvasRef = useRef(null);
   const cmpCanvasRef  = useRef(null);
   const histChartRef  = useRef(null); // Chart.js instance
   const cmpChartRef   = useRef(null); // Chart.js instance
 
-  /* ── Helpers ────────────────────────────────────────────────── */
+  /* â”€â”€ AI insight state for Tab 1 (per-material) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  // Fetched when a material is selected; reset when selection clears.
+  const [insight,        setInsight]        = useState(undefined); // undefined=not loaded, null=no insight
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError,   setInsightError]   = useState(null);
+
+  /* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const checkedCount = useMemo(
     () => Object.values(checkedIds).filter(Boolean).length,
     [checkedIds],
@@ -125,7 +133,7 @@ export function TrendsPage() {
     [trackedMaterials, phMaterialId],
   );
 
-  /* ── Load materials ─────────────────────────────────────────── */
+  /* â”€â”€ Load materials â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const loadMaterials = useCallback(async () => {
     setMaterialsStatus(STATUS.LOADING);
     try {
@@ -146,7 +154,28 @@ export function TrendsPage() {
 
   useEffect(() => { loadMaterials(); }, [loadMaterials]);
 
-  /* ── Auto-load history if URL materialId was pre-selected ───── */
+  /* â”€â”€ Fetch AI insight when material selection changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  useEffect(() => {
+    if (!phMaterialId) {
+      setInsight(undefined);
+      setInsightError(null);
+      return;
+    }
+    let cancelled = false;
+    setInsightLoading(true);
+    setInsightError(null);
+    getLatestInsight(phMaterialId)
+      .then(data => { if (!cancelled) { setInsight(data); setInsightLoading(false); } })
+      .catch(() => {
+        if (!cancelled) {
+          setInsightError('Could not load AI insight for this material.');
+          setInsightLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [phMaterialId]);
+
+  /* â”€â”€ Auto-load history if URL materialId was pre-selected â”€â”€â”€â”€â”€ */
   const didAutoLoad = useRef(false);
   useEffect(() => {
     if (
@@ -161,7 +190,7 @@ export function TrendsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materialsStatus, phMaterialId]);
 
-  /* ── Destroy chart on tab switch ────────────────────────────── */
+  /* â”€â”€ Destroy chart on tab switch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   function _destroyHistChart() {
     if (histChartRef.current) {
       histChartRef.current.destroy();
@@ -181,7 +210,7 @@ export function TrendsPage() {
     setActiveTab(tab);
   }
 
-  /* ── Tab 1: Load history ────────────────────────────────────── */
+  /* â”€â”€ Tab 1: Load history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   async function _loadHistory(page) {
     if (!phMaterialId) return;
     const mat = trackedMaterials.find(m => String(m.id) === String(phMaterialId));
@@ -212,7 +241,7 @@ export function TrendsPage() {
     }
   }
 
-  /* ── Tab 1: Render Chart.js line chart after canvas is available ── */
+  /* â”€â”€ Tab 1: Render Chart.js line chart after canvas is available â”€â”€ */
   useEffect(() => {
     if (
       histStatus !== STATUS.SUCCESS ||
@@ -272,7 +301,7 @@ export function TrendsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [histStatus, histItems, selectedHistMaterial]);
 
-  /* ── Tab 2: Load compare ────────────────────────────────────── */
+  /* â”€â”€ Tab 2: Load compare â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   async function _loadCompare() {
     const ids = Object.entries(checkedIds)
       .filter(([, v]) => v)
@@ -299,7 +328,7 @@ export function TrendsPage() {
     }
   }
 
-  /* ── Tab 2: Render compare chart after canvas ─────────────── */
+  /* â”€â”€ Tab 2: Render compare chart after canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   useEffect(() => {
     if (
       cmpStatus !== STATUS.SUCCESS ||
@@ -372,13 +401,13 @@ export function TrendsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cmpStatus, comparison]);
 
-  /* ── Compare totals — for empty detection ───────────────────── */
+  /* â”€â”€ Compare totals â€” for empty detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const cmpTotalPoints = useMemo(
     () => comparison.reduce((s, m) => s + m.series.length, 0),
     [comparison],
   );
 
-  /* ── Cleanup charts on unmount ──────────────────────────────── */
+  /* â”€â”€ Cleanup charts on unmount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   useEffect(() => {
     return () => {
       _destroyHistChart();
@@ -387,11 +416,11 @@ export function TrendsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Render ─────────────────────────────────────────────────── */
+  /* â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   return (
     <div className="page-container">
 
-      {/* ── Tab bar ─────────────────────────────────────────── */}
+      {/* â”€â”€ Tab bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="tab-bar" role="tablist" aria-label="Trends views">
         <button
           type="button"
@@ -417,7 +446,7 @@ export function TrendsPage() {
         </button>
       </div>
 
-      {/* ── Materials load error (full-page, both tabs affected) ── */}
+      {/* â”€â”€ Materials load error (full-page, both tabs affected) â”€â”€ */}
       {materialsStatus === STATUS.ERROR && (
         <ErrorState
           title="Failed to load materials"
@@ -427,7 +456,7 @@ export function TrendsPage() {
       )}
 
       {/* ========================================================
-          TAB 1 — Price History
+          TAB 1 â€” Price History
           ======================================================== */}
       <div
         id="panel-history"
@@ -450,7 +479,7 @@ export function TrendsPage() {
                 onChange={e => setPhMaterialId(e.target.value)}
                 disabled={materialsStatus === STATUS.LOADING}
               >
-                <option value="">Select a material…</option>
+                <option value="">Select a materialâ€¦</option>
                 {trackedMaterials.map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
@@ -566,10 +595,23 @@ export function TrendsPage() {
             </>
           )}
         </div>
+
+        {/* AI insight section -- visible whenever a material is selected,
+            independent of the chart load state */}
+        {phMaterialId && (
+          <div className="trends-insight-section">
+            <InsightCard
+              insight={insight ?? null}
+              loading={insightLoading}
+              error={insightError}
+              title={`AI Insight -- ${selectedHistMaterial?.name ?? 'Selected Material'}`}
+            />
+          </div>
+        )}
       </div>
 
       {/* ========================================================
-          TAB 2 — Compare Materials
+          TAB 2 â€” Compare Materials
           ======================================================== */}
       <div
         id="panel-compare"
@@ -581,7 +623,7 @@ export function TrendsPage() {
         <div className="trends-filter-bar card">
           <div className="card__body trends-filter-bar__body trends-filter-bar__body--compare">
 
-            {/* Checkbox list — tracked materials only */}
+            {/* Checkbox list â€” tracked materials only */}
             <div className="form-group trends-compare-list-wrap">
               <span className="form-label">Materials (select up to 5)</span>
               <div id="cmp-material-list" className="cmp-material-list">
@@ -611,7 +653,7 @@ export function TrendsPage() {
               </div>
               <p id="cmp-counter" className="cmp-counter">
                 {checkedCount} / 5 selected
-                {maxedOut && ' — Maximum of 5 materials can be compared.'}
+                {maxedOut && ' â€” Maximum of 5 materials can be compared.'}
               </p>
             </div>
 
@@ -706,7 +748,7 @@ export function TrendsPage() {
 }
 
 /* ================================================================
- * COMPARE DATA TABLE — accessible, date-aligned across all series
+ * COMPARE DATA TABLE â€” accessible, date-aligned across all series
  * ================================================================ */
 function CompareTable({ comparison }) {
   // Collect all unique dates (sorted ASC) across all series
@@ -716,7 +758,7 @@ function CompareTable({ comparison }) {
 
   if (sortedDates.length === 0) return null;
 
-  // Build price map: materialId → Map<recordedAt, price>
+  // Build price map: materialId â†’ Map<recordedAt, price>
   const priceMap = new Map();
   comparison.forEach(mat => {
     const m = new Map(mat.series.map(p => [p.recordedAt, p.price]));
@@ -742,7 +784,7 @@ function CompareTable({ comparison }) {
               const price = priceMap.get(mat.materialId)?.get(dt);
               return (
                 <td key={mat.materialId} className="font-mono">
-                  {price != null ? formatNumber(price, 2) : '—'}
+                  {price != null ? formatNumber(price, 2) : 'â€”'}
                 </td>
               );
             })}

@@ -37,6 +37,7 @@ function toPublicNewsItem(row) {
     url: row.url,
     sourceName: row.source_name,
     publishedAt: row.published_at,
+    summary: row.summary || null,
   };
 }
 

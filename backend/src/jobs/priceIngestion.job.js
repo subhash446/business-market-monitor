@@ -159,36 +159,44 @@ async function runIngestion() {
   }
 
   // === Step 3: Update sync status ===
-  const completedAt = new Date();
-  const durationMs = completedAt - startedAt;
-  const inserted = materialResults.filter((r) => r.status === 'inserted').length;
-  const skipped  = materialResults.filter((r) => r.status === 'skipped').length;
-  const errors   = materialResults.filter((r) => r.status === 'error').length;
-
-  logger.info(
-    `[price-ingestion] Run complete in ${durationMs}ms — ` +
-    `status=${jobStatus} inserted=${inserted} skipped=${skipped} errors=${errors}`
-  );
-
+  // isRunning is reset in the finally block below so the overlap guard is
+  // always released even if an unexpected error escapes the inner try-catches
+  // (e.g. during materialResults.filter() or a sync-status write failure that
+  // somehow rethrows despite the catch). Without finally, a single unexpected
+  // throw would permanently lock the job for the life of the process.
   try {
-    await syncStatusRepository.upsert(JOB_TYPE.PRICE_INGESTION, {
-      lastRunAt: startedAt,
-      lastSuccessAt: jobStatus === JOB_STATUS.SUCCESS ? completedAt : null,
-      lastStatus: jobStatus,
-    });
-  } catch (syncErr) {
-    logger.warn('[price-ingestion] Could not write run-end to sync_statuses:', syncErr.message);
+    const completedAt = new Date();
+    const durationMs = completedAt - startedAt;
+    const inserted = materialResults.filter((r) => r.status === 'inserted').length;
+    const skipped  = materialResults.filter((r) => r.status === 'skipped').length;
+    const errors   = materialResults.filter((r) => r.status === 'error').length;
+
+    logger.info(
+      `[price-ingestion] Run complete in ${durationMs}ms — ` +
+      `status=${jobStatus} inserted=${inserted} skipped=${skipped} errors=${errors}`
+    );
+
+    try {
+      await syncStatusRepository.upsert(JOB_TYPE.PRICE_INGESTION, {
+        lastRunAt: startedAt,
+        lastSuccessAt: jobStatus === JOB_STATUS.SUCCESS ? completedAt : null,
+        lastStatus: jobStatus,
+      });
+    } catch (syncErr) {
+      logger.warn('[price-ingestion] Could not write run-end to sync_statuses:', syncErr.message);
+    }
+
+    return {
+      symbols,
+      providerResults,
+      materialResults,
+      status: jobStatus,
+      ...(jobError ? { error: jobError } : {}),
+    };
+  } finally {
+    // Always release the overlap guard — regardless of what happened above.
+    isRunning = false;
   }
-
-  isRunning = false;
-
-  return {
-    symbols,
-    providerResults,
-    materialResults,
-    status: jobStatus,
-    ...(jobError ? { error: jobError } : {}),
-  };
 }
 
 /**

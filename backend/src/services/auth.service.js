@@ -130,8 +130,12 @@ async function requestPasswordReset(email) {
   // NotificationService doesn't exist yet either). Logging the raw token
   // is a development-only stand-in for the real email send this endpoint
   // is documented to perform (Document 5 §4.1) — it is never returned in
-  // the API response, only written to the server-side log.
-  logger.info(`[auth] Password reset requested for user ${user.id} — DEV-ONLY, no email service configured: raw token = ${rawToken}`);
+  // the API response. In production, the raw token is NEVER logged.
+  if (env.nodeEnv !== 'production') {
+    logger.info(`[auth] Password reset requested for user ${user.id} — DEV-ONLY, no email service configured: raw token = ${rawToken}`);
+  } else {
+    logger.info(`[auth] Password reset requested for user ${user.id}`);
+  }
 }
 
 // FR-AUTH-07. Document 5 §4.1: 401 AUTHENTICATION_ERROR for any invalid,

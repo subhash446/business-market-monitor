@@ -31,9 +31,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../api/dashboard.api.js';
-import { Skeleton }    from '../components/ui/Skeleton.jsx';
-import { EmptyState }  from '../components/ui/EmptyState.jsx';
-import { ErrorState }  from '../components/ui/ErrorState.jsx';
+import { getBusinessLatestInsights } from '../api/aiInsights.api.js';
+import { Skeleton }     from '../components/ui/Skeleton.jsx';
+import { EmptyState }   from '../components/ui/EmptyState.jsx';
+import { ErrorState }   from '../components/ui/ErrorState.jsx';
+import { InsightCard }  from '../components/ui/InsightCard.jsx';
 import { formatNumber, formatDateTime, formatAlertCondition } from '../utils/format.js';
 import '../styles/pages/dashboard.css';
 
@@ -46,6 +48,12 @@ export function DashboardPage() {
   const [status,    setStatus]    = useState(STATUS.LOADING);
   const [data,      setData]      = useState(null);
   const [errMsg,    setErrMsg]    = useState('');
+
+  // AI insights loaded independently — never blocks main dashboard data.
+  // A Gemini/AI failure shows an inline error on Panel 6 only.
+  const [aiInsights,        setAiInsights]        = useState([]);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(true);
+  const [aiInsightsError,   setAiInsightsError]   = useState(null);
 
   /* ── Load dashboard data ──────────────────────────────────────── */
   const loadDashboard = useCallback(async () => {
@@ -67,7 +75,22 @@ export function DashboardPage() {
     }
   }, []);
 
+  /* ── Load AI insights (independent of main dashboard) ────────── */
+  const loadAiInsights = useCallback(async () => {
+    setAiInsightsLoading(true);
+    setAiInsightsError(null);
+    try {
+      const insights = await getBusinessLatestInsights(3);
+      setAiInsights(insights ?? []);
+    } catch {
+      setAiInsightsError('Could not load AI insights. They will be retried on next load.');
+    } finally {
+      setAiInsightsLoading(false);
+    }
+  }, []);
+
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { loadAiInsights(); }, [loadAiInsights]);
 
   /* ── Render ───────────────────────────────────────────────────── */
   const isLoading = status === STATUS.LOADING;
@@ -212,6 +235,52 @@ export function DashboardPage() {
                   </strong>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* ── Panel 6 — AI Market Intelligence (full-width) ─────── */}
+          {/* Loaded independently — a Gemini error here never affects other panels. */}
+          <section
+            className="card dashboard-panel dashboard-panel--full"
+            aria-labelledby="panel-ai-insights-heading"
+          >
+            <div className="card__header dashboard-panel__header">
+              <div className="insight-card__title-row">
+                <i className="fa-solid fa-robot insight-card__ai-icon" aria-hidden="true" />
+                <h2 className="card__title" id="panel-ai-insights-heading">AI Market Intelligence</h2>
+                <span className="insight-card__badge-ai" aria-label="AI-generated content">AI</span>
+              </div>
+            </div>
+            <div className="card__body">
+              {aiInsightsLoading && <Skeleton type="panel" rows={3} />}
+
+              {!aiInsightsLoading && aiInsightsError && (
+                <p className="insight-card__error">
+                  <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+                  {' '}{aiInsightsError}
+                </p>
+              )}
+
+              {!aiInsightsLoading && !aiInsightsError && aiInsights.length === 0 && (
+                <EmptyState
+                  icon="fa-solid fa-robot"
+                  title="No AI insights generated yet"
+                  message="AI market insights are generated automatically each morning once enough price data is available."
+                />
+              )}
+
+              {!aiInsightsLoading && !aiInsightsError && aiInsights.length > 0 && (
+                <div className="insight-panel-list">
+                  {aiInsights.map(insight => (
+                    <InsightCard
+                      key={insight.id}
+                      insight={insight}
+                      title={`Insight — Material #${insight.tracked_material_id}`}
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 

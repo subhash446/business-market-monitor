@@ -11,7 +11,7 @@ router.post('/register', rateLimiter, validate(validateRegister), authController
 router.post('/login', rateLimiter, validate(validateLogin), authController.login);
 router.post('/refresh', validate(validateRefresh), authController.refresh);
 router.post('/password-reset/request', rateLimiter, validate(validateRequestPasswordReset), authController.requestPasswordReset);
-router.post('/password-reset/confirm', validate(validateConfirmPasswordReset), authController.confirmPasswordReset);
+router.post('/password-reset/confirm', rateLimiter, validate(validateConfirmPasswordReset), authController.confirmPasswordReset);
 router.get('/email-verification/confirm', authController.confirmEmailVerification);
 
 // Protected
