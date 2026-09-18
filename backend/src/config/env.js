@@ -20,6 +20,7 @@ const env = {
     // deployment explicitly opts in via env vars.
     sslEnabled: (process.env.DB_SSL_ENABLED || 'false').toLowerCase() === 'true',
     sslRejectUnauthorized: (process.env.DB_SSL_REJECT_UNAUTHORIZED || 'true').toLowerCase() === 'true',
+    sslCaPath: process.env.DB_SSL_CA_PATH || '',
   },
 
   jwt: {

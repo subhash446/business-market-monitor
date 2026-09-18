@@ -12,6 +12,8 @@
  * minimal CA chains require setting this false — an operational choice,
  * not a code change).
  */
+const fs = require('fs');
+const path = require('path');
 const mysql = require('mysql2/promise');
 const env = require('../config/env');
 const logger = require('../utils/logger');
@@ -27,7 +29,28 @@ const poolConfig = {
 };
 
 if (env.db.sslEnabled) {
-  poolConfig.ssl = { rejectUnauthorized: env.db.sslRejectUnauthorized };
+  const sslConfig = {
+    rejectUnauthorized: env.db.sslRejectUnauthorized,
+  };
+
+  const caPath = env.db.sslCaPath;
+  if (caPath && caPath.trim() !== '') {
+    try {
+      sslConfig.ca = fs.readFileSync(path.resolve(caPath.trim()), 'utf8');
+    } catch (err) {
+      throw new Error(
+        `[database] Failed to read SSL CA certificate at "${caPath}": ${err.message}. ` +
+        `Ensure DB_SSL_CA_PATH points to a valid and readable CA certificate file.`
+      );
+    }
+  } else if (env.db.sslRejectUnauthorized) {
+    throw new Error(
+      '[database] Database SSL certificate verification is enabled (DB_SSL_ENABLED=true, DB_SSL_REJECT_UNAUTHORIZED=true) ' +
+      'but DB_SSL_CA_PATH is not configured or is empty. Set DB_SSL_CA_PATH to your CA certificate path (e.g. ./certs/ca.pem).'
+    );
+  }
+
+  poolConfig.ssl = sslConfig;
 }
 
 const pool = mysql.createPool(poolConfig);

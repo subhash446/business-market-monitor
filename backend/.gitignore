@@ -3,3 +3,7 @@ node_modules/
 logs/*
 !logs/.gitkeep
 *.log
+
+# SSL certificates — never commit
+certs/*.pem
+certs/*.crt

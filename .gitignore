@@ -6,3 +6,9 @@
 .env
 *.env
 backend/.env
+
+# SSL certificates — never commit
+backend/certs/*.pem
+backend/certs/*.crt
+certs/*.pem
+certs/*.crt
