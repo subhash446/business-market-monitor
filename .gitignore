@@ -5,6 +5,9 @@
 # Environment / secrets — never commit
 .env
 *.env
+# Allow committed .env.production for Vite build-time public configuration
+# (VITE_* vars are public; Cloudflare Pages cannot inject build-time vars without this file)
+!frontend-react/.env.production
 backend/.env
 
 # SSL certificates — never commit
