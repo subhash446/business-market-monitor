@@ -129,8 +129,28 @@ export function setSessionExpiredHandler(handler) {
  * API CONSTANTS
  * ---------------------------------------------------------------- */
 
-/** Base path for all API calls — relative, no hardcoded domain. */
-export const API_BASE = '/api/v1';
+/**
+ * Resolves the base API URL without trailing slash issues.
+ * Supports public VITE_API_BASE_URL for cross-origin deployments (e.g. Cloudflare Pages).
+ * Defaults to relative /api/v1 for local Vite development and same-origin serving.
+ *
+ * @param {string} [rawUrl]
+ * @returns {string}
+ */
+export function resolveApiBase(rawUrl) {
+  const trimmed = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+  if (!trimmed) {
+    return '/api/v1';
+  }
+  const cleanUrl = trimmed.replace(/\/+$/, '');
+  if (cleanUrl.endsWith('/api/v1')) {
+    return cleanUrl;
+  }
+  return `${cleanUrl}/api/v1`;
+}
+
+/** Base path for all API calls. */
+export const API_BASE = resolveApiBase(import.meta.env?.VITE_API_BASE_URL);
 
 const REFRESH_URL = `${API_BASE}/auth/refresh`;
 
