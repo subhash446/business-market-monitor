@@ -35,12 +35,22 @@ const env = {
     refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
   },
 
-  smtp: {
-    host: process.env.SMTP_HOST || '',
-    port: parseInt(process.env.SMTP_PORT, 10) || 587,
-    user: process.env.SMTP_USER || '',
-    password: process.env.SMTP_PASSWORD || '',
-    fromEmail: process.env.SMTP_FROM_EMAIL || '',
+  resend: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+    /**
+     * Validates that required Resend credentials are present and non-blank.
+     * Throws an Error with actionable guidance if unconfigured.
+     */
+    validate() {
+      if (!this.apiKey || String(this.apiKey).trim() === '') {
+        throw new Error('RESEND_API_KEY is not configured. Please set RESEND_API_KEY in your .env file.');
+      }
+      if (!this.fromEmail || String(this.fromEmail).trim() === '') {
+        throw new Error('RESEND_FROM_EMAIL is not configured. Please set RESEND_FROM_EMAIL in your .env file.');
+      }
+      return true;
+    },
   },
 
   cors: {
