@@ -449,11 +449,23 @@ function MaterialTableRow({ material, busy, symbolBusy, onToggle, onSetSymbol })
       </td>
       <td className="table__cell">
         {material.isTracked && (
-          <ExternalSymbolSelect
-            material={material}
-            busy={symbolBusy}
-            onSetSymbol={onSetSymbol}
-          />
+          material.externalSymbol ? (
+            <ExternalSymbolSelect
+              material={material}
+              busy={symbolBusy}
+              onSetSymbol={onSetSymbol}
+            />
+          ) : (
+            <span className="text-xs text-secondary">
+              No automatic source —{' '}
+              <Link
+                to={`/prices?materialId=${material.id}`}
+                className="text-accent"
+              >
+                add supplier quote
+              </Link>
+            </span>
+          )
         )}
       </td>
       <td className="table__cell">
@@ -480,11 +492,23 @@ function MaterialCard({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
       </div>
       {material.isTracked && (
         <div className="material-card__symbol">
-          <ExternalSymbolSelect
-            material={material}
-            busy={symbolBusy}
-            onSetSymbol={onSetSymbol}
-          />
+          {material.externalSymbol ? (
+            <ExternalSymbolSelect
+              material={material}
+              busy={symbolBusy}
+              onSetSymbol={onSetSymbol}
+            />
+          ) : (
+            <span className="text-xs text-secondary">
+              No automatic source —{' '}
+              <Link
+                to={`/prices?materialId=${material.id}`}
+                className="text-accent"
+              >
+                add supplier quote
+              </Link>
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -560,13 +584,15 @@ function TrackButton({ material, busy, onToggle }) {
  * Links use material.id = tracked_materials.id (universal ID)
  * ──────────────────────────────────────────────────────────── */
 function ActionLinks({ material }) {
+  const logLabel = material.externalSymbol ? 'Log Price' : 'Log Supplier Quote';
+
   return (
     <div className="materials-actions">
       <Link
         to={`/prices?materialId=${material.id}`}
         className="btn btn--sm btn--ghost"
       >
-        Log Price
+        {logLabel}
       </Link>
       <Link
         to={`/trends?materialId=${material.id}`}
