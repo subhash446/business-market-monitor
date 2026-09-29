@@ -20,7 +20,7 @@
 jest.mock('../src/config/env', () => ({
   gemini: {
     apiKey:  'test-gemini-key',
-    model:   'gemini-3.8-flash',
+    model:   'gemini-3.6-flash',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     timeoutMs: 30000,
   },
