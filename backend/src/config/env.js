@@ -115,6 +115,9 @@ const env = {
     enabled: (process.env.NEWS_INGESTION_ENABLED || 'false').toLowerCase() === 'true',
     // Timeout (ms) for outbound HTTP calls to the news provider.
     timeoutMs: parseInt(process.env.NEWS_PROVIDER_TIMEOUT_MS, 10) || 15000,
+    // Minimum delay (ms) between consecutive provider requests to respect rate limits.
+    // Default: 1500ms (GNews free tier: 1 req/s max); 0 in test environment.
+    throttleMs: parseInt(process.env.NEWS_INGESTION_THROTTLE_MS, 10) || (process.env.NODE_ENV === 'test' ? 0 : 1500),
   },
 
   // GNews (gnews.io) API v4 — Primary news provider.

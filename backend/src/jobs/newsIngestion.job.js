@@ -54,7 +54,11 @@ let isRunning = false;
  *   keywordsProcessed: number,
  * }
  */
-async function runIngestion() {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runIngestion(options = {}) {
   if (!env.newsIngestion.enabled) {
     logger.info('[news-ingestion] Skipped — NEWS_INGESTION_ENABLED is false');
     return { status: 'SKIPPED', reason: 'disabled', inserted: 0, skipped: 0, errors: 0, keywordsProcessed: 0 };
@@ -94,8 +98,17 @@ async function runIngestion() {
       // Group keywords by industry to batch provider calls
       // (one call per industry, using OR-combined query "kw1 OR kw2 OR kw3")
       const byIndustry = groupKeywordsByIndustry(allKeywords);
+      const throttleMs = options.throttleMs !== undefined
+        ? options.throttleMs
+        : (env.newsIngestion.throttleMs ?? (process.env.NODE_ENV === 'test' ? 0 : 1500));
 
+      let isFirst = true;
       for (const [industryId, kwRows] of byIndustry) {
+        if (!isFirst && throttleMs > 0) {
+          await sleep(throttleMs);
+        }
+        isFirst = false;
+
         const query = kwRows.map((k) => `"${k.keyword}"`).join(' OR ');
         keywordsProcessed += kwRows.length;
 

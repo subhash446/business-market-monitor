@@ -339,4 +339,25 @@ describe('newsIngestion.job — runIngestion()', () => {
     // Run-end: lastStatus = SUCCESS
     expect(syncRepo.upsert.mock.calls[1][1]).toMatchObject({ lastStatus: 'SUCCESS' });
   });
+
+  test('13. multi-industry throttle delay is respected across industries', async () => {
+    const newsRepo = require('../src/repositories/news.repository');
+    const gnews    = require('../src/providers/gnews.provider');
+    const svc      = require('../src/services/newsIngestion.service');
+
+    newsRepo.listKeywordsWithIndustry.mockResolvedValue([
+      { id: 1, keyword: 'packaging', industry_id: 1 },
+      { id: 2, keyword: 'polymer', industry_id: 2 },
+    ]);
+    gnews.fetchArticlesByKeyword.mockResolvedValue([]);
+    svc.ingestArticle.mockResolvedValue({ status: 'inserted', newsItemId: 1 });
+
+    const start = Date.now();
+    const result = await runIngestion({ throttleMs: 50 });
+    const elapsed = Date.now() - start;
+
+    expect(result.status).toBe('SUCCESS');
+    expect(gnews.fetchArticlesByKeyword).toHaveBeenCalledTimes(2);
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+  });
 });

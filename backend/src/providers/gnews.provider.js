@@ -67,7 +67,8 @@ class ProviderError extends Error {
  * @returns {Promise<NewsArticle[]>}
  * @throws {ProviderError}
  */
-async function fetchArticlesByKeyword(keyword, { max = 10, lang = 'en' } = {}) {
+async function fetchArticlesByKeyword(keyword, opts = {}) {
+  const { max = 10, lang = 'en', _retryCount = 0 } = opts;
   const url = buildUrl(keyword, { max, lang });
   const timeoutMs = env.newsIngestion.timeoutMs;
 
@@ -98,6 +99,17 @@ async function fetchArticlesByKeyword(keyword, { max = 10, lang = 'en' } = {}) {
     throw new ProviderError(
       'PROVIDER_AUTH',
       `GNews authentication failed (HTTP ${response.status}) — check GNEWS_API_KEY`
+    );
+  }
+
+  if (response.status === 429) {
+    if (_retryCount < 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return fetchArticlesByKeyword(keyword, { ...opts, _retryCount: _retryCount + 1 });
+    }
+    throw new ProviderError(
+      'PROVIDER_RATE_LIMIT',
+      `GNews rate limit exceeded (HTTP 429)`
     );
   }
 

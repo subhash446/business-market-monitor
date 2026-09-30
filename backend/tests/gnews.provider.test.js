@@ -194,4 +194,41 @@ describe('gnews.provider — fetchArticlesByKeyword()', () => {
 
     jest.resetModules();
   });
+
+  // ── 4. Rate limit (429) & retry ──────────────────────────────────────────
+
+  test('14. retries once on 429 and returns normalized articles if retry succeeds', async () => {
+    let callCount = 0;
+    global.fetch = jest.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          json: jest.fn().mockResolvedValue({ errors: ['Rate limit reached'] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue(makeGNewsResponse([makeArticle()])),
+      });
+    });
+
+    const results = await fetchArticlesByKeyword('crude oil');
+    expect(callCount).toBe(2);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe('Crude oil price India rises sharply');
+  }, 10000);
+
+  test('15. throws PROVIDER_RATE_LIMIT when 429 persists after retry', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: jest.fn().mockResolvedValue({ errors: ['Rate limit reached'] }),
+    });
+
+    await expect(fetchArticlesByKeyword('crude oil'))
+      .rejects.toMatchObject({ name: 'ProviderError', code: 'PROVIDER_RATE_LIMIT' });
+  }, 10000);
 });
