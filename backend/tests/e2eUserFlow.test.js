@@ -34,6 +34,11 @@ jest.mock('../src/services/notification.service', () => ({
   sendAlertNotification: jest.fn().mockResolvedValue({ messageId: 'msg-123' }),
 }));
 
+jest.mock('../src/email/mailer', () => ({
+  sendEmail: jest.fn().mockResolvedValue({ id: 'resend-msg-123' }),
+  verifyConnection: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock('../src/providers/gemini.provider', () => ({
   generateInsight: jest.fn(),
   ProviderError: class ProviderError extends Error {

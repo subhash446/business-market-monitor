@@ -23,6 +23,11 @@ jest.mock('../src/utils/logger', () => ({
   flush: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../src/email/mailer', () => ({
+  sendEmail: jest.fn().mockResolvedValue({ id: 'msg-test-123' }),
+  verifyConnection: jest.fn().mockResolvedValue(true),
+}));
+
 const { pool } = require('../src/database/connection');
 const logger = require('../src/utils/logger');
 const env = require('../src/config/env');
@@ -89,47 +94,76 @@ describe('Security Hardening Audit Checks', () => {
     const userRepository = require('../src/repositories/user.repository');
     const userTokenRepository = require('../src/repositories/userToken.repository');
     const authService = require('../src/services/auth.service');
+    const mailer = require('../src/email/mailer');
 
-    test('raw password reset token is NOT logged in production environment', async () => {
-      const originalNodeEnv = env.nodeEnv;
-      try {
-        env.nodeEnv = 'production';
+    test('raw password reset token and reset URL are NEVER logged in any environment', async () => {
+      jest.spyOn(userRepository, 'findByEmail').mockResolvedValue({ id: 42, email: 'user@example.com' });
+      jest.spyOn(userTokenRepository, 'invalidateActiveTokensForUser').mockResolvedValue();
+      jest.spyOn(userTokenRepository, 'create').mockResolvedValue();
+      jest.spyOn(mailer, 'sendEmail').mockResolvedValue({ id: 'msg-1' });
 
-        jest.spyOn(userRepository, 'findByEmail').mockResolvedValue({ id: 42, email: 'user@example.com' });
-        jest.spyOn(userTokenRepository, 'invalidateActiveTokensForUser').mockResolvedValue();
-        jest.spyOn(userTokenRepository, 'create').mockResolvedValue();
+      for (const testEnv of ['production', 'development', 'staging', 'test']) {
+        const originalEnv = env.nodeEnv;
+        env.nodeEnv = testEnv;
+        try {
+          logger.info.mockClear();
+          logger.error.mockClear();
+          logger.warn.mockClear();
 
-        await authService.requestPasswordReset('user@example.com');
+          await authService.requestPasswordReset('user@example.com');
 
-        expect(logger.info).toHaveBeenCalledTimes(1);
-        const loggedMessage = logger.info.mock.calls[0][0];
+          expect(logger.info).toHaveBeenCalledWith('[auth] Password reset email sent for user 42');
 
-        // Must log that reset was requested, but must NOT leak the raw token in production
-        expect(loggedMessage).toContain('Password reset requested for user 42');
-        expect(loggedMessage).not.toContain('raw token =');
-      } finally {
-        env.nodeEnv = originalNodeEnv;
+          const allLogged = [
+            ...logger.info.mock.calls.map(c => c[0]),
+            ...logger.error.mock.calls.map(c => c[0]),
+            ...logger.warn.mock.calls.map(c => c[0]),
+          ].join(' ');
+
+          expect(allLogged).not.toContain('raw token');
+          expect(allLogged).not.toContain('/reset-password?token=');
+          expect(allLogged).not.toContain('DEV-ONLY');
+        } finally {
+          env.nodeEnv = originalEnv;
+        }
       }
     });
 
-    test('raw password reset token is only logged in non-production environments with DEV-ONLY tag', async () => {
-      const originalNodeEnv = env.nodeEnv;
-      try {
-        env.nodeEnv = 'development';
+    test('dispatches email via mailer with recipient and reset link', async () => {
+      jest.spyOn(userRepository, 'findByEmail').mockResolvedValue({ id: 42, email: 'user@example.com' });
+      jest.spyOn(userTokenRepository, 'invalidateActiveTokensForUser').mockResolvedValue();
+      jest.spyOn(userTokenRepository, 'create').mockResolvedValue();
+      const sendEmailSpy = jest.spyOn(mailer, 'sendEmail').mockResolvedValue({ id: 'msg-1' });
 
-        jest.spyOn(userRepository, 'findByEmail').mockResolvedValue({ id: 42, email: 'user@example.com' });
-        jest.spyOn(userTokenRepository, 'invalidateActiveTokensForUser').mockResolvedValue();
-        jest.spyOn(userTokenRepository, 'create').mockResolvedValue();
+      await authService.requestPasswordReset('user@example.com');
 
-        await authService.requestPasswordReset('user@example.com');
+      expect(sendEmailSpy).toHaveBeenCalledTimes(1);
+      const callArg = sendEmailSpy.mock.calls[0][0];
+      expect(callArg.to).toBe('user@example.com');
+      expect(callArg.subject).toBe('Reset Your Password - Business Market Monitor');
+      expect(callArg.html).toContain('/reset-password?token=');
+      expect(callArg.html).toContain('Reset Password');
+    });
 
-        expect(logger.info).toHaveBeenCalledTimes(1);
-        const loggedMessage = logger.info.mock.calls[0][0];
+    test('handles mailer failure safely without falsely reporting success and without leaking tokens', async () => {
+      jest.spyOn(userRepository, 'findByEmail').mockResolvedValue({ id: 42, email: 'user@example.com' });
+      jest.spyOn(userTokenRepository, 'invalidateActiveTokensForUser').mockResolvedValue();
+      jest.spyOn(userTokenRepository, 'create').mockResolvedValue();
+      jest.spyOn(mailer, 'sendEmail').mockRejectedValue(new Error('Resend API down'));
 
-        expect(loggedMessage).toContain('DEV-ONLY, no email service configured: raw token =');
-      } finally {
-        env.nodeEnv = originalNodeEnv;
-      }
+      await expect(
+        authService.requestPasswordReset('user@example.com')
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to send password reset email. Please try again later.',
+      });
+
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      const errorMsg = logger.error.mock.calls[0][0];
+      expect(errorMsg).toContain('[auth] Failed to send password reset email for user 42: Resend API down');
+      expect(errorMsg).not.toContain('token=');
+      expect(errorMsg).not.toContain('raw token');
     });
   });
 

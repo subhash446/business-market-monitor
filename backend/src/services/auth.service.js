@@ -15,6 +15,8 @@ const jwtConfig = require('../config/jwt.config');
 const env = require('../config/env');
 const logger = require('../utils/logger');
 const AppError = require('../utils/AppError');
+const mailer = require('../email/mailer');
+const { buildPasswordResetEmail } = require('../email/templates/passwordReset.template');
 
 // Production Hardening Phase B, finding H-3: looks up the user's business
 // once, at token-issuance time (login/refresh), instead of leaving
@@ -125,16 +127,24 @@ async function requestPasswordReset(email) {
     expiresAt,
   });
 
-  // Nodemailer/email delivery has never been implemented in this project
-  // (explicitly deferred since Phase 9 — Document 3 §10's channel-agnostic
-  // NotificationService doesn't exist yet either). Logging the raw token
-  // is a development-only stand-in for the real email send this endpoint
-  // is documented to perform (Document 5 §4.1) — it is never returned in
-  // the API response. In production, the raw token is NEVER logged.
-  if (env.nodeEnv !== 'production') {
-    logger.info(`[auth] Password reset requested for user ${user.id} — DEV-ONLY, no email service configured: raw token = ${rawToken}`);
-  } else {
-    logger.info(`[auth] Password reset requested for user ${user.id}`);
+  const baseUrl = (process.env.CLIENT_URL || process.env.FRONTEND_URL || env.cors?.allowedOrigin || 'http://localhost:5000').split(',')[0].trim().replace(/\/+$/, '');
+  const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+  const { subject, html } = buildPasswordResetEmail({
+    resetUrl,
+    expiryMinutes: env.passwordReset.tokenExpiryMinutes,
+  });
+
+  try {
+    await mailer.sendEmail({
+      to: user.email || email,
+      subject,
+      html,
+    });
+    logger.info(`[auth] Password reset email sent for user ${user.id}`);
+  } catch (err) {
+    logger.error(`[auth] Failed to send password reset email for user ${user.id}: ${err.message}`);
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to send password reset email. Please try again later.');
   }
 }
 
