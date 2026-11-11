@@ -19,6 +19,7 @@ const crypto = require('crypto');
 // ── Read methods (existing, unchanged) ────────────────────────────────────────
 
 async function listByIndustry(industryId, { limit, offset }) {
+  if (!industryId) return [];
   // mysql2's prepared statements (execute()) don't support LIMIT/OFFSET as
   // bound `?` placeholders (throws ER_WRONG_ARGUMENTS). limit/offset are
   // already validated, server-generated integers from utils/pagination.js
@@ -41,6 +42,7 @@ async function listByIndustry(industryId, { limit, offset }) {
 }
 
 async function countByIndustry(industryId) {
+  if (!industryId) return 0;
   const [rows] = await pool.execute(
     `SELECT COUNT(DISTINCT ni.id) AS total
      FROM news_items ni
@@ -48,7 +50,7 @@ async function countByIndustry(industryId) {
      WHERE nit.industry_id = ?`,
     [industryId]
   );
-  return rows[0].total;
+  return Number(rows[0]?.total || 0);
 }
 
 // ── Write methods (Phase G — News Ingestion) ──────────────────────────────────
@@ -126,21 +128,16 @@ async function listKeywordsWithIndustry() {
   return rows;
 }
 
-// Phase H (AI Insights Job) -- purely additive, nothing above changed.
-//
-// Fetches the most-recent news headlines for an industry, with a fixed cap.
-// Used by the AI insights job to gather headline evidence before calling
-// the LLM. Not paginated: the job needs the most-recent N headlines; the
-// aiInsight.service further caps to MAX_NEWS_ITEMS (5) before prompt build.
-// Returns only the columns needed for AI evidence: title, summary,
-// source_name, published_at. URL and id are intentionally excluded
-// because the AI insights job does not store news references.
+// Phase 3 (Evidence Traceability) -- returns article id and url alongside headline
+// so that AI insights can link exact source evidence into ai_insight_evidence_news.
 async function listRecentByIndustry(industryId, limit = 10) {
   const safeLimit = Number(limit);
 
   const [rows] = await pool.execute(
     `SELECT DISTINCT
+       ni.id,
        ni.title,
+       ni.url,
        ni.summary,
        ni.source_name,
        ni.published_at

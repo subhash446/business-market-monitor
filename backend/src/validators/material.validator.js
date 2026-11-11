@@ -1,52 +1,89 @@
 /**
  * Request body validation for Raw Material Tracking (Document 5 §3.3, §4.5;
- * Document 2 FR-MAT-01, 03). Hand-rolled, dependency-free — same approach
+ * Document 2 FR-MAT-01, 02, 03, 04). Hand-rolled, dependency-free — same approach
  * as auth.validator.js and business.validator.js.
  *
- * Phase 6A scope only: PATCH may update isTracked ONLY. name, category,
- * unit, businessId, industryId, and any template-derived data are all
- * rejected here — a generic "unknown field" check, not a name-by-name list,
- * so anything not explicitly allowed is refused by default.
+ * Phase 6A scope:
+ *   PATCH /api/v1/materials/:materialId
+ *   May update any subset of: isTracked, customName, unitId.
+ *   - At least one field must be provided.
+ *   - Any unknown/unsupported field is rejected.
+ *   - isTracked must be boolean if provided.
+ *   - customName must be non-empty string <= 150 chars if provided.
+ *   - unitId must be positive integer if provided.
+ *
+ * Phase 6B scope:
+ *   POST /api/v1/materials
+ *   Requires customName and unitId.
+ *   - customName required, non-empty, max 150 chars.
+ *   - unitId required, positive integer referencing units_of_measurement.
  */
-const ALLOWED_UPDATE_FIELDS = ['isTracked'];
+
+const ALLOWED_UPDATE_FIELDS = ['isTracked', 'customName', 'unitId'];
+const MAX_CUSTOM_NAME_LENGTH = 150;
+const { isStrictPositiveInteger } = require('../utils/validationHelpers');
 
 function validateUpdateMaterial(body) {
   const errors = [];
-  const providedFields = Object.keys(body || {});
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    errors.push({ field: 'body', issue: 'must be an object' });
+    return errors;
+  }
+
+  const providedFields = Object.keys(body);
 
   const disallowed = providedFields.filter((field) => !ALLOWED_UPDATE_FIELDS.includes(field));
   disallowed.forEach((field) => {
     errors.push({ field, issue: 'cannot be updated' });
   });
 
-  if (body.isTracked === undefined) {
-    errors.push({ field: 'isTracked', issue: 'is required' });
-  } else if (typeof body.isTracked !== 'boolean') {
-    errors.push({ field: 'isTracked', issue: 'must be a boolean' });
+  if (providedFields.length === 0) {
+    errors.push({ field: 'body', issue: 'must provide at least one field to update' });
+    return errors;
+  }
+
+  if (body.isTracked !== undefined) {
+    if (typeof body.isTracked !== 'boolean') {
+      errors.push({ field: 'isTracked', issue: 'must be a boolean' });
+    }
+  }
+
+  if (body.customName !== undefined) {
+    if (typeof body.customName !== 'string' || !body.customName.trim()) {
+      errors.push({ field: 'customName', issue: 'cannot be empty' });
+    } else if (body.customName.trim().length > MAX_CUSTOM_NAME_LENGTH) {
+      errors.push({ field: 'customName', issue: `must be at most ${MAX_CUSTOM_NAME_LENGTH} characters` });
+    }
+  }
+
+  if (body.unitId !== undefined) {
+    if (!isStrictPositiveInteger(body.unitId)) {
+      errors.push({ field: 'unitId', issue: 'must be a valid unit id' });
+    }
   }
 
   return errors;
 }
 
-// Added in Phase 6B (Custom Materials, FR-MAT-02).
-// 150-char limit matches tracked_materials.custom_name VARCHAR(150)
-// (Document 4 §5.4) exactly — rejected here before it ever reaches the DB.
-// Duplicate-name and invalid-unitId existence checks are NOT done here —
-// those require a database lookup, so they belong in the service layer
-// (materialTracking.service.js), consistent with how business.validator.js
-// only checks shape/format and leaves industryId existence to the service.
-const MAX_CUSTOM_NAME_LENGTH = 150;
-
 function validateCreateMaterial(body) {
   const errors = [];
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    errors.push({ field: 'body', issue: 'must be an object' });
+    return errors;
+  }
 
-  if (!body.customName || !String(body.customName).trim()) {
+  const providedFields = Object.keys(body);
+  const allowedFields = ['customName', 'unitId'];
+  const disallowed = providedFields.filter((f) => !allowedFields.includes(f));
+  disallowed.forEach((f) => errors.push({ field: f, issue: 'is not an allowed field' }));
+
+  if (!body.customName || typeof body.customName !== 'string' || !body.customName.trim()) {
     errors.push({ field: 'customName', issue: 'is required' });
-  } else if (String(body.customName).trim().length > MAX_CUSTOM_NAME_LENGTH) {
+  } else if (body.customName.trim().length > MAX_CUSTOM_NAME_LENGTH) {
     errors.push({ field: 'customName', issue: `must be at most ${MAX_CUSTOM_NAME_LENGTH} characters` });
   }
 
-  if (body.unitId === undefined || body.unitId === null || Number.isNaN(Number(body.unitId))) {
+  if (!isStrictPositiveInteger(body.unitId)) {
     errors.push({ field: 'unitId', issue: 'is required and must be a valid id' });
   }
 
@@ -54,31 +91,20 @@ function validateCreateMaterial(body) {
 }
 
 // Added in Phase B (External Symbol Management) — purely additive.
-//
-// Validates the body of PATCH /api/v1/materials/:materialId/external-symbol.
-// Allowed body shapes:
-//   { "externalSymbol": "WTI" }
-//   { "externalSymbol": "BRENT" }
-//   { "externalSymbol": null }
-//
-// The allowed values are driven by SUPPORTED_SYMBOLS — the single source of
-// truth for which commodities the application can ingest automatically.
-// Any string value not in that set is rejected here, before it ever reaches
-// the service or database.
 const { SUPPORTED_SYMBOLS } = require('../config/commodityMapping');
 const ALLOWED_SYMBOLS = Object.values(SUPPORTED_SYMBOLS);
-const ALLOWED_BODY_FIELDS = ['externalSymbol'];
+const ALLOWED_SYMBOL_BODY_FIELDS = ['externalSymbol'];
 
 function validateSetExternalSymbol(body) {
   const errors = [];
   const providedFields = Object.keys(body || {});
 
-  const disallowed = providedFields.filter((f) => !ALLOWED_BODY_FIELDS.includes(f));
+  const disallowed = providedFields.filter((f) => !ALLOWED_SYMBOL_BODY_FIELDS.includes(f));
   disallowed.forEach((f) => errors.push({ field: f, issue: 'cannot be set here' }));
 
   if (!providedFields.includes('externalSymbol')) {
     errors.push({ field: 'externalSymbol', issue: 'is required' });
-    return errors; // no point type-checking a missing field
+    return errors;
   }
 
   const { externalSymbol } = body;
@@ -97,4 +123,8 @@ function validateSetExternalSymbol(body) {
   return errors;
 }
 
-module.exports = { validateUpdateMaterial, validateCreateMaterial, validateSetExternalSymbol };
+module.exports = {
+  validateUpdateMaterial,
+  validateCreateMaterial,
+  validateSetExternalSymbol,
+};

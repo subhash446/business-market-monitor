@@ -22,28 +22,55 @@ async function findIndustryById(industryId) {
 }
 
 async function getRawMaterialsByIndustry(industryId) {
-  const [rows] = await pool.execute(
-    `SELECT rm.id, rm.name, rm.description, u.abbreviation AS unit_abbreviation, u.name AS unit_name
-     FROM raw_materials rm
-     JOIN units_of_measurement u ON u.id = rm.default_unit_id
-     WHERE rm.industry_id = ?
-     ORDER BY rm.name`,
-    [industryId]
-  );
-  return rows;
+  try {
+    const [rows] = await pool.execute(
+      `SELECT rm.id, rm.name, rm.description, rm.default_external_symbol,
+              u.abbreviation AS unit_abbreviation, u.name AS unit_name
+       FROM raw_materials rm
+       JOIN units_of_measurement u ON u.id = rm.default_unit_id
+       WHERE rm.industry_id = ?
+       ORDER BY rm.name`,
+      [industryId]
+    );
+    return rows;
+  } catch {
+    const [rows] = await pool.execute(
+      `SELECT rm.id, rm.name, rm.description,
+              u.abbreviation AS unit_abbreviation, u.name AS unit_name
+       FROM raw_materials rm
+       JOIN units_of_measurement u ON u.id = rm.default_unit_id
+       WHERE rm.industry_id = ?
+       ORDER BY rm.name`,
+      [industryId]
+    );
+    return rows;
+  }
 }
 
-// Added in Phase 5 (Template Generation) — purely additive, no existing
-// function above was changed. Returns the raw default_unit_id (not just its
-// display abbreviation) needed to write tracked_materials.unit_id;
-// the existing getRawMaterialsByIndustry() above stays exactly as Phase 4
-// left it, for the read-only KB API response shape (Document 5 §4.3).
+// Added in Phase 5 (Template Generation) — returns id, name, default_unit_id,
+// and default_external_symbol needed to write tracked_materials rows.
 async function getRawMaterialsForTemplateGeneration(industryId) {
-  const [rows] = await pool.execute(
-    'SELECT id, default_unit_id FROM raw_materials WHERE industry_id = ? ORDER BY name',
-    [industryId]
-  );
-  return rows;
+  try {
+    const [rows] = await pool.execute(
+      `SELECT rm.id, rm.name, rm.default_unit_id, rm.default_external_symbol, ind.slug AS industry_slug
+       FROM raw_materials rm
+       JOIN industries ind ON ind.id = rm.industry_id
+       WHERE rm.industry_id = ?
+       ORDER BY rm.name`,
+      [industryId]
+    );
+    return rows;
+  } catch {
+    const [rows] = await pool.execute(
+      `SELECT rm.id, rm.name, rm.default_unit_id, ind.slug AS industry_slug
+       FROM raw_materials rm
+       JOIN industries ind ON ind.id = rm.industry_id
+       WHERE rm.industry_id = ?
+       ORDER BY rm.name`,
+      [industryId]
+    );
+    return rows;
+  }
 }
 
 async function getCostDriversByIndustry(industryId) {

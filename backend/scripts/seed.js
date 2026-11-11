@@ -75,12 +75,14 @@ async function seedRawMaterials() {
     const industryId = await getIndustryId(row.industrySlug);
     const unitId = await getUnitId(row.unitAbbr);
     const [result] = await pool.execute(
-      'INSERT IGNORE INTO raw_materials (industry_id, name, default_unit_id) VALUES (?, ?, ?)',
-      [industryId, row.name, unitId]
+      `INSERT INTO raw_materials (industry_id, name, default_unit_id, default_external_symbol)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE default_external_symbol = VALUES(default_external_symbol)`,
+      [industryId, row.name, unitId, row.defaultExternalSymbol || null]
     );
     if (result.affectedRows > 0) count += 1;
   }
-  console.log(`[seed] raw_materials: ${count} inserted, ${rawMaterialsSeed.rows.length - count} already existed`);
+  console.log(`[seed] raw_materials: ${count} inserted/updated, ${rawMaterialsSeed.rows.length - count} unchanged`);
 }
 
 async function seedCostDrivers() {

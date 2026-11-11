@@ -82,8 +82,20 @@ export async function getAlertRules() {
  * @returns {Promise<{id,trackedMaterialId,conditionType,thresholdPrice,isActive}>}
  * @throws 400 VALIDATION_ERROR, 404 NOT_FOUND, 409 CONFLICT
  */
-export async function createAlertRule({ trackedMaterialId, conditionType, thresholdPrice }) {
-  const { data } = await post('/alerts/rules', { trackedMaterialId, conditionType, thresholdPrice });
+export async function createAlertRule({
+  trackedMaterialId,
+  conditionType,
+  thresholdPrice,
+  thresholdType = 'ABSOLUTE',
+  cooldownHours = 24,
+}) {
+  const { data } = await post('/alerts/rules', {
+    trackedMaterialId,
+    conditionType,
+    thresholdPrice,
+    thresholdType,
+    cooldownHours,
+  });
   return data;
 }
 

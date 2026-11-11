@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AI Market Intelligence controller (Phase H).
  *
  * All three endpoints are read-only.
@@ -63,4 +63,19 @@ async function listLatestForBusiness(req, res, next) {
   }
 }
 
-module.exports = { getLatest, listHistory, listLatestForBusiness };
+// GET /api/v1/ai-insights/:insightId/evidence
+// Returns full supporting evidence (prices & news) with strict tenant isolation.
+async function getEvidence(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const evidence = await aiInsightQueryService.getInsightEvidence(
+      businessId,
+      req.params.insightId
+    );
+    sendSuccess(res, evidence);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getLatest, listHistory, listLatestForBusiness, getEvidence };

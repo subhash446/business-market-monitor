@@ -3,6 +3,7 @@
  * BusinessService). Framework-agnostic — no req/res, no SQL (Document 3 §3).
  */
 const businessRepository = require('../repositories/business.repository');
+const materialRepository = require('../repositories/material.repository');
 const templateGenerationService = require('./templateGeneration.service');
 const AppError = require('../utils/AppError');
 
@@ -21,9 +22,6 @@ async function createBusiness({ userId, name, industryId, contactEmail, contactP
   try {
     business = await businessRepository.create({ userId, industryId, name, contactEmail, contactPhone, address });
   } catch (err) {
-    // DB-level safety net behind the application-level check above
-    // (Document 4 §5.2 UNIQUE KEY uq_businesses_user_id) — closes the
-    // same race-condition gap as auth.service.js's registration check.
     if (err.code === 'ER_DUP_ENTRY') {
       throw new AppError(409, 'CONFLICT', 'This user already has a business');
     }
@@ -31,12 +29,21 @@ async function createBusiness({ userId, name, industryId, contactEmail, contactP
   }
 
   const { materialsGenerated } = await templateGenerationService.generateTemplate(business.id, industryId);
+  const trackedList = await materialRepository.listByBusinessId(business.id);
 
   return {
     id: business.id,
     name: business.name,
     industryId: business.industry_id,
     materialsGenerated,
+    materials: (trackedList || []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      unit: m.unit_abbreviation,
+      isTracked: !!m.is_tracked,
+      externalSymbol: m.external_symbol,
+      hasAutomatedFeed: !!m.external_symbol,
+    })),
   };
 }
 
@@ -54,9 +61,6 @@ async function updateBusiness(userId, updates) {
     throw new AppError(404, 'NOT_FOUND', 'Business not found');
   }
 
-  // industryId is deliberately not accepted here at all (Document 5 §4.2) —
-  // enforced earlier at the validator layer (business.validator.js), which
-  // rejects the request before it ever reaches this service.
   const updated = await businessRepository.update(business.id, {
     name: updates.name,
     contactEmail: updates.contactEmail ?? business.contact_email,

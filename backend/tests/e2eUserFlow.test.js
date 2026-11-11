@@ -338,6 +338,7 @@ describe('Full V1 End-to-End Product Flow', () => {
       triggered_at: '2026-09-16T10:00:00Z',
     });
     jest.spyOn(alertEventRepository, 'updateDeliveryStatus').mockResolvedValue();
+    jest.spyOn(alertRuleRepository, 'claimTriggerCooldown').mockResolvedValueOnce(true);
 
     const triggeredEvents = await alertEvaluationService.evaluateMaterial(10, 101);
     expect(triggeredEvents.length).toBe(1);

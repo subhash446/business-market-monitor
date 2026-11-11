@@ -6,7 +6,7 @@ const dashboardAggregationService = require('../services/dashboardAggregation.se
 const resolveBusinessId = require('../utils/resolveBusinessId');
 const { sendSuccess } = require('../utils/response');
 
-// GET /api/v1/dashboard — FR-DASH-01, 03, 04 (FR-DASH-02 omitted, see service file header)
+// GET /api/v1/dashboard — FR-DASH-01, 02, 03, 04
 async function getDashboard(req, res, next) {
   try {
     const businessId = await resolveBusinessId(req.auth);

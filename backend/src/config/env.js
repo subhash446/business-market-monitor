@@ -108,6 +108,16 @@ const env = {
     get timeoutMs() { return env.priceIngestion.timeoutMs; },
   },
 
+  // Indian Government data provider (Phase 4 — Data.gov.in / Agmarknet / MoAFW).
+  // Free registration: https://data.gov.in
+  indiaGovt: {
+    enabled: (process.env.INDIA_GOVT_DATA_ENABLED || 'false').toLowerCase() === 'true',
+    apiKey: process.env.GOV_DATA_API_KEY,
+    baseUrl: process.env.DATA_GOV_IN_BASE_URL || 'https://api.data.gov.in',
+    resourceIdMandi: process.env.DATA_GOV_IN_MANDI_RESOURCE_ID || '9ef84268-d588-465a-a308-a864a43d0070',
+    get timeoutMs() { return env.priceIngestion.timeoutMs; },
+  },
+
   // Automatic news ingestion (Phase G).
   // Opt-in: disabled by default so existing deployments without a provider
   // key continue to start cleanly.
@@ -138,6 +148,12 @@ const env = {
     // Timeout (ms) for Gemini API calls. LLM calls are slower than data APIs;
     // 30 s is a reasonable upper bound for a 1-2 KB prompt on Flash models.
     timeoutMs: parseInt(process.env.AI_INSIGHTS_TIMEOUT_MS, 10) || 30000,
+  },
+
+  // Automatic Alert Evaluation job (Phase 2).
+  // Opt-in: disabled by default (ALERT_EVALUATION_ENABLED=true to activate).
+  alertEvaluation: {
+    enabled: (process.env.ALERT_EVALUATION_ENABLED || 'false').toLowerCase() === 'true',
   },
 
   // Google Gemini API -- Primary LLM provider for AI insights.

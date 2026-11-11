@@ -1,5 +1,5 @@
 /**
- * Automatic price ingestion job (Phase A — Document 3 §8).
+ * Automatic price ingestion job (Phase A — Document 3 §8, Phase 4 Multi-Provider).
  *
  * Scheduled via node-cron using env.cron.priceIngestion (PRICE_INGESTION_CRON,
  * default: '0 5 * * *' — 05:00 UTC daily). The scheduler is initialised
@@ -7,9 +7,11 @@
  * behaves consistently across local development, cloud deployment, and
  * production servers regardless of the host system timezone.
  *
- * Job lifecycle:
- *   start()  — called once in server.js after app.listen()
- *   stop()   — called in server.js graceful-shutdown handler
+ * Supported providers:
+ *   1. U.S. Energy Information Administration (EIA):
+ *      WTI, BRENT (Crude oil proxy benchmarks)
+ *   2. Data.gov.in / Agmarknet / Ministry of Agriculture (India Govt):
+ *      WHEAT_GOI, SUGAR_GOI, EDIBLE_OIL_GOI (Indian wholesale mandi modal prices)
  *
  * Safety guarantees:
  *   - Skips execution when PRICE_INGESTION_ENABLED=false (safe default)
@@ -17,14 +19,15 @@
  *     the next scheduled tick is logged and skipped (appropriate for a
  *     single-process Node.js server — no Redis/BullMQ needed)
  *   - All provider errors are caught and logged; the application never
- *     crashes because the provider is unavailable
+ *     crashes because a provider is unavailable
  *   - Sync status is always written at run-start (last_run_at) and at
  *     run-end (last_status: SUCCESS or FAILED) regardless of outcome
  */
 const cron = require('node-cron');
 const env = require('../config/env');
 const logger = require('../utils/logger');
-const { fetchLatestPrices, ProviderError } = require('../providers/eia.provider');
+const eiaProvider = require('../providers/eia.provider');
+const indiaGovtProvider = require('../providers/indiaGovt.provider');
 const materialRepository = require('../repositories/material.repository');
 const syncStatusRepository = require('../repositories/syncStatus.repository');
 const { ingestFromProvider } = require('../services/priceIngestion.service');
@@ -83,27 +86,76 @@ async function runIngestion() {
   let jobStatus = JOB_STATUS.SUCCESS;
   let jobError;
 
-  try {
-    // === Step 1: Fetch latest prices from EIA (single batch request) ===
-    providerResults = await fetchLatestPrices(symbols);
-    logger.info(
-      `[price-ingestion] Provider returned ${providerResults.length} price(s): ` +
-      providerResults.map((r) => `${r.symbol}=${r.price} on ${r.recordedAt}`).join(', ')
-    );
-  } catch (err) {
-    jobStatus = JOB_STATUS.FAILED;
-    jobError = err;
+  // === Step 1: Fetch latest prices from configured providers ===
 
-    if (err instanceof ProviderError) {
-      if (err.code === 'PROVIDER_AUTH') {
-        // Auth errors indicate a misconfigured key — log as error-level so
-        // it's visible and actionable; no point retrying in the same process.
-        logger.error(`[price-ingestion] Provider auth error — check EIA_API_KEY: ${err.message}`);
+  // 1a. EIA Provider (Crude Oil Proxies: WTI, BRENT)
+  const eiaSymbols = symbols.filter(
+    (sym) => sym === SUPPORTED_SYMBOLS.WTI || sym === SUPPORTED_SYMBOLS.BRENT
+  );
+
+  if (eiaSymbols.length > 0) {
+    try {
+      const eiaPrices = await eiaProvider.fetchLatestPrices(eiaSymbols);
+      providerResults.push(...eiaPrices);
+      logger.info(
+        `[price-ingestion] EIA provider returned ${eiaPrices.length} price(s): ` +
+        eiaPrices.map((r) => `${r.symbol}=${r.price} on ${r.recordedAt}`).join(', ')
+      );
+    } catch (err) {
+      jobStatus = JOB_STATUS.FAILED;
+      jobError = err;
+
+      if (err instanceof eiaProvider.ProviderError || err.name === 'ProviderError') {
+        if (err.code === 'PROVIDER_AUTH') {
+          logger.error(`[price-ingestion] Provider auth error — check EIA_API_KEY: ${err.message}`);
+        } else {
+          logger.warn(`[price-ingestion] EIA provider error (${err.code}): ${err.message}`);
+        }
       } else {
-        logger.warn(`[price-ingestion] Provider error (${err.code}): ${err.message}`);
+        logger.error('[price-ingestion] Unexpected error calling EIA provider:', err.message);
       }
+    }
+  }
+
+  // 1b. Indian Government Provider (data.gov.in / Agmarknet: WHEAT_GOI, SUGAR_GOI, EDIBLE_OIL_GOI)
+  const goiSymbols = symbols.filter(
+    (sym) =>
+      sym === SUPPORTED_SYMBOLS.WHEAT_GOI ||
+      sym === SUPPORTED_SYMBOLS.SUGAR_GOI ||
+      sym === SUPPORTED_SYMBOLS.EDIBLE_OIL_GOI
+  );
+
+  if (goiSymbols.length > 0) {
+    if (!env.indiaGovt || !env.indiaGovt.enabled) {
+      logger.info(
+        '[price-ingestion] India Govt provider skipped — INDIA_GOVT_DATA_ENABLED is false or unconfigured'
+      );
     } else {
-      logger.error('[price-ingestion] Unexpected error calling provider:', err.message);
+      try {
+        const goiPrices = await indiaGovtProvider.fetchLatestPrices(goiSymbols);
+        providerResults.push(...goiPrices);
+        logger.info(
+          `[price-ingestion] India Govt provider returned ${goiPrices.length} price(s): ` +
+          goiPrices.map((r) => `${r.symbol}=${r.price} on ${r.recordedAt}`).join(', ')
+        );
+      } catch (err) {
+        jobStatus = JOB_STATUS.FAILED;
+        if (!jobError) jobError = err;
+
+        if (err instanceof indiaGovtProvider.ProviderError || err.name === 'ProviderError') {
+          if (err.code === 'PROVIDER_AUTH') {
+            logger.error(
+              `[price-ingestion] Provider auth error — check GOV_DATA_API_KEY: ${err.message}`
+            );
+          } else {
+            logger.warn(
+              `[price-ingestion] India Govt provider error (${err.code}): ${err.message}`
+            );
+          }
+        } else {
+          logger.error('[price-ingestion] Unexpected error calling India Govt provider:', err.message);
+        }
+      }
     }
   }
 
@@ -160,10 +212,7 @@ async function runIngestion() {
 
   // === Step 3: Update sync status ===
   // isRunning is reset in the finally block below so the overlap guard is
-  // always released even if an unexpected error escapes the inner try-catches
-  // (e.g. during materialResults.filter() or a sync-status write failure that
-  // somehow rethrows despite the catch). Without finally, a single unexpected
-  // throw would permanently lock the job for the life of the process.
+  // always released even if an unexpected error escapes the inner try-catches.
   try {
     const completedAt = new Date();
     const durationMs = completedAt - startedAt;

@@ -3,13 +3,10 @@
  * Also serves Industry Template review (FR-TPL-02) — no dedicated Template
  * endpoints exist (Document 5 §4.4).
  *
- * Phase 6A: listMaterials, updateMaterial. Phase 6B: addMaterial (custom
- * materials, FR-MAT-02).
+ * Phase 6A: listMaterials (supports ?trackedOnly=true), updateMaterial (isTracked, customName, unitId).
+ * Phase 6B: addMaterial (custom materials, FR-MAT-02).
  *
- * Production Hardening Phase B, finding A2: this file previously defined
- * its own local resolveBusinessId(), duplicating utils/resolveBusinessId.js
- * used by every other controller (dashboard, news, price, trend, alert).
- * Now uses the shared utility, matching the rest of the project.
+ * Uses shared resolveBusinessId utility for tenant isolation.
  */
 const materialTrackingService = require('../services/materialTracking.service');
 const resolveBusinessId = require('../utils/resolveBusinessId');
@@ -19,7 +16,8 @@ const { sendSuccess } = require('../utils/response');
 async function listMaterials(req, res, next) {
   try {
     const businessId = await resolveBusinessId(req.auth);
-    const materials = await materialTrackingService.listMaterials(businessId);
+    const trackedOnly = req.query.trackedOnly === 'true';
+    const materials = await materialTrackingService.listMaterials(businessId, trackedOnly);
     sendSuccess(res, materials);
   } catch (err) {
     next(err);
@@ -30,8 +28,12 @@ async function listMaterials(req, res, next) {
 async function updateMaterial(req, res, next) {
   try {
     const businessId = await resolveBusinessId(req.auth);
-    const { isTracked } = req.body;
-    const material = await materialTrackingService.updateMaterial(businessId, req.params.materialId, { isTracked });
+    const { isTracked, customName, unitId } = req.body;
+    const material = await materialTrackingService.updateMaterial(
+      businessId,
+      req.params.materialId,
+      { isTracked, customName, unitId }
+    );
     sendSuccess(res, material);
   } catch (err) {
     next(err);
@@ -54,7 +56,7 @@ async function addMaterial(req, res, next) {
 async function setExternalSymbol(req, res, next) {
   try {
     const businessId = await resolveBusinessId(req.auth);
-    const { externalSymbol } = req.body;   // null | 'WTI' | 'BRENT' — already validated
+    const { externalSymbol } = req.body; // null | 'WTI' | 'BRENT' — already validated
     const material = await materialTrackingService.setExternalSymbol(
       businessId,
       req.params.materialId,

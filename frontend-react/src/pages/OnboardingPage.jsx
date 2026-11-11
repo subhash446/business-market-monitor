@@ -2,57 +2,38 @@
  * OnboardingPage — Business Setup (3-step wizard)
  * Business Market Monitor — React frontend
  *
- * Ported from: frontend/pages/onboarding.html + frontend/js/pages/onboarding.js
- *
- * FLOW (preserved exactly from original):
+ * Flow:
  *  1. Auth guard: requireAuth() — handled by ProtectedRoute in App.jsx
- *     requireBusiness() is NOT called — this IS the business creation step.
- *  2. Step 1 — Load industries from GET /industries (public), user selects one
- *  3. Step 2 — User fills business details, POST /business
- *  4. After POST /business success: setCachedBusiness() → show Step 3
- *  5. Step 3 — Confirmation: "Go to Dashboard" button
- *     → POST /auth/refresh { refreshToken }  (mandatory — Doc 3 §4.10)
- *       (existing token still has businessId: null; refresh gets the real businessId)
- *     → setTokens(newAccessToken, refreshToken)
- *     → refreshUser() updates AuthContext user state (businessId now populated)
- *     → setBusiness() updates AuthContext business state
- *     → navigate('/dashboard')
- *
- * POST /business PAYLOAD:
- *   { name, industryId, contactEmail?, contactPhone?, address? }
- *   Optional fields only sent when non-empty (matches original exactly).
- *   DO NOT send userId or businessId.
- *
- * VALIDATION:
- *   name: required, 2–150 chars (UI spec §3.1 — stricter than backend MAX 200)
- *   contactEmail: optional, valid format if provided
- *   contactPhone: optional, no format restriction
- *   address: optional, no format restriction
- *
- * INDUSTRY_ICONS: matches original icon map exactly.
- *
- * CSS: uses onboarding.css + all existing component classes.
- * Layout: standalone (no AppLayout/sidebar) — uses onboarding-container.
+ *  2. Step 1 — Load industries from GET /industries, user selects one.
+ *              Displays preview of materials automatically tracked for this industry.
+ *  3. Step 2 — User fills business details, POST /business.
+ *  4. After POST /business success: sets cached business → show Step 3.
+ *  5. Step 3 — Confirmation: displays auto-configured materials breakdown and "Go to Dashboard".
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listIndustries, createBusiness } from '../api/business.api.js';
+import { listIndustries, getIndustryMaterials, createBusiness } from '../api/business.api.js';
 import { post as apiPost } from '../api/client.js';
 import { getRefreshToken, setTokens, setCachedBusiness } from '../auth/auth.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { isEmail } from '../utils/validate.js';
+import { createLatestRequestGuard, runLatestIndustryPreview } from '../utils/requestGuard.js';
 import '../styles/pages/onboarding.css';
 
 /* ----------------------------------------------------------------
- * Industry icon map (Doc 4 §3.1 — matches onboarding.js exactly)
+ * Industry icon map
  * ---------------------------------------------------------------- */
 const INDUSTRY_ICONS = {
-  'manufacturing':   'fa-solid fa-industry',
-  'agriculture':     'fa-solid fa-seedling',
-  'construction':    'fa-solid fa-helmet-safety',
-  'food & beverage': 'fa-solid fa-utensils',
-  'textile':         'fa-solid fa-shirt',
+  'packaged drinking water': 'fa-solid fa-bottle-water',
+  'plastic manufacturing':   'fa-solid fa-industry',
+  'food & beverage':         'fa-solid fa-utensils',
+  'dairy':                   'fa-solid fa-cow',
+  'fmcg':                    'fa-solid fa-boxes-stacked',
+  'manufacturing':           'fa-solid fa-industry',
+  'agriculture':             'fa-solid fa-seedling',
+  'construction':            'fa-solid fa-helmet-safety',
+  'textile':                 'fa-solid fa-shirt',
 };
 
 function getIndustryIcon(name) {
@@ -69,11 +50,15 @@ export function OnboardingPage() {
   /* ── Step state ─────────────────────────────────────────────── */
   const [currentStep, setCurrentStep] = useState(1); // 1 | 2 | 3
 
-  /* ── Step 1 — Industry ──────────────────────────────────────── */
-  const [industries,          setIndustries]        = useState(null);  // null=loading, []=[loaded]
-  const [industriesError,     setIndustriesError]   = useState(false);
-  const [selectedIndustryId,  setSelectedIndustryId]  = useState(null);
-  const [selectedIndustryName,setSelectedIndustryName] = useState('');
+  /* ── Step 1 — Industry & Material Preview ────────────────────── */
+  const [industries,           setIndustries]          = useState(null);
+  const [industriesError,      setIndustriesError]     = useState(false);
+  const [selectedIndustryId,   setSelectedIndustryId]   = useState(null);
+  const [selectedIndustryName, setSelectedIndustryName] = useState('');
+  const [previewMaterials,     setPreviewMaterials]    = useState([]);
+  const [previewLoading,       setPreviewLoading]      = useState(false);
+  const [previewError,         setPreviewError]        = useState(false);
+  const [previewGuard]         = useState(() => createLatestRequestGuard());
   const industryGridRef = useRef(null);
 
   /* ── Step 2 — Business details ──────────────────────────────── */
@@ -81,23 +66,23 @@ export function OnboardingPage() {
   const [contactEmail,  setContactEmail]  = useState('');
   const [contactPhone,  setContactPhone]  = useState('');
   const [address,       setAddress]       = useState('');
-  const [step2Errors,   setStep2Errors]   = useState({});  // { name?, contactEmail? }
-  const [step2FormErr,  setStep2FormErr]  = useState('');  // form-level error
-  const [step2409Err,   setStep2409Err]   = useState(false); // 409 — already has business
+  const [step2Errors,   setStep2Errors]   = useState({});
+  const [step2FormErr,  setStep2FormErr]  = useState('');
+  const [step2409Err,   setStep2409Err]   = useState(false);
   const [creating,      setCreating]      = useState(false);
   const bizNameRef = useRef(null);
 
   /* ── Step 3 — Confirmation ──────────────────────────────────── */
-  const [createdBusiness,  setCreatedBusiness]  = useState(null); // POST /business response
+  const [createdBusiness,  setCreatedBusiness]  = useState(null);
   const [refreshing,       setRefreshing]       = useState(false);
-  const [step3Error,       setStep3Error]       = useState('');   // '' | 'retry_login'
+  const [step3Error,       setStep3Error]       = useState('');
   const dashboardBtnRef = useRef(null);
 
   /* ----------------------------------------------------------------
    * Load industries on mount (Step 1)
    * ---------------------------------------------------------------- */
   const loadIndustries = useCallback(async () => {
-    setIndustries(null);          // triggers skeleton
+    setIndustries(null);
     setIndustriesError(false);
     try {
       const data = await listIndustries();
@@ -110,12 +95,15 @@ export function OnboardingPage() {
 
   useEffect(() => { loadIndustries(); }, [loadIndustries]);
 
+  useEffect(() => () => {
+    previewGuard.invalidate();
+  }, [previewGuard]);
+
   /* ----------------------------------------------------------------
    * Step navigation helpers
    * ---------------------------------------------------------------- */
   function goToStep(n) {
     setCurrentStep(n);
-    // Scroll to top (matches original window.scrollTo(0,0))
     window.scrollTo(0, 0);
   }
 
@@ -123,7 +111,6 @@ export function OnboardingPage() {
   function handleStep1Continue() {
     if (!selectedIndustryId) return;
     goToStep(2);
-    // Focus business name field after DOM update
     setTimeout(() => bizNameRef.current?.focus(), 0);
   }
 
@@ -148,12 +135,10 @@ export function OnboardingPage() {
 
     const errors = {};
 
-    // name: required, 2–150 chars (UI spec §3.1)
     if (!trimName || trimName.length < 2 || trimName.length > 150) {
       errors.name = 'Business name is required (2–150 characters).';
     }
 
-    // contactEmail: optional, valid format if provided
     if (trimEmail && !isEmail(trimEmail).valid) {
       errors.contactEmail = 'Please enter a valid email address.';
     }
@@ -166,18 +151,15 @@ export function OnboardingPage() {
 
     setCreating(true);
 
-    // Build body — only include optional fields when non-empty
     const body = { name: trimName, industryId: selectedIndustryId };
     if (trimEmail) body.contactEmail = trimEmail;
     if (trimPhone) body.contactPhone = trimPhone;
     if (trimAddress) body.address    = trimAddress;
 
     try {
-      // POST /api/v1/business
       const result = await createBusiness(body);
       setCreatedBusiness(result);
 
-      // Cache business in sessionStorage immediately (mirrors setCachedBusiness in original)
       setCachedBusiness({
         id:         result.id,
         name:       result.name,
@@ -185,7 +167,6 @@ export function OnboardingPage() {
       });
 
       goToStep(3);
-      // Focus "Go to Dashboard" button after DOM update
       setTimeout(() => dashboardBtnRef.current?.focus(), 0);
 
     } catch (err) {
@@ -195,11 +176,7 @@ export function OnboardingPage() {
   }
 
   /* ----------------------------------------------------------------
-   * Step 3 — "Go to Dashboard" → mandatory token refresh (Doc 3 §4.10)
-   *
-   * The existing stored token still has businessId: null.
-   * POST /auth/refresh obtains a new access token embedding the real businessId.
-   * Then: setTokens() → refreshUser() updates AuthContext → setBusiness() → navigate
+   * Step 3 — "Go to Dashboard" → token refresh
    * ---------------------------------------------------------------- */
   async function handleGotoDashboard() {
     setStep3Error('');
@@ -208,7 +185,6 @@ export function OnboardingPage() {
     const refreshToken = getRefreshToken();
 
     try {
-      // POST /api/v1/auth/refresh — { refreshToken } — skipAuth (no bearer header needed)
       const res  = await apiPost('/auth/refresh', { refreshToken }, { skipAuth: true });
       const data = res.data;
 
@@ -216,23 +192,18 @@ export function OnboardingPage() {
         throw new Error('No access token in refresh response');
       }
 
-      // Store updated tokens — new access token contains the real businessId
       setTokens(data.accessToken, refreshToken);
-
-      // Update AuthContext: re-decode user from fresh token (businessId now populated)
       refreshUser();
 
-      // Update AuthContext business state with the created business data
       if (createdBusiness) {
         setBusiness({
-          id:         createdBusiness.id,
-          name:       createdBusiness.name,
-          industryId: createdBusiness.industryId,
+          id:           createdBusiness.id,
+          name:         createdBusiness.name,
+          industryId:   createdBusiness.industryId,
           industryName: createdBusiness.industryName ?? selectedIndustryName,
         });
       }
 
-      // Navigate to dashboard
       navigate('/dashboard', { replace: true });
 
     } catch {
@@ -242,11 +213,32 @@ export function OnboardingPage() {
   }
 
   /* ----------------------------------------------------------------
-   * Industry card select handler
+   * Industry card select handler + auto-load material preview
    * ---------------------------------------------------------------- */
   function handleSelectIndustry(industry) {
     setSelectedIndustryId(industry.id);
     setSelectedIndustryName(industry.name);
+
+    void runLatestIndustryPreview({
+      industryId: industry.id,
+      fetchMaterials: getIndustryMaterials,
+      guard: previewGuard,
+      onStart: () => {
+        setPreviewLoading(true);
+        setPreviewError(false);
+        setPreviewMaterials([]);
+      },
+      onSuccess: (materials) => {
+        setPreviewMaterials(materials);
+      },
+      onError: () => {
+        setPreviewMaterials([]);
+        setPreviewError(true);
+      },
+      onSettled: () => {
+        setPreviewLoading(false);
+      },
+    });
   }
 
   /* ----------------------------------------------------------------
@@ -316,7 +308,9 @@ export function OnboardingPage() {
               aria-labelledby="step1-heading"
             >
               <h2 className="onboarding-step__heading" id="step1-heading">Select Your Industry</h2>
-              <p className="onboarding-step__body">Choose the industry that best matches your business.</p>
+              <p className="onboarding-step__body">
+                Choose your industry. The platform will automatically identify and associate the relevant raw materials and price benchmarks with your workspace.
+              </p>
 
               {/* Industry grid */}
               <div
@@ -334,6 +328,76 @@ export function OnboardingPage() {
                   onRetry={loadIndustries}
                 />
               </div>
+
+              {/* Material Mapping Preview Panel */}
+              {selectedIndustryId && (
+                <div className="card" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                    <i className="fa-solid fa-layer-group" style={{ color: 'var(--color-primary)' }} aria-hidden="true" />
+                    <h3 style={{ fontSize: 'var(--text-base)', margin: 0, fontWeight: 600 }}>
+                      Materials Automatically Tracked for {selectedIndustryName}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-secondary" style={{ marginBottom: 'var(--space-3)' }}>
+                    These materials will be automatically configured for your business. You will not have to search for or manually add them.
+                  </p>
+
+                  {previewLoading ? (
+                    <div style={{ padding: 'var(--space-3) 0', color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)' }}>
+                      <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }} /> Loading materials catalog...
+                    </div>
+                  ) : previewError ? (
+                    <p className="text-xs" role="alert" style={{ margin: 0, color: 'var(--color-danger, #dc2626)' }}>
+                      Could not load materials preview for this industry. Select the industry card again to retry.
+                    </p>
+                  ) : previewMaterials.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      {previewMaterials.map((mat) => (
+                        <div
+                          key={mat.name}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: 'var(--space-2) var(--space-3)',
+                            backgroundColor: 'var(--color-surface-subtle, #f9fafb)',
+                            borderRadius: 'var(--radius-sm, 6px)',
+                            border: '1px solid var(--color-border-subtle, #f3f4f6)',
+                          }}
+                        >
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{mat.name}</span>{' '}
+                            <span className="text-xs text-muted">({mat.defaultUnit || mat.unit})</span>
+                            {mat.disclaimer && (
+                              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px', maxWidth: '420px', lineHeight: 1.25 }}>
+                                {mat.disclaimer}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 'var(--space-2)' }}>
+                            {mat.hasAutomatedFeed ? (
+                              <span className={`badge ${mat.isProxy ? 'badge--warning' : 'badge--info'}`} style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                <i className={mat.isProxy ? 'fa-solid fa-chart-line' : 'fa-solid fa-building-columns'} style={{ marginRight: '4px' }} aria-hidden="true" />
+                                {mat.isProxy ? `Proxy: ${mat.defaultExternalSymbol}` : `Mandi: ${mat.defaultExternalSymbol}`}
+                              </span>
+                            ) : (
+                              <span className="badge badge--neutral" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                Supplier Quote
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted" style={{ margin: 0 }}>
+                      {selectedIndustryName === 'FMCG'
+                        ? 'FMCG is configured as a flexible generic template. You can track custom materials tailored to your specific product lines after setup.'
+                        : 'No default materials pre-configured. Custom materials can be added from the Materials tab.'}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="onboarding-actions">
                 <button
@@ -359,7 +423,7 @@ export function OnboardingPage() {
             >
               <h2 className="onboarding-step__heading" id="step2-heading">Tell Us About Your Business</h2>
 
-              {/* Form-level error (network, generic) */}
+              {/* Form-level error */}
               {step2FormErr && (
                 <div className="form-alert form-alert--error form-alert--visible" role="alert" aria-live="assertive">
                   <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
@@ -441,7 +505,7 @@ export function OnboardingPage() {
                   )}
                 </div>
 
-                {/* Contact Phone — optional, no format restriction */}
+                {/* Contact Phone — optional */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="ob-contact-phone">
                     Contact phone <span className="form-label__optional">(optional)</span>
@@ -458,7 +522,7 @@ export function OnboardingPage() {
                   />
                 </div>
 
-                {/* Address — optional, textarea */}
+                {/* Address — optional */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="ob-address">
                     Address <span className="form-label__optional">(optional)</span>
@@ -520,15 +584,41 @@ export function OnboardingPage() {
                   </p>
                   <p className="onboarding-success__detail">
                     <strong id="ob-materials-count">{String(createdBusiness?.materialsGenerated ?? 0)}</strong>{' '}
-                    materials have been pre-loaded from your industry template.
+                    materials have been automatically configured and associated with your workspace.
                   </p>
                 </div>
 
+                {/* Display auto-associated materials list */}
+                {createdBusiness?.materials && createdBusiness.materials.length > 0 && (
+                  <div className="card" style={{ textAlign: 'left', margin: 'var(--space-4) 0', padding: 'var(--space-3) var(--space-4)', maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--color-border)' }}>
+                    <strong style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'block', marginBottom: 'var(--space-2)' }}>
+                      AUTOMATICALLY CONFIGURED MATERIALS:
+                    </strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      {createdBusiness.materials.map((m) => (
+                        <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)', padding: 'var(--space-1) 0', borderBottom: '1px solid var(--color-border-subtle, #f3f4f6)' }}>
+                          <span><strong>{m.name}</strong> <span className="text-muted">({m.unit})</span></span>
+                          {m.hasAutomatedFeed ? (
+                            <span className="badge badge--info" style={{ fontSize: '10px' }}>
+                              <i className="fa-solid fa-bolt" style={{ marginRight: '3px' }} aria-hidden="true" />
+                              Automated ({m.externalSymbol})
+                            </span>
+                          ) : (
+                            <span className="badge badge--neutral" style={{ fontSize: '10px' }}>
+                              Supplier Quote
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <p className="onboarding-success__body">
-                  We&apos;ve set up your workspace. Click below to refresh your session and go to your dashboard.
+                  We&apos;ve configured your workspace. Tracked materials with automated benchmarks will update automatically. Click below to enter your dashboard.
                 </p>
 
-                {/* Step 3 error (refresh token failure) */}
+                {/* Step 3 error */}
                 {step3Error === 'retry_login' && (
                   <div className="form-alert form-alert--error form-alert--visible" role="alert" aria-live="assertive">
                     <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
@@ -566,11 +656,8 @@ export function OnboardingPage() {
 
 /* ----------------------------------------------------------------
  * IndustryGrid — inner component for Step 1 industry display
- * Replaces the imperative _renderSkeletons / _renderIndustryCards /
- * _renderIndustryError functions from onboarding.js.
  * ---------------------------------------------------------------- */
 function IndustryGrid({ industries, hasError, selectedId, onSelect, onRetry }) {
-  // Loading state — industries === null
   if (industries === null) {
     return (
       <>
@@ -581,7 +668,6 @@ function IndustryGrid({ industries, hasError, selectedId, onSelect, onRetry }) {
     );
   }
 
-  // Error state
   if (hasError || industries.length === 0) {
     return (
       <div className="error-state">
@@ -603,7 +689,6 @@ function IndustryGrid({ industries, hasError, selectedId, onSelect, onRetry }) {
     );
   }
 
-  // Industry cards
   return (
     <>
       {industries.map(industry => (
@@ -627,7 +712,7 @@ function IndustryGrid({ industries, hasError, selectedId, onSelect, onRetry }) {
 }
 
 /* ----------------------------------------------------------------
- * Error handler for POST /business (mirrors _handleCreateError)
+ * Error handler for POST /business
  * ---------------------------------------------------------------- */
 function _handleCreateError(err, setErrors, setFormErr, set409) {
   if (!err?.status) {

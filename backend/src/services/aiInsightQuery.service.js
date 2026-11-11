@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Read-only query service for AI insights (Phase H).
  *
  * Sits between the controller and aiInsight.repository.
@@ -42,7 +42,25 @@ async function getLatestInsight(businessId, trackedMaterialId) {
 
   const insight = await aiInsightRepository.findLatestByMaterial(trackedMaterialId, businessId);
   if (!insight) return null;
-  return formatInsight(insight);
+
+  let evidenceNews = [];
+  let evidencePrices = [];
+  if (typeof aiInsightRepository.findEvidenceNewsByInsightId === 'function') {
+    try {
+      evidenceNews = await aiInsightRepository.findEvidenceNewsByInsightId(insight.id);
+    } catch {
+      // non-fatal
+    }
+  }
+  if (typeof aiInsightRepository.findEvidencePricesByInsightId === 'function') {
+    try {
+      evidencePrices = await aiInsightRepository.findEvidencePricesByInsightId(insight.id);
+    } catch {
+      // non-fatal
+    }
+  }
+
+  return formatInsight(insight, { news: evidenceNews, prices: evidencePrices });
 }
 
 /**
@@ -88,6 +106,37 @@ async function listLatestForBusiness(businessId, limit = 3) {
 }
 
 /**
+ * Retrieve the full supporting evidence (prices & news) for a specific insight.
+ * Strictly verifies tenant isolation: the insight must belong to businessId.
+ *
+ * @param {number} businessId
+ * @param {number|string} insightId
+ * @returns {Promise<object>}
+ */
+async function getInsightEvidence(businessId, insightId) {
+  const insight = await aiInsightRepository.findByIdAndBusiness(insightId, businessId);
+  if (!insight) {
+    throw new AppError(404, 'NOT_FOUND', 'AI insight not found');
+  }
+
+  const [news, prices] = await Promise.all([
+    aiInsightRepository.findEvidenceNewsByInsightId(insight.id),
+    aiInsightRepository.findEvidencePricesByInsightId(insight.id),
+  ]);
+
+  return {
+    insight_id:                   insight.id,
+    tracked_material_id:          insight.tracked_material_id,
+    generated_at:                 insight.generated_at,
+    evidence_price_range:         insight.evidence_price_range,
+    evidence_price_points_count:  insight.evidence_price_points_count,
+    evidence_news_count:          insight.evidence_news_count,
+    news:                         news || [],
+    prices:                       prices || [],
+  };
+}
+
+/**
  * Shape the DB row into a clean public response object.
  *
  * Explicitly lists every field so:
@@ -98,10 +147,11 @@ async function listLatestForBusiness(businessId, limit = 3) {
  *     return DB column names as-is -- no camelCase transformation exists).
  *
  * @param {object} row  -- raw DB row from aiInsight.repository
+ * @param {object} [evidence] -- optional linked evidence { news, prices }
  * @returns {object}
  */
-function formatInsight(row) {
-  return {
+function formatInsight(row, evidence = null) {
+  const result = {
     id:                           row.id,
     tracked_material_id:          row.tracked_material_id,
     headline:                     row.headline,
@@ -116,12 +166,22 @@ function formatInsight(row) {
     model_used:                   row.model_used,
     generated_at:                 row.generated_at,
   };
-  // business_id is intentionally omitted from the public response:
-  // the client already knows it from their JWT.
+
+  if (evidence) {
+    if (Array.isArray(evidence.news) && evidence.news.length > 0) {
+      result.evidence_news = evidence.news;
+    }
+    if (Array.isArray(evidence.prices) && evidence.prices.length > 0) {
+      result.evidence_prices = evidence.prices;
+    }
+  }
+
+  return result;
 }
 
 module.exports = {
   getLatestInsight,
+  getInsightEvidence,
   listInsightHistory,
   listLatestForBusiness,
   formatInsight, // exported for testing

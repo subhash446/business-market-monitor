@@ -3,47 +3,42 @@
  * Business Market Monitor — React frontend
  *
  * Ported from: frontend/js/api/materials.api.js (Vanilla JS v1.0)
- * Change: import path updated — client.js is now in the same directory.
  *
  * Doc 3 §3 — js/api/materials.api.js
+ * Doc 5 §4.5 — Raw Material Tracking Module
  *
  * Endpoints (all mounted under /api/v1/):
  *
- *   GET  /materials
- *     Response: [{ id, rawMaterialId, name, unit, isTracked, isCustom, createdAt }]
+ *   GET  /materials[?trackedOnly=true]
+ *     Response: [{ id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol, createdAt }]
  *
  *   POST /materials
  *     Body:     { customName: string, unitId: number }
- *     Response: { id, rawMaterialId, name, unit, isTracked, isCustom, createdAt }  (201)
+ *     Response: { id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol, createdAt }  (201)
  *     Errors:   400 VALIDATION_ERROR (invalid unitId), 409 CONFLICT (duplicate name)
  *
  *   PATCH /materials/:materialId
- *     Body:     { isTracked: boolean }  — ONLY this field; any other field → 400
- *     Response: { id, rawMaterialId, name, unit, isTracked, isCustom, createdAt }
- *     Errors:   400 VALIDATION_ERROR, 404 NOT_FOUND
+ *     Body:     { isTracked?: boolean, customName?: string, unitId?: number }
+ *     Response: { id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol, createdAt }
+ *     Errors:   400 VALIDATION_ERROR, 404 NOT_FOUND, 409 CONFLICT
+ *
+ *   PATCH /materials/:materialId/external-symbol
+ *     Body:     { externalSymbol: string|null }
  *
  *   GET  /units-of-measurement  (public — no auth required)
  *     Response: [{ id, name, abbreviation }]
- *
- * CONFIRMED from backend source (materialTracking.service.js toPublicMaterial):
- *   - `name`  = COALESCE(raw_materials.name, tracked_materials.custom_name)
- *   - `unit`  = units_of_measurement.abbreviation  (e.g. "kg", "t")
- *   - `isCustom` = rawMaterialId === null
- *   - NO `customName` field in responses
- *   - NO `significantChange` field
- *
- * IMPORTANT: The `id` returned is tracked_materials.id — this is the universal
- *   material ID used by all downstream endpoints (prices, trends, alerts).
  */
 
 import { get, post, patch } from './client.js';
 
 /**
- * Fetch all tracked materials for the authenticated business.
- * @returns {Promise<Array<{id:number, name:string, unit:string, isTracked:boolean, isCustom:boolean}>>}
+ * Fetch materials for the authenticated business.
+ * @param {boolean} [trackedOnly=false]
+ * @returns {Promise<Array<{id:number, rawMaterialId:number|null, name:string, unit:string, isTracked:boolean, isCustom:boolean, externalSymbol:string|null}>>}
  */
-export async function getMaterials() {
-  const { data } = await get('/materials');
+export async function getMaterials(trackedOnly = false) {
+  const query = trackedOnly ? '?trackedOnly=true' : '';
+  const { data } = await get(`/materials${query}`);
   return data;
 }
 
@@ -51,7 +46,7 @@ export async function getMaterials() {
  * Create a custom material.
  * POST /api/v1/materials
  * @param {{ customName: string, unitId: number }} body
- * @returns {Promise<{id, name, unit, isTracked, isCustom}>}
+ * @returns {Promise<{id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol}>}
  * @throws 409 CONFLICT on duplicate name
  */
 export async function createMaterial({ customName, unitId }) {
@@ -60,28 +55,36 @@ export async function createMaterial({ customName, unitId }) {
 }
 
 /**
+ * Update material fields (isTracked, customName, unitId).
+ * PATCH /api/v1/materials/:materialId
+ * @param {number|string} materialId
+ * @param {{ isTracked?: boolean, customName?: string, unitId?: number }} updates
+ * @returns {Promise<{id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol}>}
+ */
+export async function updateMaterial(materialId, updates) {
+  const { data } = await patch(`/materials/${materialId}`, updates);
+  return data;
+}
+
+/**
  * Toggle tracking state for a material.
  * PATCH /api/v1/materials/:materialId
- * Body: { isTracked: boolean } — the ONLY allowed field.
+ * Body: { isTracked: boolean }
  * @param {number|string} materialId
  * @param {boolean} isTracked
- * @returns {Promise<{id, name, unit, isTracked, isCustom, externalSymbol}>}
+ * @returns {Promise<{id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol}>}
  */
 export async function updateMaterialTracking(materialId, isTracked) {
-  const { data } = await patch(`/materials/${materialId}`, { isTracked });
-  return data;
+  return updateMaterial(materialId, { isTracked });
 }
 
 /**
  * Set or clear the external commodity symbol for a tracked material.
  * PATCH /api/v1/materials/:materialId/external-symbol
  *
- * Phase B endpoint — allows linking a tracked material to automatic price
- * ingestion from an external provider (EIA).
- *
  * @param {number|string} materialId  tracked_materials.id
- * @param {'WTI'|'BRENT'|null} externalSymbol  null clears the mapping
- * @returns {Promise<{id, name, unit, isTracked, isCustom, externalSymbol}>}
+ * @param {string|null} externalSymbol  null clears the mapping
+ * @returns {Promise<{id, rawMaterialId, name, unit, isTracked, isCustom, externalSymbol}>}
  * @throws 400 VALIDATION_ERROR — unsupported symbol or wrong type
  * @throws 404 NOT_FOUND — material not found or belongs to another business
  */

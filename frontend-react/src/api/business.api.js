@@ -4,6 +4,7 @@
  *
  * Ported from: frontend/js/api/business.api.js (Vanilla JS v1.0)
  * Change: import path updated — client.js is now in the same directory.
+ * Phase 5: Added getIndustryMaterials()
  *
  * Doc 3 §3, §5.3 — js/api/business.api.js
  */
@@ -24,11 +25,25 @@ export async function listIndustries() {
 }
 
 /**
+ * Fetch default mapped materials for a business category / industry (Phase 5).
+ *
+ * GET /api/v1/industries/:industryId/materials
+ * Response: { industryId, industryName, industrySlug, isLightweightTemplate, materials: [...] }
+ *
+ * @param {number|string} industryId
+ * @returns {Promise<{ industryId: number, industryName: string, materials: Array<object> }>}
+ */
+export async function getIndustryMaterials(industryId) {
+  const { data } = await get(`/industries/${industryId}/materials`, {}, { skipAuth: true });
+  return data ?? { materials: [] };
+}
+
+/**
  * Create a new business profile.
  *
  * POST /api/v1/business — requires auth
  * Body: { name, industryId, contactEmail?, contactPhone?, address? }
- * Response data (201): { id, name, industryId, materialsGenerated }
+ * Response data (201): { id, name, industryId, materialsGenerated, materials }
  *
  * IMPORTANT: Field is `name` — NOT `businessName`.
  *
@@ -39,7 +54,7 @@ export async function listIndustries() {
  *   contactPhone?: string,
  *   address?:      string,
  * }} fields
- * @returns {Promise<{ id: number, name: string, industryId: number, materialsGenerated: number }>}
+ * @returns {Promise<{ id: number, name: string, industryId: number, materialsGenerated: number, materials?: Array<object> }>}
  * @throws {ApiError} — 409 if business already exists, 400 validation, 401 auth
  */
 export async function createBusiness(fields) {

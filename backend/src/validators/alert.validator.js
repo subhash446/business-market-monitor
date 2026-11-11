@@ -2,18 +2,45 @@
  * Request body validation for Email Alerts (Document 5 §3.3, §4.8;
  * Document 2 FR-ALERT-01, 05). Hand-rolled, dependency-free — same
  * approach as every other validator in this project.
+ *
+ * Phase 2 enhancements:
+ *   - thresholdType: 'ABSOLUTE' | 'PERCENTAGE'
+ *   - cooldownHours: integer between 1 and 720 (defaults to 24)
  */
 const CONDITION_TYPES = ['PRICE_ABOVE', 'PRICE_BELOW'];
+const THRESHOLD_TYPES = ['ABSOLUTE', 'PERCENTAGE'];
 
-function isValidThresholdPrice(value) {
+const {
+  isStrictFiniteNumber,
+  isStrictPositiveInteger,
+} = require('../utils/validationHelpers');
+
+function isValidThresholdPrice(value, thresholdType = 'ABSOLUTE') {
+  if (!isStrictFiniteNumber(value)) {
+    return false;
+  }
   const num = Number(value);
-  return value !== undefined && value !== null && !Number.isNaN(num) && num > 0;
+  if (num <= 0) {
+    return false;
+  }
+  if (thresholdType === 'PERCENTAGE' && num > 1000) {
+    return false;
+  }
+  return true;
+}
+
+function isValidCooldownHours(value) {
+  if (value === undefined) return true;
+  return isStrictPositiveInteger(value) && Number(value) <= 720;
 }
 
 function validateCreateRule(body) {
   const errors = [];
 
-  if (body.trackedMaterialId === undefined || body.trackedMaterialId === null || Number.isNaN(Number(body.trackedMaterialId))) {
+  const matId = isStrictPositiveInteger(body.trackedMaterialId)
+    ? Number(body.trackedMaterialId)
+    : NaN;
+  if (Number.isNaN(matId)) {
     errors.push({ field: 'trackedMaterialId', issue: 'is required and must be a valid id' });
   }
 
@@ -21,15 +48,28 @@ function validateCreateRule(body) {
     errors.push({ field: 'conditionType', issue: `must be one of ${CONDITION_TYPES.join(', ')}` });
   }
 
-  if (!isValidThresholdPrice(body.thresholdPrice)) {
-    // Matches the alert_rules CHECK constraint (Document 4 §5.6, threshold_price > 0).
-    errors.push({ field: 'thresholdPrice', issue: 'must be a number greater than 0' });
+  const thresholdType = body.thresholdType || 'ABSOLUTE';
+  if (body.thresholdType !== undefined && !THRESHOLD_TYPES.includes(body.thresholdType)) {
+    errors.push({ field: 'thresholdType', issue: `must be one of ${THRESHOLD_TYPES.join(', ')}` });
+  }
+
+  if (!isValidThresholdPrice(body.thresholdPrice, thresholdType)) {
+    errors.push({
+      field: 'thresholdPrice',
+      issue: thresholdType === 'PERCENTAGE'
+        ? 'must be a positive percentage number (e.g. 5 for 5%) up to 1000%'
+        : 'must be a number greater than 0',
+    });
+  }
+
+  if (body.cooldownHours !== undefined && !isValidCooldownHours(body.cooldownHours)) {
+    errors.push({ field: 'cooldownHours', issue: 'must be an integer between 1 and 720 hours' });
   }
 
   return errors;
 }
 
-const ALLOWED_UPDATE_FIELDS = ['conditionType', 'thresholdPrice', 'isActive'];
+const ALLOWED_UPDATE_FIELDS = ['conditionType', 'thresholdPrice', 'thresholdType', 'cooldownHours', 'isActive'];
 
 function validateUpdateRule(body) {
   const errors = [];
@@ -46,8 +86,24 @@ function validateUpdateRule(body) {
     errors.push({ field: 'conditionType', issue: `must be one of ${CONDITION_TYPES.join(', ')}` });
   }
 
-  if (body.thresholdPrice !== undefined && !isValidThresholdPrice(body.thresholdPrice)) {
-    errors.push({ field: 'thresholdPrice', issue: 'must be a number greater than 0' });
+  if (body.thresholdType !== undefined && !THRESHOLD_TYPES.includes(body.thresholdType)) {
+    errors.push({ field: 'thresholdType', issue: `must be one of ${THRESHOLD_TYPES.join(', ')}` });
+  }
+
+  if (body.thresholdPrice !== undefined) {
+    const thresholdType = body.thresholdType || 'ABSOLUTE';
+    if (!isValidThresholdPrice(body.thresholdPrice, thresholdType)) {
+      errors.push({
+        field: 'thresholdPrice',
+        issue: thresholdType === 'PERCENTAGE'
+          ? 'must be a positive percentage number (e.g. 5 for 5%) up to 1000%'
+          : 'must be a number greater than 0',
+      });
+    }
+  }
+
+  if (body.cooldownHours !== undefined && !isValidCooldownHours(body.cooldownHours)) {
+    errors.push({ field: 'cooldownHours', issue: 'must be an integer between 1 and 720 hours' });
   }
 
   if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
@@ -57,4 +113,4 @@ function validateUpdateRule(body) {
   return errors;
 }
 
-module.exports = { validateCreateRule, validateUpdateRule };
+module.exports = { validateCreateRule, validateUpdateRule, CONDITION_TYPES, THRESHOLD_TYPES };

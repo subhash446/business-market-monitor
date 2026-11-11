@@ -4,11 +4,19 @@
  * FR-HIST-01–03). Hand-rolled, dependency-free — same approach as every
  * other validator in this project.
  */
+
+const ALLOWED_DATA_CLASSES = ['OFFICIAL_BENCHMARK', 'MARKET_INDICATIVE', 'SUPPLIER_QUOTE'];
+const {
+  isStrictFiniteNumber,
+  isValidCurrencyCode,
+  isValidHttpUrl,
+} = require('../utils/validationHelpers');
+
 function validateAddPrice(body) {
   const errors = [];
 
-  const priceNum = Number(body.price);
-  if (body.price === undefined || body.price === null || Number.isNaN(priceNum) || priceNum <= 0) {
+  const priceNum = isStrictFiniteNumber(body.price) ? Number(body.price) : NaN;
+  if (Number.isNaN(priceNum) || priceNum <= 0) {
     // Matches the price_points CHECK constraint (Document 4 §5.4, price > 0)
     // — rejected here before it ever reaches the DB.
     errors.push({ field: 'price', issue: 'must be a number greater than 0' });
@@ -22,6 +30,42 @@ function validateAddPrice(body) {
       errors.push({ field: 'recordedAt', issue: 'must be a valid date' });
     } else if (recordedDate.getTime() > Date.now()) {
       errors.push({ field: 'recordedAt', issue: 'cannot be in the future' });
+    }
+  }
+
+  if (body.currency !== undefined && body.currency !== null) {
+    if (!isValidCurrencyCode(body.currency)) {
+      errors.push({ field: 'currency', issue: 'must be a 3-letter alphabetic currency code (e.g. INR, USD)' });
+    }
+  }
+
+  if (body.unitLabel !== undefined && body.unitLabel !== null) {
+    if (typeof body.unitLabel !== 'string' || body.unitLabel.length > 30) {
+      errors.push({ field: 'unitLabel', issue: 'must be a string up to 30 characters' });
+    }
+  }
+
+  if (body.region !== undefined && body.region !== null) {
+    if (typeof body.region !== 'string' || body.region.length > 100) {
+      errors.push({ field: 'region', issue: 'must be a string up to 100 characters' });
+    }
+  }
+
+  if (body.grade !== undefined && body.grade !== null) {
+    if (typeof body.grade !== 'string' || body.grade.length > 100) {
+      errors.push({ field: 'grade', issue: 'must be a string up to 100 characters' });
+    }
+  }
+
+  if (body.sourceUrl !== undefined && body.sourceUrl !== null) {
+    if (!isValidHttpUrl(body.sourceUrl, 500)) {
+      errors.push({ field: 'sourceUrl', issue: 'must be a valid http or https URL string up to 500 characters' });
+    }
+  }
+
+  if (body.dataClass !== undefined && body.dataClass !== null) {
+    if (!ALLOWED_DATA_CLASSES.includes(body.dataClass)) {
+      errors.push({ field: 'dataClass', issue: `must be one of: ${ALLOWED_DATA_CLASSES.join(', ')}` });
     }
   }
 

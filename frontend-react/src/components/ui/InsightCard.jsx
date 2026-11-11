@@ -31,7 +31,10 @@
  * AI generation is never triggered from here.
  */
 
-import { formatRelativeTime } from '../../utils/format.js';
+import { useState } from 'react';
+import { formatRelativeTime, formatDate, formatPrice, getSafeExternalUrl } from '../../utils/format.js';
+import { classifyInsightBenchmarkDisclosure } from '../../utils/insightDisclosure.js';
+import { getInsightEvidence } from '../../api/aiInsights.api.js';
 import './InsightCard.css';
 
 /* ── Outlook / confidence display maps ───────────────────────────── */
@@ -57,9 +60,42 @@ export function InsightCard({
   error    = null,
   title    = 'AI Market Insight',
   compact  = false,
+  defaultShowEvidence = false,
 }) {
+  const [showEvidence, setShowEvidence] = useState(Boolean(defaultShowEvidence));
+  const [evidenceData, setEvidenceData] = useState(null);
+  const [loadingEvidence, setLoadingEvidence] = useState(false);
+  const [evidenceError, setEvidenceError] = useState(null);
+
   const outlook    = insight ? (OUTLOOK_CONFIG[insight.outlook]    ?? OUTLOOK_CONFIG.NEUTRAL)    : null;
   const confidence = insight ? (CONFIDENCE_CONFIG[insight.confidence] ?? CONFIDENCE_CONFIG.LOW) : null;
+
+  const isInsufficientEvidence = Boolean(
+    insight && (insight.status === 'insufficient_evidence' || insight.reason === 'insufficient_evidence')
+  );
+
+  const handleToggleEvidence = async () => {
+    const nextState = !showEvidence;
+    setShowEvidence(nextState);
+
+    // If opening and we don't have embedded evidence or already-fetched evidenceData, fetch it
+    if (nextState && insight?.id && !evidenceData && (!insight.evidence_prices && !insight.evidence_news)) {
+      setLoadingEvidence(true);
+      setEvidenceError(null);
+      try {
+        const data = await getInsightEvidence(insight.id);
+        setEvidenceData(data);
+      } catch (err) {
+        setEvidenceError(err.message || 'Could not load evidence records');
+      } finally {
+        setLoadingEvidence(false);
+      }
+    }
+  };
+
+  const pricesList = insight?.evidence_prices || evidenceData?.prices || [];
+  const newsList = insight?.evidence_news || evidenceData?.news || [];
+  const disclosureType = classifyInsightBenchmarkDisclosure(insight, pricesList);
 
   return (
     <section className={`insight-card card${compact ? ' insight-card--compact' : ''}`} aria-label={title}>
@@ -70,7 +106,7 @@ export function InsightCard({
           <h3 className="card__title insight-card__title">{title}</h3>
           <span className="insight-card__badge-ai" aria-label="AI-generated content">AI</span>
         </div>
-        {insight && outlook && (
+        {insight && !isInsufficientEvidence && outlook && (
           <div className="insight-card__outlook-row">
             <span className={`insight-badge ${outlook.cls}`} aria-label={`Outlook: ${outlook.label}`}>
               <i className={`${outlook.icon} insight-badge__icon`} aria-hidden="true" />
@@ -106,21 +142,54 @@ export function InsightCard({
           </p>
         )}
 
+        {/* Insufficient Evidence State */}
+        {!loading && !error && isInsufficientEvidence && (
+          <div className="insight-card__empty insight-card__insufficient">
+            <i className="fa-solid fa-triangle-exclamation insight-card__empty-icon" aria-hidden="true" />
+            <p className="insight-card__empty-title">Insufficient Price Evidence</p>
+            <p className="insight-card__empty-message">
+              {insight.message || 'AI market intelligence requires at least 3 verified price observations to ensure factual analysis without speculation. Insights will be generated automatically once sufficient price records exist.'}
+            </p>
+          </div>
+        )}
+
         {/* Empty state — no insight generated yet */}
         {!loading && !error && !insight && (
           <div className="insight-card__empty">
             <i className="fa-solid fa-robot insight-card__empty-icon" aria-hidden="true" />
             <p className="insight-card__empty-title">No insight available yet</p>
             <p className="insight-card__empty-message">
-              AI market insights are generated automatically each morning once enough price
-              data is available. Check back after the next scheduled run.
+              AI market insights are generated automatically once at least 3 valid price observations
+              and industry news are available. Check back after price records are logged.
             </p>
           </div>
         )}
 
         {/* Insight content */}
-        {!loading && !error && insight && (
+        {!loading && !error && insight && !isInsufficientEvidence && (
           <>
+            {/* Upstream Proxy Benchmark Warning */}
+            {disclosureType === 'CRUDE_PROXY' && (
+              <div className="insight-proxy-notice" role="note">
+                <i className="fa-solid fa-circle-info insight-proxy-notice__icon" aria-hidden="true" />
+                <div className="insight-proxy-notice__content">
+                  <strong>Upstream Benchmark Disclosure:</strong> This insight is derived from global commodity proxy pricing
+                  (USD/bbl), not direct local purchase transactions. Business cost impacts reflect directional cost pressures.
+                </div>
+              </div>
+            )}
+
+            {/* Domestic Indian Wholesale Mandi Disclosure */}
+            {disclosureType === 'DOMESTIC_MANDI' && (
+              <div className="insight-proxy-notice insight-proxy-notice--domestic" role="note">
+                <i className="fa-solid fa-building-columns insight-proxy-notice__icon" aria-hidden="true" />
+                <div className="insight-proxy-notice__content">
+                  <strong>Domestic Mandi Benchmark Disclosure:</strong> This insight uses official Indian wholesale mandi pricing
+                  (INR/quintal via Agmarknet / data.gov.in), reflecting bulk wholesale auctions rather than direct contract rates.
+                </div>
+              </div>
+            )}
+
             {/* Headline */}
             <p className="insight-card__headline">{insight.headline}</p>
 
@@ -148,20 +217,167 @@ export function InsightCard({
               </div>
             </dl>
 
-            {/* Evidence row — hidden in compact mode */}
+            {/* Evidence summary & drilldown — hidden in compact mode */}
             {!compact && (
-              <div className="insight-card__evidence">
-                <span className="insight-evidence__label">Evidence basis:</span>
-                <span className="insight-evidence__item">
-                  <i className="fa-solid fa-chart-line" aria-hidden="true" />
-                  {insight.evidence_price_points_count} price point{insight.evidence_price_points_count !== 1 ? 's' : ''}
-                  {insight.evidence_price_range ? ` (${insight.evidence_price_range})` : ''}
-                </span>
-                {insight.evidence_news_count > 0 && (
-                  <span className="insight-evidence__item">
-                    <i className="fa-solid fa-newspaper" aria-hidden="true" />
-                    {insight.evidence_news_count} news headline{insight.evidence_news_count !== 1 ? 's' : ''}
-                  </span>
+              <div className="insight-evidence-container">
+                <div className="insight-card__evidence">
+                  <div className="insight-evidence__summary">
+                    <span className="insight-evidence__label">Evidence basis:</span>
+                    <span className="insight-evidence__item">
+                      <i className="fa-solid fa-chart-line" aria-hidden="true" />
+                      {insight.evidence_price_points_count} price point{insight.evidence_price_points_count !== 1 ? 's' : ''}
+                      {insight.evidence_price_range ? ` (${insight.evidence_price_range})` : ''}
+                    </span>
+                    {insight.evidence_news_count > 0 && (
+                      <span className="insight-evidence__item">
+                        <i className="fa-solid fa-newspaper" aria-hidden="true" />
+                        {insight.evidence_news_count} news article{insight.evidence_news_count !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="insight-evidence__toggle-btn"
+                    onClick={handleToggleEvidence}
+                    aria-expanded={showEvidence}
+                  >
+                    <span>{showEvidence ? 'Hide Source Evidence' : 'View Source Evidence'}</span>
+                    <i className={`fa-solid ${showEvidence ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true" />
+                  </button>
+                </div>
+
+                {/* Expanded Evidence Drawer */}
+                {showEvidence && (
+                  <div className="insight-evidence-drawer">
+                    {loadingEvidence && (
+                      <div className="insight-evidence__loading">
+                        <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
+                        <span>Loading evidence records...</span>
+                      </div>
+                    )}
+
+                    {evidenceError && (
+                      <p className="insight-evidence__error">
+                        <i className="fa-solid fa-circle-exclamation" aria-hidden="true" /> {evidenceError}
+                      </p>
+                    )}
+
+                    {/* Price Points Evidence */}
+                    <div className="insight-evidence__section">
+                      <h4 className="insight-evidence__section-title">
+                        <i className="fa-solid fa-chart-line" aria-hidden="true" />
+                        Supporting Price Observations ({pricesList.length || insight.evidence_price_points_count})
+                      </h4>
+                      {pricesList.length > 0 ? (
+                        <div className="insight-evidence__table-wrapper">
+                          <table className="insight-evidence__table">
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Price</th>
+                                <th>Classification</th>
+                                <th>Provider / Source</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pricesList.map((pt, idx) => (
+                                <tr key={pt.id || idx}>
+                                  <td>{formatDate(pt.recorded_at)}</td>
+                                  <td className="font-mono">
+                                    {pt.currency ? `${pt.currency} ` : ''}
+                                    {formatPrice(pt.price)}
+                                    {pt.unit_label ? ` ${pt.unit_label}` : ''}
+                                  </td>
+                                  <td>
+                                    <span className={`evidence-class-badge evidence-class-badge--${(pt.data_class || 'quote').toLowerCase()}`}>
+                                      {pt.data_class === 'OFFICIAL_BENCHMARK'
+                                        ? 'Official Benchmark'
+                                        : pt.data_class === 'MARKET_INDICATIVE'
+                                        ? 'Proxy Benchmark'
+                                        : 'Supplier Quote'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {(() => {
+                                      const safeSourceUrl = getSafeExternalUrl(pt.source_url);
+                                      if (safeSourceUrl) {
+                                        return (
+                                          <a
+                                            href={safeSourceUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="insight-evidence__link"
+                                          >
+                                            {pt.provider_name || pt.source || 'Source'}
+                                            <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden="true" />
+                                          </a>
+                                        );
+                                      }
+                                      return <span>{pt.provider_name || pt.source || '—'}</span>;
+                                    })()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="insight-evidence__empty-text">
+                          Price range: {insight.evidence_price_range || 'N/A'} across {insight.evidence_price_points_count} points.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* News Articles Evidence */}
+                    <div className="insight-evidence__section">
+                      <h4 className="insight-evidence__section-title">
+                        <i className="fa-solid fa-newspaper" aria-hidden="true" />
+                        Linked Industry News ({newsList.length || insight.evidence_news_count})
+                      </h4>
+                      {newsList.length > 0 ? (
+                        <ul className="insight-evidence__news-list">
+                          {newsList.map((art, idx) => (
+                            <li key={art.id || idx} className="insight-evidence__news-item">
+                              <div className="insight-evidence__news-main">
+                                {(() => {
+                                  const safeArticleUrl = getSafeExternalUrl(art.url);
+                                  if (safeArticleUrl) {
+                                    return (
+                                      <a
+                                        href={safeArticleUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="insight-evidence__article-title"
+                                      >
+                                        {art.title}
+                                        <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden="true" />
+                                      </a>
+                                    );
+                                  }
+                                  return <span className="insight-evidence__article-title">{art.title}</span>;
+                                })()}
+                                <div className="insight-evidence__news-meta">
+                                  {art.source_name && (
+                                    <span className="insight-evidence__source">{art.source_name}</span>
+                                  )}
+                                  {art.published_at && (
+                                    <span className="insight-evidence__date">{formatDate(art.published_at)}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="insight-evidence__empty-text">
+                          {insight.evidence_news_count > 0
+                            ? `${insight.evidence_news_count} news article headlines informed this insight.`
+                            : 'No external news articles were linked for this insight run.'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}

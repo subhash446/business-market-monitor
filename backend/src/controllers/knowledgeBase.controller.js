@@ -1,6 +1,6 @@
 /**
- * Industry Knowledge Base module (Document 2 §5.3, Document 5 §4.3).
- * Read-only — no write endpoints (OI-1). All four endpoints implemented (Phase 4).
+ * Industry Knowledge Base module (Document 2 §5.3, Document 5 §4.3, Phase 5 Category Mapping).
+ * Read-only — no write endpoints (OI-1).
  */
 const knowledgeBaseService = require('../services/knowledgeBase.service');
 const { sendSuccess } = require('../utils/response');
@@ -20,6 +20,16 @@ async function getIndustry(req, res, next) {
   try {
     const industry = await knowledgeBaseService.getIndustry(req.params.industryId);
     sendSuccess(res, industry);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/v1/industries/:industryId/materials — Phase 5 Automatic Mapping
+async function getIndustryMaterials(req, res, next) {
+  try {
+    const materials = await knowledgeBaseService.getIndustryMaterials(req.params.industryId);
+    sendSuccess(res, materials);
   } catch (err) {
     next(err);
   }
@@ -45,4 +55,10 @@ async function listUnitsOfMeasurement(req, res, next) {
   }
 }
 
-module.exports = { listIndustries, getIndustry, getIndustryKnowledgeBase, listUnitsOfMeasurement };
+module.exports = {
+  listIndustries,
+  getIndustry,
+  getIndustryMaterials,
+  getIndustryKnowledgeBase,
+  listUnitsOfMeasurement,
+};

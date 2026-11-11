@@ -3,24 +3,37 @@
  * 05, Document 3 §5 PriceIngestionService). Framework-agnostic — no req/res,
  * no SQL (Document 3 §3).
  *
- * Phase 7 scope only: manual entry (source = MANUAL), the V1 default per
+ * Phase 7 scope: manual entry (source = MANUAL), the V1 default per
  * the Document 3 ADR. Scheduled/government-dataset ingestion is a separate,
- * internal node-cron job (Document 3 §8) — not implemented here; no
- * PriceSourceAdapter abstraction is built for a single hardcoded source with
- * no second implementation yet (that pattern belongs to the jobs/ phase,
- * when it actually has more than one source to abstract over).
+ * internal node-cron job (Document 3 §8).
  *
  * Phase A addition: ingestFromProvider() — handles one normalized MarketPrice
  * for one tracked material. Reuses the same priceRepository.create() +
  * alertEvaluationService.evaluateMaterial() pipeline as addManualPrice();
  * no duplication of insertion or alert logic.
+ *
+ * Phase 1 (Data Integrity): enriches both manual and automatic price insertions
+ * with currency, unit_label, region, grade, provider_name, source_url, and
+ * data_class to clearly distinguish proxy benchmarks (WTI/Brent in USD/bbl)
+ * from direct local procurement quotes (INR/kg).
  */
 const priceRepository = require('../repositories/price.repository');
 const materialRepository = require('../repositories/material.repository');
 const alertEvaluationService = require('./alertEvaluation.service');
+const { COMMODITY_METADATA } = require('../config/commodityMapping');
 const AppError = require('../utils/AppError');
 
-async function addManualPrice(businessId, materialId, { price, recordedAt }) {
+const { normalizeCurrencyCode, isValidHttpUrl } = require('../utils/validationHelpers');
+
+async function addManualPrice(businessId, materialId, {
+  price,
+  recordedAt,
+  currency,
+  unitLabel,
+  region,
+  grade,
+  sourceUrl,
+}) {
   const material = await materialRepository.findByIdForBusiness(materialId, businessId);
   if (!material) {
     throw new AppError(404, 'NOT_FOUND', 'Material not found');
@@ -31,19 +44,43 @@ async function addManualPrice(businessId, materialId, { price, recordedAt }) {
     throw new AppError(404, 'NOT_FOUND', 'Material is not currently tracked');
   }
 
+  const trimmedSourceUrl = typeof sourceUrl === 'string' && sourceUrl.trim() ? sourceUrl.trim() : null;
+  if (trimmedSourceUrl && !isValidHttpUrl(trimmedSourceUrl)) {
+    const ValidationAppError = require('../utils/AppError');
+    throw new ValidationAppError(400, 'VALIDATION_ERROR', 'Invalid sourceUrl: must use http or https protocol');
+  }
+
   const created = await priceRepository.create({
     trackedMaterialId: materialId,
     price,
     recordedAt,
     source: 'MANUAL',
+    currency: normalizeCurrencyCode(currency, 'INR'), // Default INR for domestic SME transactions
+    unitLabel: unitLabel || material.unit_abbreviation || material.unit || null,
+    region: region || 'Domestic (India)',
+    grade: grade || null,
+    providerName: 'Supplier Manual Entry',
+    sourceUrl: trimmedSourceUrl,
+    dataClass: 'SUPPLIER_QUOTE',
+    isValid: true,
   });
-// Evaluate active alert rules immediately after recording the price.
-await alertEvaluationService.evaluateMaterial(businessId, materialId);
+
+  // Evaluate active alert rules immediately after recording the price.
+  await alertEvaluationService.evaluateMaterial(businessId, materialId);
+
   return {
     id: created.id,
     price: created.price,
     recordedAt: created.recorded_at,
     source: created.source,
+    currency: created.currency,
+    unitLabel: created.unit_label,
+    region: created.region,
+    grade: created.grade,
+    providerName: created.provider_name,
+    sourceUrl: created.source_url,
+    dataClass: created.data_class,
+    isValid: created.is_valid !== undefined ? !!created.is_valid : true,
   };
 }
 
@@ -70,7 +107,7 @@ await alertEvaluationService.evaluateMaterial(businessId, materialId);
  */
 async function ingestFromProvider(trackedMaterial, marketPrice) {
   const { id: trackedMaterialId, business_id: businessId } = trackedMaterial;
-  const { price, recordedAt } = marketPrice;
+  const { price, recordedAt, symbol } = marketPrice;
 
   // recordedAt from provider is 'YYYY-MM-DD'; stored as midnight DATETIME
   // e.g. '2026-09-09' → '2026-09-09 00:00:00' in MySQL DATETIME column.
@@ -88,12 +125,25 @@ async function ingestFromProvider(trackedMaterial, marketPrice) {
       return { status: 'skipped', trackedMaterialId, businessId, reason: 'duplicate' };
     }
 
+    // Populate commodity-specific metadata from canonical symbol catalog
+    const meta = (symbol && COMMODITY_METADATA[symbol]) || {};
+    const resolvedCurrency = normalizeCurrencyCode(marketPrice.currency, meta.currency || null);
+
     // Reuse the exact same repository method the manual path uses.
     await priceRepository.create({
       trackedMaterialId,
       price,
       recordedAt: recordedAtDateTime,
       source: 'THIRD_PARTY_API',
+      currency: resolvedCurrency,
+      unitLabel: marketPrice.unitLabel || meta.unitLabel || null,
+      region: marketPrice.region || meta.region || null,
+      grade: marketPrice.grade || meta.grade || null,
+      providerName: marketPrice.providerName || meta.provider || 'External Market Provider',
+      sourceUrl: marketPrice.sourceUrl || meta.sourceUrl || null,
+      dataClass: marketPrice.dataClass || meta.dataClass || 'MARKET_INDICATIVE',
+      isValid: true,
+      invalidReason: null,
     });
 
     // Evaluate alert rules immediately — exactly as addManualPrice() does.
@@ -106,4 +156,3 @@ async function ingestFromProvider(trackedMaterial, marketPrice) {
 }
 
 module.exports = { addManualPrice, ingestFromProvider };
-

@@ -25,11 +25,27 @@ async function getLatestPrice(req, res, next) {
   }
 }
 
+// GET /api/v1/materials/:materialId/prices/source-info — Phase 1 Provenance & Disclaimer
+async function getPriceSourceInfo(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+
+    const sourceInfo = await priceQueryService.getPriceSourceInfo(
+      businessId,
+      req.params.materialId
+    );
+
+    sendSuccess(res, sourceInfo);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // POST /api/v1/materials/:materialId/prices — FR-PRICE-01, 02, 05
 async function addPrice(req, res, next) {
   try {
     const businessId = await resolveBusinessId(req.auth);
-    const { price, recordedAt } = req.body;
+    const { price, recordedAt, currency, unitLabel, region, grade, sourceUrl, dataClass } = req.body;
 
     const created = await priceIngestionService.addManualPrice(
       businessId,
@@ -37,6 +53,12 @@ async function addPrice(req, res, next) {
       {
         price,
         recordedAt,
+        currency,
+        unitLabel,
+        region,
+        grade,
+        sourceUrl,
+        dataClass,
       }
     );
 
@@ -48,5 +70,6 @@ async function addPrice(req, res, next) {
 
 module.exports = {
   getLatestPrice,
+  getPriceSourceInfo,
   addPrice,
 };

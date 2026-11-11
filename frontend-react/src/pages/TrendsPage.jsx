@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TrendsPage â€” Price history chart + multi-material comparison
  * Business Market Monitor â€” React frontend
  *
@@ -39,7 +39,7 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -80,6 +80,7 @@ const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4'];
 const STATUS = { IDLE: 'idle', LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
 
 export function TrendsPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   /* â”€â”€ Materials state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -279,7 +280,11 @@ export function TrendsPage() {
           tooltip: {
             callbacks: {
               title: (ctx) => formatDate(ctx[0].label),
-              label: (ctx) => `${formatNumber(ctx.parsed.y, 2)} / ${unit}`,
+              label: (ctx) => {
+                const item = histItems[ctx.dataIndex];
+                const unitStr = item?.unitLabel || (item?.currency ? `${item.currency}/${unit}` : unit);
+                return `${formatNumber(ctx.parsed.y, 2)} ${unitStr}${item?.dataClass === 'MARKET_INDICATIVE' ? ' (Proxy)' : ''}`;
+              },
             },
           },
         },
@@ -379,7 +384,12 @@ export function TrendsPage() {
             intersect: false,
             callbacks: {
               title: (ctx) => formatDate(ctx[0].label),
-              label: (ctx) => `${ctx.dataset.label}: ${formatNumber(ctx.parsed.y, 2)}`,
+              label: (ctx) => {
+                const mat = comparison[ctx.datasetIndex];
+                const pt = mat?.series?.find(p => p.recordedAt === sortedDates[ctx.dataIndex]);
+                const unitStr = pt?.unitLabel || pt?.currency || '';
+                return `${ctx.dataset.label}: ${formatNumber(ctx.parsed.y, 2)}${unitStr ? ` ${unitStr}` : ''}`;
+              },
             },
           },
         },
@@ -479,7 +489,7 @@ export function TrendsPage() {
                 onChange={e => setPhMaterialId(e.target.value)}
                 disabled={materialsStatus === STATUS.LOADING}
               >
-                <option value="">Select a materialâ€¦</option>
+                <option value="">Select a material…</option>
                 {trackedMaterials.map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
@@ -539,12 +549,59 @@ export function TrendsPage() {
               icon="fa-solid fa-chart-line"
               title="No price data available"
               message="There are no price records for this material in the selected date range. Try adjusting the dates or logging some prices."
-              action={{ label: 'Log a Price', onClick: () => {} }}
+              action={{ label: 'Log a Price', onClick: () => navigate('/prices?materialId=' + phMaterialId) }}
             />
           )}
 
           {histStatus === STATUS.SUCCESS && histItems.length > 0 && (
             <>
+              {/* Benchmark / Proxy notice */}
+              {(() => {
+                const isGoi = selectedHistMaterial?.externalSymbol?.endsWith('_GOI') ||
+                  histItems.some(i => i.unitLabel === 'INR/quintal' || (i.currency === 'INR' && i.dataClass === 'MARKET_INDICATIVE'));
+                const isCrudeProxy = selectedHistMaterial?.externalSymbol === 'WTI' ||
+                  selectedHistMaterial?.externalSymbol === 'BRENT' ||
+                  histItems.some(i => i.currency === 'USD' || i.dataClass === 'OFFICIAL_BENCHMARK');
+
+                if (isGoi) {
+                  return (
+                    <div className="card" style={{ marginBottom: 'var(--space-4)', borderLeft: '4px solid var(--color-primary, #3b82f6)', backgroundColor: 'var(--color-primary-subtle, #eff6ff)' }}>
+                      <div className="card__body" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <i className="fa-solid fa-building-columns" style={{ color: 'var(--color-primary, #2563eb)' }} aria-hidden="true" />
+                          <strong style={{ color: 'var(--color-primary, #1e40af)', fontSize: 'var(--text-sm)' }}>
+                            Official Indian Wholesale Mandi Benchmark
+                          </strong>
+                        </div>
+                        <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                          Prices shown reflect authentic official Indian wholesale market mandi modal prices (Agmarknet / Ministry of Agriculture) in INR/quintal. These reflect wholesale mandi auctions, not packaged consumer retail prices.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isCrudeProxy || selectedHistMaterial?.externalSymbol || histItems.some(i => i.dataClass === 'MARKET_INDICATIVE')) {
+                  return (
+                    <div className="card" style={{ marginBottom: 'var(--space-4)', borderLeft: '4px solid var(--color-warning, #f59e0b)', backgroundColor: 'var(--color-warning-subtle, #fef3c7)' }}>
+                      <div className="card__body" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <i className="fa-solid fa-triangle-exclamation" style={{ color: 'var(--color-warning-text, #b45309)' }} aria-hidden="true" />
+                          <strong style={{ color: 'var(--color-warning-text, #b45309)', fontSize: 'var(--text-sm)' }}>
+                            Market Indicative Proxy Benchmark
+                          </strong>
+                        </div>
+                        <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                          Prices shown reflect global commodity benchmarks ({selectedHistMaterial?.externalSymbol || 'Crude Oil'} in USD/bbl) acting as upstream indicative proxies, not direct local purchase transactions.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+
               {/* Chart canvas */}
               <div id="ph-chart-container" className="chart-container">
                 <canvas
@@ -573,7 +630,10 @@ export function TrendsPage() {
                     <thead>
                       <tr>
                         <th scope="col">Date</th>
-                        <th scope="col">Price ({selectedHistMaterial?.unit})</th>
+                        <th scope="col">Price</th>
+                        <th scope="col">Currency & Unit</th>
+                        <th scope="col">Classification</th>
+                        <th scope="col">Source</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -581,6 +641,13 @@ export function TrendsPage() {
                         <tr key={i}>
                           <td>{formatDate(row.recordedAt)}</td>
                           <td className="font-mono">{formatNumber(row.price, 2)}</td>
+                          <td>{row.currency ? `${row.currency} (${row.unitLabel || selectedHistMaterial?.unit || 'unit'})` : (selectedHistMaterial?.unit || '—')}</td>
+                          <td>
+                            <span className={`badge ${row.dataClass === 'OFFICIAL_BENCHMARK' ? 'badge--info' : row.dataClass === 'MARKET_INDICATIVE' ? 'badge--warning' : 'badge--neutral'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                              {row.dataClass === 'OFFICIAL_BENCHMARK' ? 'Benchmark' : row.dataClass === 'MARKET_INDICATIVE' ? 'Proxy' : 'Quote'}
+                            </span>
+                          </td>
+                          <td className="text-xs text-secondary">{row.source || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -653,7 +720,7 @@ export function TrendsPage() {
               </div>
               <p id="cmp-counter" className="cmp-counter">
                 {checkedCount} / 5 selected
-                {maxedOut && ' â€” Maximum of 5 materials can be compared.'}
+                {maxedOut && ' — Maximum of 5 materials can be compared.'}
               </p>
             </div>
 
@@ -715,6 +782,11 @@ export function TrendsPage() {
 
           {cmpStatus === STATUS.SUCCESS && cmpTotalPoints > 0 && (
             <>
+              <p className="text-xs text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>
+                <i className="fa-solid fa-circle-info" style={{ marginRight: '4px' }} />
+                Comparing multi-material trends. Series reflect respective benchmark units and currencies.
+              </p>
+
               <div id="cmp-chart-container" className="chart-container">
                 <canvas
                   id="cmp-chart"
@@ -748,7 +820,7 @@ export function TrendsPage() {
 }
 
 /* ================================================================
- * COMPARE DATA TABLE â€” accessible, date-aligned across all series
+ * COMPARE DATA TABLE — accessible, date-aligned across all series
  * ================================================================ */
 function CompareTable({ comparison }) {
   // Collect all unique dates (sorted ASC) across all series
@@ -758,7 +830,7 @@ function CompareTable({ comparison }) {
 
   if (sortedDates.length === 0) return null;
 
-  // Build price map: materialId â†’ Map<recordedAt, price>
+  // Build price map: materialId → Map<recordedAt, price>
   const priceMap = new Map();
   comparison.forEach(mat => {
     const m = new Map(mat.series.map(p => [p.recordedAt, p.price]));
@@ -766,31 +838,47 @@ function CompareTable({ comparison }) {
   });
 
   return (
-    <table className="table table--compact">
-      <caption>Price comparison data</caption>
-      <thead>
-        <tr>
-          <th scope="col">Date</th>
-          {comparison.map(mat => (
-            <th key={mat.materialId} scope="col">{mat.name}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {sortedDates.map(dt => (
-          <tr key={dt}>
-            <td>{formatDate(dt)}</td>
+    <>
+      <p className="text-xs text-secondary" style={{ margin: 'var(--space-2) 0', fontStyle: 'italic' }}>
+        <i className="fa-solid fa-circle-info" style={{ marginRight: '4px' }} />
+        Values reflect individual commodity benchmark units and currencies. Compare relative trend trajectories rather than direct absolute prices when units differ.
+      </p>
+      <table className="table table--compact">
+        <caption>Price comparison data</caption>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
             {comparison.map(mat => {
-              const price = priceMap.get(mat.materialId)?.get(dt);
+              const unit = mat.series[0]?.unitLabel || mat.series[0]?.currency || null;
               return (
-                <td key={mat.materialId} className="font-mono">
-                  {price != null ? formatNumber(price, 2) : 'â€”'}
-                </td>
+                <th key={mat.materialId} scope="col">
+                  {mat.name}
+                  {unit && (
+                    <span className="text-xs text-secondary" style={{ display: 'block', fontWeight: 'normal' }}>
+                      ({unit})
+                    </span>
+                  )}
+                </th>
               );
             })}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {sortedDates.map(dt => (
+            <tr key={dt}>
+              <td>{formatDate(dt)}</td>
+              {comparison.map(mat => {
+                const price = priceMap.get(mat.materialId)?.get(dt);
+                return (
+                  <td key={mat.materialId} className="font-mono">
+                    {price != null ? formatNumber(price, 2) : '—'}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

@@ -62,10 +62,29 @@ const STATUS = { LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
 
 /* ── Supported external symbols (matches backend SUPPORTED_SYMBOLS) ── */
 const SYMBOL_OPTIONS = [
-  { value: '',      label: 'None' },
-  { value: 'WTI',  label: 'WTI (Crude Oil)' },
-  { value: 'BRENT', label: 'Brent (Crude Oil)' },
+  { value: '',               label: 'None' },
+  { value: 'WTI',            label: 'WTI (Crude Oil Proxy — USD/bbl)' },
+  { value: 'BRENT',          label: 'Brent (Crude Oil Proxy — USD/bbl)' },
+  { value: 'WHEAT_GOI',      label: 'Wheat (India Mandi — INR/quintal)' },
+  { value: 'SUGAR_GOI',      label: 'Sugar (India Mandi — INR/quintal)' },
+  { value: 'EDIBLE_OIL_GOI', label: 'Mustard Oil (India Mandi — INR/quintal)' },
 ];
+
+function getSymbolDescription(symbol) {
+  switch (symbol) {
+    case 'WTI':
+    case 'BRENT':
+      return 'Proxy benchmark: Global crude oil (USD/bbl). Useful as a leading indicator, not a direct material price.';
+    case 'WHEAT_GOI':
+      return 'Official benchmark: Indian wholesale wheat mandi modal price (Agmarknet / data.gov.in) in INR/quintal (raw grain FAQ grade).';
+    case 'SUGAR_GOI':
+      return 'Official benchmark: Indian wholesale sugar mandi modal price (Agmarknet / data.gov.in) in INR/quintal (bulk commercial M-30 grade).';
+    case 'EDIBLE_OIL_GOI':
+      return 'Official benchmark: Indian wholesale mustard oil price (Agmarknet / data.gov.in) in INR/quintal (refined/packed wholesale).';
+    default:
+      return null;
+  }
+}
 
 export function MaterialsPage() {
   const { showToast } = useToast();
@@ -449,23 +468,28 @@ function MaterialTableRow({ material, busy, symbolBusy, onToggle, onSetSymbol })
       </td>
       <td className="table__cell">
         {material.isTracked && (
-          material.externalSymbol ? (
+          <div className="material-symbol-cell">
             <ExternalSymbolSelect
               material={material}
               busy={symbolBusy}
               onSetSymbol={onSetSymbol}
             />
-          ) : (
-            <span className="text-xs text-secondary">
-              No automatic source —{' '}
-              <Link
-                to={`/prices?materialId=${material.id}`}
-                className="text-accent"
-              >
-                add supplier quote
-              </Link>
-            </span>
-          )
+            {material.externalSymbol ? (
+              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', maxWidth: '280px', lineHeight: 1.3 }}>
+                {getSymbolDescription(material.externalSymbol) || 'Automatic market benchmark.'}
+              </span>
+            ) : (
+              <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px' }}>
+                No automatic source —{' '}
+                <Link
+                  to={`/prices?materialId=${material.id}`}
+                  className="text-accent"
+                >
+                  add supplier quote
+                </Link>
+              </span>
+            )}
+          </div>
         )}
       </td>
       <td className="table__cell">
@@ -492,14 +516,17 @@ function MaterialCard({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
       </div>
       {material.isTracked && (
         <div className="material-card__symbol">
+          <ExternalSymbolSelect
+            material={material}
+            busy={symbolBusy}
+            onSetSymbol={onSetSymbol}
+          />
           {material.externalSymbol ? (
-            <ExternalSymbolSelect
-              material={material}
-              busy={symbolBusy}
-              onSetSymbol={onSetSymbol}
-            />
+            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', lineHeight: 1.3 }}>
+              {getSymbolDescription(material.externalSymbol) || 'Automatic market benchmark.'}
+            </span>
           ) : (
-            <span className="text-xs text-secondary">
+            <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px' }}>
               No automatic source —{' '}
               <Link
                 to={`/prices?materialId=${material.id}`}

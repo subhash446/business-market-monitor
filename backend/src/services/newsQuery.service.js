@@ -19,6 +19,13 @@ async function listNewsForBusiness(businessId, { page, limit, offset }) {
     throw new AppError(404, 'NOT_FOUND', 'Business not found');
   }
 
+  if (!business.industry_id) {
+    return {
+      items: [],
+      meta: buildMeta({ page, limit, total: 0 }),
+    };
+  }
+
   const [rows, total] = await Promise.all([
     newsRepository.listByIndustry(business.industry_id, { limit, offset }),
     newsRepository.countByIndustry(business.industry_id),
@@ -31,12 +38,16 @@ async function listNewsForBusiness(businessId, { page, limit, offset }) {
 }
 
 function toPublicNewsItem(row) {
+  let publishedAt = row.published_at;
+  if (publishedAt instanceof Date) {
+    publishedAt = publishedAt.toISOString();
+  }
   return {
     id: row.id,
     title: row.title,
     url: row.url,
     sourceName: row.source_name,
-    publishedAt: row.published_at,
+    publishedAt,
     summary: row.summary || null,
   };
 }

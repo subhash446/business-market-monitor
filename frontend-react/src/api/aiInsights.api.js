@@ -79,3 +79,14 @@ export async function getBusinessLatestInsights(limit = 3) {
   const { data } = await get(`/ai-insights/business/latest?${params}`);
   return data ?? [];
 }
+
+/**
+ * Fetch full supporting evidence (price records & news articles) for a specific AI insight.
+ *
+ * @param {number|string} insightId
+ * @returns {Promise<object>}
+ */
+export async function getInsightEvidence(insightId) {
+  const { data } = await get(`/ai-insights/${insightId}/evidence`);
+  return data;
+}

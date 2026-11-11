@@ -17,6 +17,9 @@
  *
  * Phase A addition: EIA_API_KEY is required only when PRICE_INGESTION_ENABLED
  * is true — opt-out deployments are completely unaffected.
+ *
+ * Phase 4 addition: GOV_DATA_API_KEY is required only when INDIA_GOVT_DATA_ENABLED
+ * is true.
  */
 const env = require('./env');
 
@@ -51,6 +54,11 @@ function validateEnv() {
   // is explicitly enabled. Same opt-in reasoning as EIA and GNews above.
   if (env.aiInsights.enabled && isBlank(env.gemini.apiKey)) {
     missing.push('GEMINI_API_KEY (required when AI_INSIGHTS_ENABLED=true)');
+  }
+
+  // Phase 4: India Govt Data API key is only required when INDIA_GOVT_DATA_ENABLED is true.
+  if (env.indiaGovt && env.indiaGovt.enabled && isBlank(env.indiaGovt.apiKey)) {
+    missing.push('GOV_DATA_API_KEY (required when INDIA_GOVT_DATA_ENABLED=true)');
   }
 
   if (missing.length > 0) {

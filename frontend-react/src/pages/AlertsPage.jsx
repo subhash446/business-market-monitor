@@ -39,6 +39,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getMaterials,
 } from '../api/materials.api.js';
+import { mapAlertCreateError } from '../utils/alertErrors.js';
 import {
   getAlertRules,
   createAlertRule,
@@ -66,7 +67,11 @@ function getMaterialName(materials, trackedMaterialId) {
   return m ? m.name : `Material #${trackedMaterialId}`;
 }
 
-function formatCondition(conditionType) {
+function formatCondition(conditionType, thresholdType = 'ABSOLUTE') {
+  if (thresholdType === 'PERCENTAGE') {
+    if (conditionType === 'PRICE_ABOVE') return 'Price Increase (≥ %)';
+    if (conditionType === 'PRICE_BELOW') return 'Price Drop (≥ %)';
+  }
   if (conditionType === 'PRICE_ABOVE') return 'Price Above';
   if (conditionType === 'PRICE_BELOW') return 'Price Below';
   return conditionType;
@@ -339,7 +344,7 @@ function RulesTable({ rules, materials, toggleBusy, onToggle, onDelete, onCreate
         <caption className="sr-only">Alert rules</caption>
         <thead>
           <tr className="table__header-row">
-            {['Material', 'Condition', 'Threshold', 'Status', 'Actions'].map(col => (
+            {['Material', 'Condition', 'Threshold', 'Cooldown', 'Status', 'Actions'].map(col => (
               <th key={col} className="table__cell table__cell--header" scope="col">
                 {col}
               </th>
@@ -366,11 +371,27 @@ function RulesTable({ rules, materials, toggleBusy, onToggle, onDelete, onCreate
 /* ── Single Rule Row ────────────────────────────────────────────── */
 function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
   const matName = getMaterialName(materials, rule.trackedMaterialId);
+  const isPct = rule.thresholdType === 'PERCENTAGE';
   return (
     <tr data-rule-id={rule.id}>
       <td className="table__cell">{matName}</td>
-      <td className="table__cell">{formatCondition(rule.conditionType)}</td>
-      <td className="table__cell font-mono">{formatNumber(rule.thresholdPrice, 2)}</td>
+      <td className="table__cell">
+        <span className={`badge ${isPct ? 'badge--info' : 'badge--neutral'}`} style={{ marginRight: '6px', fontSize: '10px' }}>
+          {isPct ? '% Change' : 'Absolute'}
+        </span>
+        {formatCondition(rule.conditionType, rule.thresholdType)}
+      </td>
+      <td className="table__cell font-mono">
+        {isPct ? `${formatNumber(rule.thresholdPrice, 1)}%` : formatNumber(rule.thresholdPrice, 2)}
+      </td>
+      <td className="table__cell text-xs text-secondary">
+        {rule.cooldownHours || 24}h
+        {rule.lastTriggeredAt && (
+          <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+            Fired: {formatDateTime(rule.lastTriggeredAt)}
+          </span>
+        )}
+      </td>
       <td className="table__cell">
         <span className={`badge ${rule.isActive ? 'badge--success' : 'badge--neutral'}`}>
           {rule.isActive ? 'Active' : 'Paused'}
@@ -416,7 +437,7 @@ function EventsTable({ events }) {
       <EmptyState
         icon="fa-solid fa-bell"
         title="No alerts triggered yet"
-        message="Alert events will appear here when a material price crosses one of your alert thresholds. Automated monitoring is pending activation in the current version."
+        message="Alert events will appear here when a material price crosses one of your alert thresholds."
       />
     );
   }
@@ -427,7 +448,7 @@ function EventsTable({ events }) {
         <caption className="sr-only">Alert event history</caption>
         <thead>
           <tr className="table__header-row">
-            {['Triggered At', 'Condition', 'Triggered Price', 'Delivery Status'].map(col => (
+            {['Triggered At', 'Condition', 'Threshold', 'Observed Change', 'Triggered Price', 'Delivery Status'].map(col => (
               <th key={col} className="table__cell table__cell--header" scope="col">
                 {col}
               </th>
@@ -437,12 +458,27 @@ function EventsTable({ events }) {
         <tbody>
           {events.map(evt => {
             const { cls, label } = deliveryBadgeProps(evt.deliveryStatus);
+            const isPct = evt.thresholdTypeSnapshot === 'PERCENTAGE';
             return (
               <tr key={evt.id}>
                 <td className="table__cell">{formatDateTime(evt.triggeredAt)}</td>
                 <td className="table__cell">
-                  {formatCondition(evt.conditionTypeSnapshot)}{' '}
-                  {formatNumber(evt.thresholdPriceSnapshot, 2)}
+                  <span className={`badge ${isPct ? 'badge--info' : 'badge--neutral'}`} style={{ marginRight: '6px', fontSize: '10px' }}>
+                    {isPct ? '% Change' : 'Absolute'}
+                  </span>
+                  {formatCondition(evt.conditionTypeSnapshot, evt.thresholdTypeSnapshot)}
+                </td>
+                <td className="table__cell font-mono">
+                  {isPct
+                    ? `${formatNumber(evt.thresholdPriceSnapshot, 1)}%`
+                    : formatNumber(evt.thresholdPriceSnapshot, 2)}
+                </td>
+                <td className="table__cell font-mono">
+                  {evt.triggeredChangePercent !== null && evt.triggeredChangePercent !== undefined ? (
+                    <span style={{ color: Number(evt.triggeredChangePercent) >= 0 ? 'var(--color-danger, #ef4444)' : 'var(--color-success, #22c55e)' }}>
+                      {Number(evt.triggeredChangePercent) >= 0 ? '+' : ''}{formatNumber(evt.triggeredChangePercent, 2)}%
+                    </span>
+                  ) : '—'}
                 </td>
                 <td className="table__cell font-mono">{formatNumber(evt.triggeredPrice, 2)}</td>
                 <td className="table__cell">
@@ -462,32 +498,37 @@ function EventsTable({ events }) {
  * Fields: trackedMaterialId (select), conditionType (radio), thresholdPrice (number)
  * POST /api/v1/alerts/rules { trackedMaterialId, conditionType, thresholdPrice }
  * ================================================================ */
-function CreateRuleModal({ isOpen, onClose, materials, onCreated, showToast }) {
-  const [matId,       setMatId]       = useState('');
-  const [matErr,      setMatErr]      = useState('');
-  const [condition,   setCondition]   = useState('');
-  const [condErr,     setCondErr]     = useState('');
-  const [threshold,   setThreshold]   = useState('');
-  const [threshErr,   setThreshErr]   = useState('');
-  const [formErr,     setFormErr]     = useState('');
-  const [saving,      setSaving]      = useState(false);
+function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
+  const [matId,          setMatId]          = useState('');
+  const [matErr,         setMatErr]         = useState('');
+  const [thresholdType,  setThresholdType]  = useState('ABSOLUTE'); // 'ABSOLUTE' | 'PERCENTAGE'
+  const [condition,      setCondition]      = useState('');
+  const [condErr,        setCondErr]        = useState('');
+  const [threshold,      setThreshold]      = useState('');
+  const [threshErr,      setThreshErr]      = useState('');
+  const [cooldownHours,  setCooldownHours]  = useState('24');
+  const [cooldownErr,    setCooldownErr]    = useState('');
+  const [formErr,        setFormErr]        = useState('');
+  const [saving,         setSaving]         = useState(false);
 
   // Reset on open/close
   useEffect(() => {
     if (!isOpen) {
       setMatId(''); setMatErr('');
+      setThresholdType('ABSOLUTE');
       setCondition(''); setCondErr('');
       setThreshold(''); setThreshErr('');
+      setCooldownHours('24'); setCooldownErr('');
       setFormErr(''); setSaving(false);
     }
   }, [isOpen]);
 
-  // Only tracked materials in the select — mirrors original _materials.filter(m => m.isTracked)
+  // Only tracked materials in the select
   const trackedMaterials = materials.filter(m => m.isTracked);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMatErr(''); setCondErr(''); setThreshErr(''); setFormErr('');
+    setMatErr(''); setCondErr(''); setThreshErr(''); setCooldownErr(''); setFormErr('');
 
     let valid = true;
 
@@ -506,37 +547,37 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated, showToast }) {
     if (!threshold || isNaN(rawThresh) || rawThresh <= 0) {
       setThreshErr('Threshold must be a positive number.');
       valid = false;
+    } else if (thresholdType === 'PERCENTAGE' && rawThresh > 1000) {
+      setThreshErr('Percentage threshold must be 1000% or less.');
+      valid = false;
+    }
+
+    const cd = Number(cooldownHours);
+    if (!cooldownHours || Number.isNaN(cd) || !Number.isInteger(cd) || cd < 1 || cd > 720) {
+      setCooldownErr('Cooldown must be between 1 and 720 hours.');
+      valid = false;
     }
 
     if (!valid) return;
 
     setSaving(true);
     try {
-      // POST /api/v1/alerts/rules — body: { trackedMaterialId, conditionType, thresholdPrice }
       const created = await createAlertRule({
         trackedMaterialId,
         conditionType:  condition,
         thresholdPrice: rawThresh,
+        thresholdType,
+        cooldownHours:  cd,
       });
       onClose();
       onCreated(created);
     } catch (err) {
-      if (err?.status === 409) {
-        setFormErr('An alert rule already exists for this material and condition.');
-      } else if (err?.status === 404) {
-        setMatErr('Material not found. Please reload and try again.');
-      } else if (err?.status === 400) {
-        const errors = err?.errors ?? [];
-        const mE = errors.find(e => e.field === 'trackedMaterialId');
-        const cE = errors.find(e => e.field === 'conditionType');
-        const tE = errors.find(e => e.field === 'thresholdPrice');
-        if (mE) setMatErr('Please select a material.');
-        if (cE) setCondErr('Please select a condition.');
-        if (tE) setThreshErr('Threshold must be a positive number.');
-        if (!mE && !cE && !tE) setFormErr('Please check your inputs and try again.');
-      } else {
-        setFormErr('Could not create alert rule. Check your connection.');
-      }
+      const mapped = mapAlertCreateError(err);
+      if (mapped.matErr) setMatErr(mapped.matErr);
+      if (mapped.condErr) setCondErr(mapped.condErr);
+      if (mapped.threshErr) setThreshErr(mapped.threshErr);
+      if (mapped.cooldownErr) setCooldownErr(mapped.cooldownErr);
+      if (mapped.formErr) setFormErr(mapped.formErr);
     } finally {
       setSaving(false);
     }
@@ -607,13 +648,44 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated, showToast }) {
           )}
         </div>
 
+        {/* Threshold Type toggle: Absolute vs % Change */}
+        <div className="form-group">
+          <label className="form-label form-label--required">Threshold Type</label>
+          <div className="filter-group" style={{ display: 'inline-flex', width: '100%' }}>
+            <button
+              type="button"
+              className={`filter-btn ${thresholdType === 'ABSOLUTE' ? 'filter-btn--active' : ''}`}
+              style={{ flex: 1, textAlign: 'center' }}
+              onClick={() => { setThresholdType('ABSOLUTE'); setThreshErr(''); }}
+            >
+              Absolute Price
+            </button>
+            <button
+              type="button"
+              className={`filter-btn ${thresholdType === 'PERCENTAGE' ? 'filter-btn--active' : ''}`}
+              style={{ flex: 1, textAlign: 'center' }}
+              onClick={() => { setThresholdType('PERCENTAGE'); setThreshErr(''); }}
+            >
+              Percentage Change (%)
+            </button>
+          </div>
+        </div>
+
         {/* Condition radio group */}
         <div className="form-group">
           <fieldset className="radio-fieldset">
             <legend className="form-label form-label--required">Condition</legend>
             {[
-              { id: 'ar-condition-above', value: 'PRICE_ABOVE', label: 'Price goes above threshold' },
-              { id: 'ar-condition-below', value: 'PRICE_BELOW', label: 'Price goes below threshold' },
+              {
+                id: 'ar-condition-above',
+                value: 'PRICE_ABOVE',
+                label: thresholdType === 'PERCENTAGE' ? 'Price increases by ≥ threshold %' : 'Price goes above threshold',
+              },
+              {
+                id: 'ar-condition-below',
+                value: 'PRICE_BELOW',
+                label: thresholdType === 'PERCENTAGE' ? 'Price drops by ≥ threshold %' : 'Price goes below threshold',
+              },
             ].map(({ id, value, label }) => (
               <label key={value} className="radio-label">
                 <input
@@ -635,19 +707,20 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated, showToast }) {
           )}
         </div>
 
-        {/* Threshold price */}
+        {/* Threshold price / percentage */}
         <div className="form-group">
           <label className="form-label form-label--required" htmlFor="ar-threshold">
-            Threshold Price
+            {thresholdType === 'PERCENTAGE' ? 'Threshold Change (%)' : 'Threshold Price'}
           </label>
           <input
             type="number"
             id="ar-threshold"
             name="thresholdPrice"
             className={`form-control font-mono${threshErr ? ' form-control--error' : ''}`}
-            min="0.01"
-            step="0.01"
-            placeholder="e.g. 1500.00"
+            min={thresholdType === 'PERCENTAGE' ? '0.1' : '0.01'}
+            step={thresholdType === 'PERCENTAGE' ? '0.1' : '0.01'}
+            max={thresholdType === 'PERCENTAGE' ? '1000' : undefined}
+            placeholder={thresholdType === 'PERCENTAGE' ? 'e.g. 5 for 5%' : 'e.g. 1500.00'}
             value={threshold}
             onChange={e => { setThreshold(e.target.value); setThreshErr(''); }}
             aria-required="true"
@@ -656,6 +729,34 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated, showToast }) {
           {threshErr && (
             <p className="form-error form-error--visible" id="ar-threshold-error" role="alert">
               {threshErr}
+            </p>
+          )}
+        </div>
+
+        {/* Cooldown period (hours) */}
+        <div className="form-group">
+          <label className="form-label" htmlFor="ar-cooldown">
+            Cooldown Period (hours)
+          </label>
+          <input
+            type="number"
+            id="ar-cooldown"
+            name="cooldownHours"
+            className={`form-control font-mono${cooldownErr ? ' form-control--error' : ''}`}
+            min="1"
+            max="720"
+            step="1"
+            placeholder="24"
+            value={cooldownHours}
+            onChange={e => { setCooldownHours(e.target.value); setCooldownErr(''); }}
+            aria-describedby="ar-cooldown-error"
+          />
+          <small className="text-xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
+            Suppresses repeated alert notifications for this rule within this window.
+          </small>
+          {cooldownErr && (
+            <p className="form-error form-error--visible" id="ar-cooldown-error" role="alert">
+              {cooldownErr}
             </p>
           )}
         </div>

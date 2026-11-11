@@ -2,8 +2,9 @@
  * All queries against `tracked_materials` (Document 4 §5.4).
  * Parameterized queries only (Document 3 §13, NFR-SEC-04).
  *
- * Phase 6A scope only: list + scoped find + update(isTracked). No create
- * (custom materials) and no delete — those are explicitly out of scope.
+ * Phase 6A: list (with optional trackedOnly filter) + scoped find + update(isTracked, customName, unitId).
+ * Phase 6B: createCustom (custom materials, FR-MAT-02) with duplicate prevention.
+ * No delete endpoint — stopping tracking via isTracked = false preserves price history (FR-MAT-03).
  *
  * Every method that touches a specific row scopes by business_id, never a
  * bare id alone — this is what enforces business isolation (Document 5 §2.4).
@@ -11,7 +12,7 @@
 const { pool } = require('../database/connection');
 
 const BASE_SELECT = `
-  SELECT tm.id, tm.raw_material_id, COALESCE(rm.name, tm.custom_name) AS name,
+  SELECT tm.id, tm.raw_material_id, tm.unit_id, COALESCE(rm.name, tm.custom_name) AS name,
          u.abbreviation AS unit_abbreviation, tm.is_tracked, tm.external_symbol,
          tm.created_at
   FROM tracked_materials tm
@@ -19,11 +20,17 @@ const BASE_SELECT = `
   JOIN units_of_measurement u ON u.id = tm.unit_id
 `;
 
-async function listByBusinessId(businessId) {
-  const [rows] = await pool.execute(
-    `${BASE_SELECT} WHERE tm.business_id = ? ORDER BY name ASC`,
-    [businessId]
-  );
+async function listByBusinessId(businessId, trackedOnly = false) {
+  let query = `${BASE_SELECT} WHERE tm.business_id = ?`;
+  const params = [businessId];
+
+  if (trackedOnly) {
+    query += ' AND tm.is_tracked = TRUE';
+  }
+
+  query += ' ORDER BY name ASC';
+
+  const [rows] = await pool.execute(query, params);
   return rows;
 }
 
@@ -42,6 +49,34 @@ async function findByIdForBusiness(materialId, businessId) {
 async function findById(materialId) {
   const [rows] = await pool.execute(`${BASE_SELECT} WHERE tm.id = ? LIMIT 1`, [materialId]);
   return rows[0] || null;
+}
+
+async function updateMaterial(materialId, { isTracked, customName, unitId }) {
+  const updates = [];
+  const params = [];
+
+  if (isTracked !== undefined) {
+    updates.push('is_tracked = ?');
+    params.push(isTracked);
+  }
+  if (customName !== undefined) {
+    updates.push('custom_name = ?');
+    params.push(customName);
+  }
+  if (unitId !== undefined) {
+    updates.push('unit_id = ?');
+    params.push(unitId);
+  }
+
+  if (updates.length > 0) {
+    params.push(materialId);
+    await pool.execute(
+      `UPDATE tracked_materials SET ${updates.join(', ')} WHERE id = ?`,
+      params
+    );
+  }
+
+  return findById(materialId);
 }
 
 async function updateTrackingStatus(materialId, isTracked) {
@@ -84,18 +119,15 @@ async function createCustom({ businessId, customName, unitId }) {
   return findById(result.insertId);
 }
 
-// Added in Production Hardening Phase B (finding A1) — moved here from
-// templateGeneration.service.js, which previously ran this transaction
-// directly against `pool`, bypassing the repository layer. The transaction
-// logic itself (begin/check-existing/insert-new/commit/rollback) is
-// unchanged — only its location moved, per A1's explicit instruction to
-// preserve transaction safety while relocating the SQL.
+// Added in Production Hardening Phase B (finding A1) and updated in Phase 5
+// (Automatic Business-to-Material Mapping).
 //
-// rawMaterials: [{ id, default_unit_id }, ...] — the exact shape returned
-// by knowledgeBaseRepository.getRawMaterialsForTemplateGeneration().
+// rawMaterials: [{ id, default_unit_id, default_external_symbol, external_symbol }, ...]
+//
+// Returns { materialsGenerated: count, createdMaterials: [{ id, rawMaterialId, businessId, unitId, externalSymbol }] }
 async function bulkCreateFromTemplate(businessId, rawMaterials) {
   if (!rawMaterials || rawMaterials.length === 0) {
-    return { materialsGenerated: 0 };
+    return { materialsGenerated: 0, createdMaterials: [] };
   }
 
   const connection = await pool.getConnection();
@@ -104,9 +136,7 @@ async function bulkCreateFromTemplate(businessId, rawMaterials) {
 
     // Never generate duplicates, and safe to call more than once for the
     // same business (idempotent) — check what's already tracked first,
-    // inside this same transaction/connection. Document 4 §10.3 notes MySQL
-    // can't enforce "one row per (business_id, raw_material_id)" natively,
-    // so this is an application-level check.
+    // inside this same transaction/connection.
     const [existingRows] = await connection.execute(
       'SELECT raw_material_id FROM tracked_materials WHERE business_id = ? AND raw_material_id IS NOT NULL',
       [businessId]
@@ -114,16 +144,25 @@ async function bulkCreateFromTemplate(businessId, rawMaterials) {
     const alreadyTracked = new Set(existingRows.map((row) => row.raw_material_id));
     const toInsert = rawMaterials.filter((rm) => !alreadyTracked.has(rm.id));
 
+    const createdMaterials = [];
     for (const rawMaterial of toInsert) {
-      await connection.execute(
-        `INSERT INTO tracked_materials (business_id, raw_material_id, custom_name, unit_id, is_tracked)
-         VALUES (?, ?, NULL, ?, TRUE)`,
-        [businessId, rawMaterial.id, rawMaterial.default_unit_id]
+      const externalSymbol = rawMaterial.external_symbol || rawMaterial.default_external_symbol || null;
+      const [insertResult] = await connection.execute(
+        `INSERT INTO tracked_materials (business_id, raw_material_id, custom_name, unit_id, is_tracked, external_symbol)
+         VALUES (?, ?, NULL, ?, TRUE, ?)`,
+        [businessId, rawMaterial.id, rawMaterial.default_unit_id, externalSymbol]
       );
+      createdMaterials.push({
+        id: insertResult.insertId,
+        rawMaterialId: rawMaterial.id,
+        businessId,
+        unitId: rawMaterial.default_unit_id,
+        externalSymbol,
+      });
     }
 
     await connection.commit();
-    return { materialsGenerated: toInsert.length };
+    return { materialsGenerated: toInsert.length, createdMaterials };
   } catch (err) {
     await connection.rollback();
     throw err;
@@ -161,7 +200,7 @@ async function findTrackedByExternalSymbol(symbol) {
 async function updateExternalSymbol(materialId, externalSymbol) {
   await pool.execute(
     'UPDATE tracked_materials SET external_symbol = ? WHERE id = ?',
-    [externalSymbol, materialId]   // externalSymbol may be null (clears the column)
+    [externalSymbol, materialId] // externalSymbol may be null (clears the column)
   );
   return findById(materialId);
 }
@@ -171,14 +210,6 @@ async function updateExternalSymbol(materialId, externalSymbol) {
 // Returns ALL actively-tracked materials across ALL businesses, with the
 // minimum columns the AI insights job needs:
 //   id, business_id, name (resolved), industry_id (from the business row).
-//
-// industry_id is joined from `businesses` (not tracked_materials) because
-// materials are categorised by their owner's industry -- the same association
-// the news tagging system uses (news_item_tags.industry_id = businesses.industry_id).
-//
-// Job-only: this method is NOT called from any controller or route.
-// Business isolation for API reads is enforced by findByIdForBusiness() and
-// listByBusinessId() which are the only methods exposed to user requests.
 async function findAllTracked() {
   const [rows] = await pool.execute(
     `SELECT tm.id,
@@ -199,6 +230,7 @@ module.exports = {
   listByBusinessId,
   findByIdForBusiness,
   findById,
+  updateMaterial,
   updateTrackingStatus,
   findCustomByNameForBusiness,
   unitExists,
@@ -208,4 +240,3 @@ module.exports = {
   updateExternalSymbol,
   findAllTracked,
 };
-

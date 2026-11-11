@@ -5,15 +5,23 @@ async function sendAlertNotification({
   to,
   materialName,
   conditionType,
+  thresholdType = 'ABSOLUTE',
   thresholdPrice,
   triggeredPrice,
+  triggeredChangePercent = null,
+  currency = 'INR',
+  unitLabel = null,
   triggeredAt,
 }) {
   const { subject, html } = buildAlertNotification({
     materialName,
     conditionType,
+    thresholdType,
     thresholdPrice,
     triggeredPrice,
+    triggeredChangePercent,
+    currency,
+    unitLabel,
     triggeredAt,
   });
 

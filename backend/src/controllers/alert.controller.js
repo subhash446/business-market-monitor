@@ -1,7 +1,6 @@
 /**
  * Email Alerts module (Document 2 §5.8, Document 5 §4.8).
- * Implemented (Phase 9): all 5 rule/event endpoints. Scheduled evaluation
- * and email delivery are explicitly out of scope (approved decisions #5-8).
+ * Phase 2: supports percentage and absolute threshold types, cooldowns, and full evaluation.
  */
 const alertRuleService = require('../services/alertRule.service');
 const resolveBusinessId = require('../utils/resolveBusinessId');
@@ -23,8 +22,14 @@ async function listAlertRules(req, res, next) {
 async function createAlertRule(req, res, next) {
   try {
     const businessId = await resolveBusinessId(req.auth);
-    const { trackedMaterialId, conditionType, thresholdPrice } = req.body;
-    const rule = await alertRuleService.createRule(businessId, { trackedMaterialId, conditionType, thresholdPrice });
+    const { trackedMaterialId, conditionType, thresholdPrice, thresholdType, cooldownHours } = req.body;
+    const rule = await alertRuleService.createRule(businessId, {
+      trackedMaterialId,
+      conditionType,
+      thresholdPrice,
+      thresholdType,
+      cooldownHours,
+    });
     sendSuccess(res, rule, undefined, 201);
   } catch (err) {
     next(err);

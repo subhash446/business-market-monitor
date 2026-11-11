@@ -219,10 +219,127 @@ async function countByMaterial(trackedMaterialId, businessId) {
   return rows[0].total;
 }
 
+/**
+ * Fetch a single insight by ID scoped strictly to the owning business (tenant isolation).
+ *
+ * @param {number|string} insightId
+ * @param {number|string} businessId
+ * @returns {Promise<object|null>}
+ */
+async function findByIdAndBusiness(insightId, businessId) {
+  const [rows] = await pool.execute(
+    `SELECT ${SELECT_COLS}
+     FROM ai_insights
+     WHERE id = ? AND business_id = ?
+     LIMIT 1`,
+    [insightId, businessId]
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Link news items to an insight in ai_insight_evidence_news (Phase 3).
+ * Uses INSERT IGNORE so duplicate links are safely skipped.
+ *
+ * @param {number} aiInsightId
+ * @param {Array<number>} newsItemIds
+ * @returns {Promise<void>}
+ */
+async function linkEvidenceNews(aiInsightId, newsItemIds) {
+  if (!aiInsightId || !Array.isArray(newsItemIds) || newsItemIds.length === 0) return;
+  const uniqueIds = [...new Set(newsItemIds)]
+    .map(Number)
+    .filter(id => Number.isInteger(id) && id > 0);
+  if (uniqueIds.length === 0) return;
+
+  const placeholders = uniqueIds.map(() => '(?, ?)').join(', ');
+  const params = [];
+  for (const id of uniqueIds) {
+    params.push(aiInsightId, id);
+  }
+
+  await pool.execute(
+    `INSERT IGNORE INTO ai_insight_evidence_news (ai_insight_id, news_item_id)
+     VALUES ${placeholders}`,
+    params
+  );
+}
+
+/**
+ * Link price points to an insight in ai_insight_evidence_prices (Phase 3).
+ * Uses INSERT IGNORE so duplicate links are safely skipped.
+ *
+ * @param {number} aiInsightId
+ * @param {Array<number>} pricePointIds
+ * @returns {Promise<void>}
+ */
+async function linkEvidencePrices(aiInsightId, pricePointIds) {
+  if (!aiInsightId || !Array.isArray(pricePointIds) || pricePointIds.length === 0) return;
+  const uniqueIds = [...new Set(pricePointIds)]
+    .map(Number)
+    .filter(id => Number.isInteger(id) && id > 0);
+  if (uniqueIds.length === 0) return;
+
+  const placeholders = uniqueIds.map(() => '(?, ?)').join(', ');
+  const params = [];
+  for (const id of uniqueIds) {
+    params.push(aiInsightId, id);
+  }
+
+  await pool.execute(
+    `INSERT IGNORE INTO ai_insight_evidence_prices (ai_insight_id, price_point_id)
+     VALUES ${placeholders}`,
+    params
+  );
+}
+
+/**
+ * Retrieve all linked news articles for a specific insight (Phase 3).
+ *
+ * @param {number|string} aiInsightId
+ * @returns {Promise<Array<object>>}
+ */
+async function findEvidenceNewsByInsightId(aiInsightId) {
+  const [rows] = await pool.execute(
+    `SELECT ni.id, ni.title, ni.url, ni.source_name, ni.published_at, ni.summary
+     FROM news_items ni
+     JOIN ai_insight_evidence_news aien ON aien.news_item_id = ni.id
+     WHERE aien.ai_insight_id = ?
+     ORDER BY ni.published_at DESC`,
+    [aiInsightId]
+  );
+  return rows;
+}
+
+/**
+ * Retrieve all linked price points for a specific insight (Phase 3).
+ *
+ * @param {number|string} aiInsightId
+ * @returns {Promise<Array<object>>}
+ */
+async function findEvidencePricesByInsightId(aiInsightId) {
+  const [rows] = await pool.execute(
+    `SELECT pp.id, pp.price, pp.recorded_at, pp.source, pp.currency, pp.unit_label,
+            pp.region, pp.grade, pp.provider_name, pp.source_url, pp.data_class,
+            pp.is_valid, pp.invalid_reason
+     FROM price_points pp
+     JOIN ai_insight_evidence_prices aiep ON aiep.price_point_id = pp.id
+     WHERE aiep.ai_insight_id = ?
+     ORDER BY pp.recorded_at ASC`,
+    [aiInsightId]
+  );
+  return rows;
+}
+
 module.exports = {
   create,
   findLatestByMaterial,
   findLatestByBusiness,
   listByMaterial,
   countByMaterial,
+  findByIdAndBusiness,
+  linkEvidenceNews,
+  linkEvidencePrices,
+  findEvidenceNewsByInsightId,
+  findEvidencePricesByInsightId,
 };

@@ -161,7 +161,13 @@ export function formatNumber(value, decimals = 2) {
  * @param {number|null} thresholdPrice
  * @returns {string}
  */
-export function formatAlertCondition(conditionType, thresholdPrice) {
+export function formatAlertCondition(conditionType, thresholdPrice, thresholdType = 'ABSOLUTE') {
+  if (thresholdType === 'PERCENTAGE') {
+    const isAbove = conditionType === 'PRICE_ABOVE';
+    return isAbove
+      ? `Price Increase ≥ ${formatNumber(thresholdPrice, 1)}%`
+      : `Price Drop ≥ ${formatNumber(thresholdPrice, 1)}%`;
+  }
   const label =
     conditionType === 'PRICE_ABOVE' ? 'Price Above' :
     conditionType === 'PRICE_BELOW' ? 'Price Below' :
@@ -227,4 +233,150 @@ export function snakeToTitle(str) {
     .split('_')
     .map((word) => capitalize(word))
     .join(' ');
+}
+
+/* ----------------------------------------------------------------
+ * CURRENCY, UNIT & SAFE URL HELPERS
+ * ---------------------------------------------------------------- */
+
+const USD_PROXY_SYMBOLS = new Set(['WTI', 'BRENT']);
+
+/**
+ * Resolve currency for a price display without blindly assuming USD for domestic
+ * Indian Government (GOI) commodity feeds.
+ *
+ * @param {{
+ *   currency?: string | null,
+ *   sourceCurrency?: string | null,
+ *   externalSymbol?: string | null,
+ * }} params
+ * @returns {string}
+ */
+export function resolveMaterialCurrency({ currency, sourceCurrency, externalSymbol } = {}) {
+  if (typeof currency === 'string' && currency.trim()) {
+    return currency.trim().toUpperCase();
+  }
+  if (typeof sourceCurrency === 'string' && sourceCurrency.trim()) {
+    return sourceCurrency.trim().toUpperCase();
+  }
+  if (externalSymbol && USD_PROXY_SYMBOLS.has(String(externalSymbol).trim().toUpperCase())) {
+    return 'USD';
+  }
+  return 'INR';
+}
+
+/**
+ * Strip a leading currency prefix (e.g. "USD/bbl" -> "bbl", "INR/quintal" -> "quintal")
+ * so currency + unit formatting does not duplicate the currency code.
+ *
+ * @param {string|null|undefined} unitLabel
+ * @param {string|null|undefined} currency
+ * @returns {string}
+ */
+export function stripCurrencyFromUnit(unitLabel, currency) {
+  if (unitLabel === null || unitLabel === undefined) return '';
+  const trimmed = String(unitLabel).trim();
+  if (!trimmed) return '';
+
+  const safeCurrency = typeof currency === 'string' && currency.trim()
+    ? currency.trim().toUpperCase()
+    : '';
+
+  if (safeCurrency) {
+    if (trimmed.toUpperCase() === safeCurrency) {
+      return '';
+    }
+    const prefix = `${safeCurrency}/`;
+    if (trimmed.toUpperCase().startsWith(prefix)) {
+      return trimmed.slice(prefix.length).trim();
+    }
+  }
+
+  return trimmed;
+}
+
+/**
+ * Format currency + unit as a clean benchmark unit string (e.g. "USD/bbl" or "INR/kg").
+ *
+ * @param {string|null|undefined} currency
+ * @param {string|null|undefined} unitLabel
+ * @returns {string}
+ */
+export function formatUnitLabel(currency, unitLabel) {
+  const safeCurrency = typeof currency === 'string' && currency.trim()
+    ? currency.trim().toUpperCase()
+    : 'INR';
+  if (!unitLabel) return safeCurrency;
+  const trimmed = String(unitLabel).trim();
+  if (!trimmed) return safeCurrency;
+  if (trimmed.toUpperCase().startsWith(`${safeCurrency}/`)) {
+    return trimmed;
+  }
+  return `${safeCurrency}/${trimmed}`;
+}
+
+/**
+ * Build currency, formatted numeric value, and de-duplicated unit suffix parts for display.
+ *
+ * @param {{
+ *   price: number | string | null | undefined,
+ *   currency?: string | null,
+ *   unitLabel?: string | null,
+ *   fallbackUnit?: string | null,
+ *   sourceCurrency?: string | null,
+ *   sourceUnitLabel?: string | null,
+ *   externalSymbol?: string | null,
+ *   decimals?: number,
+ * }} params
+ * @returns {{ currencyCode: string, formattedValue: string, unitSuffix: string, text: string }}
+ */
+export function formatPriceDisplay({
+  price,
+  currency,
+  unitLabel,
+  fallbackUnit,
+  sourceCurrency,
+  sourceUnitLabel,
+  externalSymbol,
+  decimals = 2,
+} = {}) {
+  const currencyCode = resolveMaterialCurrency({
+    currency,
+    sourceCurrency,
+    externalSymbol,
+  });
+  const formattedValue = formatNumber(price, decimals);
+  const rawUnit = unitLabel || sourceUnitLabel || fallbackUnit || '';
+  const unitSuffix = stripCurrencyFromUnit(rawUnit, currencyCode);
+  const text = `${currencyCode} ${formattedValue}${unitSuffix ? ` / ${unitSuffix}` : ''}`;
+
+  return {
+    currencyCode,
+    formattedValue,
+    unitSuffix,
+    text,
+  };
+}
+
+/**
+ * Validate external evidence/source URLs strictly for http: or https: schemes.
+ * Returns null for missing, malformed, or unsafe schemes (javascript:, data:, file:, etc.).
+ *
+ * @param {string|null|undefined} rawUrl
+ * @returns {string|null}
+ */
+export function getSafeExternalUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return trimmed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

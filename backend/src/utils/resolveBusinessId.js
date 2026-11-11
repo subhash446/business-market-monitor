@@ -27,6 +27,10 @@ async function resolveBusinessId(auth) {
     return auth.businessId;
   }
 
+  if (!auth || !auth.userId) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
+  }
+
   const business = await businessRepository.findByUserId(auth.userId);
   if (!business) {
     throw new AppError(404, 'NOT_FOUND', 'Business not found');

@@ -304,6 +304,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
         triggered_at: '2026-09-18T10:00:00Z',
       });
       const updateStatusSpy = jest.spyOn(alertEventRepository, 'updateDeliveryStatus').mockResolvedValue(true);
+      const updateTriggeredSpy = jest.spyOn(alertRuleRepository, 'claimTriggerCooldown').mockResolvedValue(true);
 
       const sendEmailSpy = jest.spyOn(mailer, 'sendEmail').mockResolvedValue({ id: 're_sent_123' });
 
@@ -315,6 +316,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
       expect(evaluated[0].delivery_status).toBe('SENT');
 
       sendEmailSpy.mockRestore();
+      updateTriggeredSpy.mockRestore();
       updateStatusSpy.mockRestore();
       alertEventRepository.create.mockRestore();
       userRepository.findById.mockRestore();
@@ -370,6 +372,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
         triggered_at: '2026-09-18T10:00:00Z',
       });
       const updateStatusSpy = jest.spyOn(alertEventRepository, 'updateDeliveryStatus').mockResolvedValue(true);
+      const updateTriggeredSpy = jest.spyOn(alertRuleRepository, 'claimTriggerCooldown').mockResolvedValue(true);
 
       const sendEmailSpy = jest.spyOn(mailer, 'sendEmail').mockRejectedValue(
         new Error('Resend email delivery failed: API key is invalid')
@@ -386,6 +389,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
 
       consoleErrorSpy.mockRestore();
       sendEmailSpy.mockRestore();
+      updateTriggeredSpy.mockRestore();
       updateStatusSpy.mockRestore();
       alertEventRepository.create.mockRestore();
       userRepository.findById.mockRestore();

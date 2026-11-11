@@ -36,7 +36,7 @@ import { Skeleton }     from '../components/ui/Skeleton.jsx';
 import { EmptyState }   from '../components/ui/EmptyState.jsx';
 import { ErrorState }   from '../components/ui/ErrorState.jsx';
 import { InsightCard }  from '../components/ui/InsightCard.jsx';
-import { formatNumber, formatDateTime, formatAlertCondition } from '../utils/format.js';
+import { formatPriceDisplay, formatDateTime, formatAlertCondition } from '../utils/format.js';
 import '../styles/pages/dashboard.css';
 
 /* ── Loading / data states ───────────────────────────────────────── */
@@ -321,16 +321,40 @@ function MaterialsList({ items, onNavigate }) {
         <li key={material.id} className="dashboard-panel__item">
           <span className="dashboard-panel__item-name">{material.name}</span>
 
-          {/* latestPrice is scalar number | null (Doc 4 §8.1, §16) */}
+          {/* latestPrice with currency, unit, and classification */}
           {material.latestPrice === null || material.latestPrice === undefined ? (
             <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
               No price recorded
             </span>
           ) : (
-            <span className="dashboard-panel__item-value font-mono">
-              {/* formatNumber gives locale-aware thousands separator e.g. "1,250.00" */}
-              {formatNumber(material.latestPrice, 2)}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span className="dashboard-panel__item-value font-mono">
+                {formatPriceDisplay({
+                  price: material.latestPrice,
+                  currency: material.currency,
+                  unitLabel: material.unitLabel,
+                  externalSymbol: material.externalSymbol,
+                }).text}
+              </span>
+              {material.dataClass && (
+                <span
+                  className={`badge ${
+                    material.dataClass === 'OFFICIAL_BENCHMARK'
+                      ? 'badge--info'
+                      : material.dataClass === 'MARKET_INDICATIVE'
+                      ? 'badge--warning'
+                      : 'badge--neutral'
+                  }`}
+                  style={{ fontSize: '10px', padding: '1px 5px' }}
+                >
+                  {material.dataClass === 'OFFICIAL_BENCHMARK'
+                    ? 'Benchmark'
+                    : material.dataClass === 'MARKET_INDICATIVE'
+                    ? 'Proxy'
+                    : 'Quote'}
+                </span>
+              )}
+            </div>
           )}
 
           {/* Quick-action links — id is tracked_materials.id (universal material ID) */}
@@ -404,7 +428,7 @@ function AlertRulesList({ items, onNavigate }) {
         <li key={rule.id} className="dashboard-panel__item">
           {/* "Price Above 1,500.00" or "Price Below 90.00" */}
           <span className="dashboard-panel__item-name">
-            {formatAlertCondition(rule.conditionType, rule.thresholdPrice)}
+            {formatAlertCondition(rule.conditionType, rule.thresholdPrice, rule.thresholdType)}
           </span>
         </li>
       ))}

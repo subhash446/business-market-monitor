@@ -7,6 +7,7 @@ const { validateAddPrice } = require('../validators/price.validator');
 
 // Mounted at /api/v1/materials alongside materials.routes.js (Document 5 §4.6)
 router.get('/:materialId/prices/latest', authMiddleware, priceController.getLatestPrice);
+router.get('/:materialId/prices/source-info', authMiddleware, priceController.getPriceSourceInfo);
 router.post('/:materialId/prices', authMiddleware, validate(validateAddPrice), priceController.addPrice);
 
 module.exports = router;
