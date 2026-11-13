@@ -18,6 +18,8 @@
  *   (or NULL, meaning "no automatic ingestion for this material").
  */
 
+const { PRICE_SOURCE } = require('../constants/enums');
+
 /** The set of commodity symbols the application can ingest from external providers. */
 const SUPPORTED_SYMBOLS = Object.freeze({
   /** West Texas Intermediate crude oil, USD per barrel (EIA). */
@@ -45,6 +47,7 @@ const COMMODITY_METADATA = Object.freeze({
     region: 'Cushing, OK',
     grade: 'Light Sweet Crude Oil',
     dataClass: 'OFFICIAL_BENCHMARK',
+    priceSource: PRICE_SOURCE.THIRD_PARTY_API,
     isProxy: true,
     disclaimer: 'Global crude oil benchmark in USD/barrel. Not an actual local polymer resin price.',
   },
@@ -59,6 +62,7 @@ const COMMODITY_METADATA = Object.freeze({
     region: 'Europe (North Sea)',
     grade: 'Brent Crude Oil',
     dataClass: 'OFFICIAL_BENCHMARK',
+    priceSource: PRICE_SOURCE.THIRD_PARTY_API,
     isProxy: true,
     disclaimer: 'Global crude oil benchmark in USD/barrel. Not an actual local polymer resin price.',
   },
@@ -73,6 +77,7 @@ const COMMODITY_METADATA = Object.freeze({
     region: 'National Mandi Average (India)',
     grade: 'FAQ (Fair Average Quality)',
     dataClass: 'MARKET_INDICATIVE',
+    priceSource: PRICE_SOURCE.GOVERNMENT_DATASET,
     isProxy: false,
     disclaimer: 'Wholesale agricultural mandi modal price for raw unmilled wheat grain (FAQ grade) in INR/quintal. Not packaged commercial flour (Atta/Maida).',
   },
@@ -87,6 +92,7 @@ const COMMODITY_METADATA = Object.freeze({
     region: 'National Mandi Average (India)',
     grade: 'Commercial Grade (M-30)',
     dataClass: 'MARKET_INDICATIVE',
+    priceSource: PRICE_SOURCE.GOVERNMENT_DATASET,
     isProxy: false,
     disclaimer: 'Domestic wholesale mill delivery/mandi spot price for bulk commercial sugar (M-30 grade) in INR/quintal. Not retail packaged consumer sugar.',
   },
@@ -101,6 +107,7 @@ const COMMODITY_METADATA = Object.freeze({
     region: 'National Mandi Average (India)',
     grade: 'Refined / Packed',
     dataClass: 'MARKET_INDICATIVE',
+    priceSource: PRICE_SOURCE.GOVERNMENT_DATASET,
     isProxy: false,
     disclaimer: 'Domestic wholesale benchmark for refined/packed mustard edible oil in INR/quintal. Specific regional varieties and retail bottle packings may vary.',
   },

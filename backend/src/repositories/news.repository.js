@@ -16,18 +16,49 @@
 const { pool } = require('../database/connection');
 const crypto = require('crypto');
 
+const MAX_NEWS_LIMIT = 100;
+
+/**
+ * Clamp and validate LIMIT values strictly as positive integers up to MAX_NEWS_LIMIT (100).
+ * Rejects floats, negative values, zero, NaN, Infinity, booleans, and non-digit strings
+ * by falling back to the specified safe default.
+ *
+ * @param {unknown} limit
+ * @param {number} defaultLimit
+ * @param {number} [maxLimit=MAX_NEWS_LIMIT]
+ * @returns {number}
+ */
+function sanitizeLimit(limit, defaultLimit, maxLimit = MAX_NEWS_LIMIT) {
+  let parsed = NaN;
+  if (typeof limit === 'number') {
+    if (Number.isInteger(limit) && limit >= 1) {
+      parsed = limit;
+    }
+  } else if (typeof limit === 'string') {
+    const trimmed = limit.trim();
+    if (/^\d+$/.test(trimmed)) {
+      const n = Number(trimmed);
+      if (Number.isSafeInteger(n) && n >= 1) {
+        parsed = n;
+      }
+    }
+  }
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return defaultLimit;
+  }
+  return Math.min(parsed, maxLimit);
+}
+
 // ── Read methods (existing, unchanged) ────────────────────────────────────────
 
 async function listByIndustry(industryId, { limit, offset }) {
   if (!industryId) return [];
   // mysql2's prepared statements (execute()) don't support LIMIT/OFFSET as
   // bound `?` placeholders (throws ER_WRONG_ARGUMENTS). limit/offset are
-  // already validated, server-generated integers from utils/pagination.js
-  // (never raw user input), so inlining them here is safe — industryId
-  // remains a real bound parameter.
-  const parsedLimit = parseInt(limit, 10);
+  // validated, clamped integers (never raw user input), so inlining them here
+  // is safe — industryId remains a real bound parameter.
+  const safeLimit = sanitizeLimit(limit, 20, MAX_NEWS_LIMIT);
   const parsedOffset = parseInt(offset, 10);
-  const safeLimit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 20;
   const safeOffset = Number.isInteger(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
   const [rows] = await pool.execute(
     `SELECT DISTINCT ni.id, ni.title, ni.url, ni.source_name, ni.published_at, ni.summary
@@ -131,7 +162,8 @@ async function listKeywordsWithIndustry() {
 // Phase 3 (Evidence Traceability) -- returns article id and url alongside headline
 // so that AI insights can link exact source evidence into ai_insight_evidence_news.
 async function listRecentByIndustry(industryId, limit = 10) {
-  const safeLimit = Number(limit);
+  if (!industryId) return [];
+  const safeLimit = sanitizeLimit(limit, 10, MAX_NEWS_LIMIT);
 
   const [rows] = await pool.execute(
     `SELECT DISTINCT

@@ -21,7 +21,28 @@ const priceRepository = require('../repositories/price.repository');
 const materialRepository = require('../repositories/material.repository');
 const alertEvaluationService = require('./alertEvaluation.service');
 const { COMMODITY_METADATA } = require('../config/commodityMapping');
+const { PRICE_SOURCE } = require('../constants/enums');
 const AppError = require('../utils/AppError');
+
+const ALLOWED_PROVIDER_SOURCES = new Set([
+  PRICE_SOURCE.GOVERNMENT_DATASET,
+  PRICE_SOURCE.THIRD_PARTY_API,
+]);
+
+function resolveProviderSource(marketPrice, meta) {
+  if (ALLOWED_PROVIDER_SOURCES.has(marketPrice?.source)) {
+    return marketPrice.source;
+  }
+  if (ALLOWED_PROVIDER_SOURCES.has(meta?.priceSource)) {
+    return meta.priceSource;
+  }
+  const symbolStr = typeof marketPrice?.symbol === 'string' ? marketPrice.symbol.trim().toUpperCase() : '';
+  const providerStr = typeof marketPrice?.providerName === 'string' ? marketPrice.providerName.toLowerCase() : '';
+  if (symbolStr.endsWith('_GOI') || providerStr.includes('data.gov.in')) {
+    return PRICE_SOURCE.GOVERNMENT_DATASET;
+  }
+  return PRICE_SOURCE.THIRD_PARTY_API;
+}
 
 const { normalizeCurrencyCode, isValidHttpUrl } = require('../utils/validationHelpers');
 
@@ -114,19 +135,21 @@ async function ingestFromProvider(trackedMaterial, marketPrice) {
   const recordedAtDateTime = `${recordedAt} 00:00:00`;
 
   try {
+    // Populate commodity-specific metadata from canonical symbol catalog
+    const meta = (symbol && COMMODITY_METADATA[symbol]) || {};
+    const resolvedSource = resolveProviderSource(marketPrice, meta);
+
     // Application-layer dedup check (belt-and-suspenders with DB constraint).
     const alreadyExists = await priceRepository.existsByMaterialDateSource(
       trackedMaterialId,
       recordedAtDateTime,
-      'THIRD_PARTY_API'
+      resolvedSource
     );
 
     if (alreadyExists) {
       return { status: 'skipped', trackedMaterialId, businessId, reason: 'duplicate' };
     }
 
-    // Populate commodity-specific metadata from canonical symbol catalog
-    const meta = (symbol && COMMODITY_METADATA[symbol]) || {};
     const resolvedCurrency = normalizeCurrencyCode(marketPrice.currency, meta.currency || null);
 
     // Reuse the exact same repository method the manual path uses.
@@ -134,7 +157,7 @@ async function ingestFromProvider(trackedMaterial, marketPrice) {
       trackedMaterialId,
       price,
       recordedAt: recordedAtDateTime,
-      source: 'THIRD_PARTY_API',
+      source: resolvedSource,
       currency: resolvedCurrency,
       unitLabel: marketPrice.unitLabel || meta.unitLabel || null,
       region: marketPrice.region || meta.region || null,

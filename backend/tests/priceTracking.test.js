@@ -456,6 +456,42 @@ describe('Phase 7 — Price Tracking', () => {
       expect(createSpy).not.toHaveBeenCalled();
     });
 
+    test('4.2b ingests India Govt symbols with GOVERNMENT_DATASET provenance and deduplicates on GOVERNMENT_DATASET', async () => {
+      const existsSpy = jest.spyOn(priceRepository, 'existsByMaterialDateSource')
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+      const createSpy = jest.spyOn(priceRepository, 'create').mockResolvedValue({
+        id: 802,
+        price: '2650.00',
+        recorded_at: '2026-11-09 00:00:00',
+        source: 'GOVERNMENT_DATASET',
+      });
+      jest.spyOn(alertEvaluationService, 'evaluateMaterial').mockResolvedValue([]);
+
+      const inserted = await priceIngestionService.ingestFromProvider(
+        { id: 15, business_id: 2 },
+        { symbol: 'WHEAT_GOI', price: 2650, recordedAt: '2026-11-09' }
+      );
+      expect(inserted.status).toBe('inserted');
+      expect(existsSpy).toHaveBeenNthCalledWith(1, 15, '2026-11-09 00:00:00', 'GOVERNMENT_DATASET');
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trackedMaterialId: 15,
+          source: 'GOVERNMENT_DATASET',
+          currency: 'INR',
+          unitLabel: 'INR/quintal',
+        })
+      );
+
+      const skipped = await priceIngestionService.ingestFromProvider(
+        { id: 15, business_id: 2 },
+        { symbol: 'WHEAT_GOI', price: 2650, recordedAt: '2026-11-09' }
+      );
+      expect(skipped.status).toBe('skipped');
+      expect(skipped.reason).toBe('duplicate');
+      expect(existsSpy).toHaveBeenNthCalledWith(2, 15, '2026-11-09 00:00:00', 'GOVERNMENT_DATASET');
+    });
+
     test('4.3 automated scheduler skips execution when PRICE_INGESTION_ENABLED is false', async () => {
       const origEnabled = env.priceIngestion.enabled;
       env.priceIngestion.enabled = false;

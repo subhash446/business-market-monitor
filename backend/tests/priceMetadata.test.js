@@ -346,8 +346,14 @@ describe('P1 Fix Regression — Provenance, Units, Currency & URL Validation', (
       { symbol: 'WHEAT_GOI', price: 2650, recordedAt: '2026-11-09' }
     );
 
+    expect(mockPriceRepository.existsByMaterialDateSource).toHaveBeenCalledWith(
+      3,
+      '2026-11-09 00:00:00',
+      'GOVERNMENT_DATASET'
+    );
     expect(mockPriceRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
+        source: 'GOVERNMENT_DATASET',
         currency: 'INR',
         unitLabel: 'INR/quintal',
         providerName: 'Data.gov.in (Agmarknet / MoAFW)',
@@ -440,5 +446,131 @@ describe('P1 Fix Regression — Provenance, Units, Currency & URL Validation', (
         sourceUrl: 'https://example.com/quote',
       })
     ).toEqual([]);
+  });
+});
+
+describe('T-02.1 & T-02.2 — Provider Provenance, Commodity Metadata Consistency & Migration 027', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('19. COMMODITY_METADATA aligns GOI & EIA provenance, units, and dataClass with provider contracts', () => {
+    const { SUPPORTED_SYMBOLS, PRICE_SOURCES } = (() => {
+      const mapping = require('../src/config/commodityMapping');
+      const { PRICE_SOURCE } = require('../src/constants/enums');
+      return { SUPPORTED_SYMBOLS: mapping.SUPPORTED_SYMBOLS, PRICE_SOURCES: PRICE_SOURCE };
+    })();
+
+    expect(Object.values(SUPPORTED_SYMBOLS).sort()).toEqual([
+      'BRENT',
+      'EDIBLE_OIL_GOI',
+      'SUGAR_GOI',
+      'WHEAT_GOI',
+      'WTI',
+    ]);
+    expect(SUPPORTED_SYMBOLS.NAPHTHA_EIA).toBeUndefined();
+    expect(COMMODITY_METADATA.NAPHTHA_EIA).toBeUndefined();
+
+    expect(COMMODITY_METADATA.WTI.priceSource).toBe(PRICE_SOURCES.THIRD_PARTY_API);
+    expect(COMMODITY_METADATA.BRENT.priceSource).toBe(PRICE_SOURCES.THIRD_PARTY_API);
+
+    for (const sym of ['WHEAT_GOI', 'SUGAR_GOI', 'EDIBLE_OIL_GOI']) {
+      expect(COMMODITY_METADATA[sym].priceSource).toBe(PRICE_SOURCES.GOVERNMENT_DATASET);
+      expect(COMMODITY_METADATA[sym].dataClass).toBe('MARKET_INDICATIVE');
+      expect(COMMODITY_METADATA[sym].unitLabel).toBe('INR/quintal');
+      expect(COMMODITY_METADATA[sym].currency).toBe('INR');
+      expect(COMMODITY_METADATA[sym].isProxy).toBe(false);
+    }
+  });
+
+  test('20. ingestFromProvider stores GOVERNMENT_DATASET for GOI feeds, preserves THIRD_PARTY_API for EIA, and prevents MANUAL spoofing', async () => {
+    mockPriceRepository.existsByMaterialDateSource.mockResolvedValue(false);
+    mockPriceRepository.create.mockResolvedValue({ id: 501 });
+
+    // SUGAR_GOI and EDIBLE_OIL_GOI store GOVERNMENT_DATASET and check dedup against GOVERNMENT_DATASET
+    await priceIngestionService.ingestFromProvider(
+      { id: 12, business_id: 3 },
+      { symbol: 'SUGAR_GOI', price: 3850, recordedAt: '2026-11-09' }
+    );
+    expect(mockPriceRepository.existsByMaterialDateSource).toHaveBeenCalledWith(
+      12,
+      '2026-11-09 00:00:00',
+      'GOVERNMENT_DATASET'
+    );
+    expect(mockPriceRepository.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source: 'GOVERNMENT_DATASET',
+        currency: 'INR',
+        unitLabel: 'INR/quintal',
+        dataClass: 'MARKET_INDICATIVE',
+      })
+    );
+
+    // Provider payload cannot spoof MANUAL source even if caller supplies source='MANUAL'
+    await priceIngestionService.ingestFromProvider(
+      { id: 13, business_id: 3 },
+      { symbol: 'EDIBLE_OIL_GOI', price: 14000, recordedAt: '2026-11-09', source: 'MANUAL' }
+    );
+    expect(mockPriceRepository.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source: 'GOVERNMENT_DATASET',
+        unitLabel: 'INR/quintal',
+      })
+    );
+
+    // EIA BRENT continues to record THIRD_PARTY_API
+    await priceIngestionService.ingestFromProvider(
+      { id: 14, business_id: 3 },
+      { symbol: 'BRENT', price: 72.1, recordedAt: '2026-11-09' }
+    );
+    expect(mockPriceRepository.existsByMaterialDateSource).toHaveBeenLastCalledWith(
+      14,
+      '2026-11-09 00:00:00',
+      'THIRD_PARTY_API'
+    );
+    expect(mockPriceRepository.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source: 'THIRD_PARTY_API',
+        currency: 'USD',
+        unitLabel: 'USD/bbl',
+        dataClass: 'OFFICIAL_BENCHMARK',
+      })
+    );
+  });
+
+  test('21. migration 027 idempotently reconciles WHEAT_GOI, EDIBLE_OIL_GOI, and deactivates unmapped NAPHTHA_EIA', async () => {
+    const m27 = require('../src/migrations/027_reconcile_commodity_symbols_metadata');
+
+    // When commodity_symbols table does not exist, up/down skip safely
+    const emptyPool = { query: jest.fn().mockResolvedValue([[{ cnt: 0 }]]) };
+    await m27.up(emptyPool);
+    expect(emptyPool.query).toHaveBeenCalledTimes(1);
+
+    // When commodity_symbols exists, up runs reconciliation updates
+    const activePool = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([[{ cnt: 1 }]])
+        .mockResolvedValue([{}]),
+    };
+    await m27.up(activePool);
+    expect(activePool.query).toHaveBeenCalledTimes(5);
+    const executedSql = activePool.query.mock.calls.slice(1).map((c) => c[0]).join('\n');
+    expect(executedSql).toContain("WHERE symbol = 'WHEAT_GOI'");
+    expect(executedSql).toContain("data_class   = 'MARKET_INDICATIVE'");
+    expect(executedSql).toContain("WHERE symbol = 'EDIBLE_OIL_GOI'");
+    expect(executedSql).toContain("unit_label   = 'INR/quintal'");
+    expect(executedSql).toContain("is_active = FALSE");
+    expect(executedSql).toContain("WHERE symbol = 'NAPHTHA_EIA'");
+
+    // down cleanly restores original 022 state when table exists
+    const downPool = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([[{ cnt: 1 }]])
+        .mockResolvedValue([{}]),
+    };
+    await m27.down(downPool);
+    expect(downPool.query).toHaveBeenCalledTimes(5);
   });
 });

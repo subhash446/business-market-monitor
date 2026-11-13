@@ -438,6 +438,43 @@ describe('Phase 8 — Market News Monitoring API', () => {
       expect(executeSpy).not.toHaveBeenCalled();
     });
 
+    test('4.6 listRecentByIndustry enforces positive integer LIMIT bounded to max 100', async () => {
+      const executeSpy = jest.spyOn(pool, 'execute').mockResolvedValue([[]]);
+
+      // Valid integer & numeric string limits within 1..100
+      await newsRepository.listRecentByIndustry(7, 15);
+      expect(executeSpy.mock.calls[0][0]).toContain('LIMIT 15');
+
+      await newsRepository.listRecentByIndustry(7, '25');
+      expect(executeSpy.mock.calls[1][0]).toContain('LIMIT 25');
+
+      // Oversized limit clamps to 100
+      await newsRepository.listRecentByIndustry(7, 999999);
+      expect(executeSpy.mock.calls[2][0]).toContain('LIMIT 100');
+
+      await newsRepository.listRecentByIndustry(7, '500');
+      expect(executeSpy.mock.calls[3][0]).toContain('LIMIT 100');
+
+      // Negative, zero, fractional, NaN, Infinity, boolean, null, and injection strings safely default to 10
+      for (const badLimit of [-5, 0, 3.7, '3.7', NaN, Infinity, '10; DROP TABLE news_items', 'abc', true, null, '']) {
+        executeSpy.mockClear();
+        await newsRepository.listRecentByIndustry(7, badLimit);
+        expect(executeSpy).toHaveBeenCalledTimes(1);
+        expect(executeSpy.mock.calls[0][0]).toContain('LIMIT 10');
+        expect(executeSpy.mock.calls[0][1]).toEqual([7]);
+      }
+
+      // listByIndustry also clamps oversized limits to 100
+      executeSpy.mockClear();
+      await newsRepository.listByIndustry(7, { limit: 1000, offset: 0 });
+      expect(executeSpy.mock.calls[0][0]).toContain('LIMIT 100 OFFSET 0');
+
+      // Missing industryId returns [] cleanly without querying DB
+      executeSpy.mockClear();
+      expect(await newsRepository.listRecentByIndustry(null, 10)).toEqual([]);
+      expect(executeSpy).not.toHaveBeenCalled();
+    });
+
   });
 
   // =========================================================================

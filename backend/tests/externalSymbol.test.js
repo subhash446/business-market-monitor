@@ -113,7 +113,7 @@ describe('setExternalSymbol() service', () => {
     const result = await setExternalSymbol(10, 1, 'WTI');
 
     expect(materialRepository.findByIdForBusiness).toHaveBeenCalledWith(1, 10);
-    expect(materialRepository.updateExternalSymbol).toHaveBeenCalledWith(1, 'WTI');
+    expect(materialRepository.updateExternalSymbol).toHaveBeenCalledWith(1, 'WTI', 10);
     expect(result.externalSymbol).toBe('WTI');
     expect(result.id).toBe(1);
   });
@@ -125,7 +125,7 @@ describe('setExternalSymbol() service', () => {
 
     const result = await setExternalSymbol(10, 1, 'BRENT');
 
-    expect(materialRepository.updateExternalSymbol).toHaveBeenCalledWith(1, 'BRENT');
+    expect(materialRepository.updateExternalSymbol).toHaveBeenCalledWith(1, 'BRENT', 10);
     expect(result.externalSymbol).toBe('BRENT');
   });
 
@@ -136,7 +136,7 @@ describe('setExternalSymbol() service', () => {
 
     const result = await setExternalSymbol(10, 1, null);
 
-    expect(materialRepository.updateExternalSymbol).toHaveBeenCalledWith(1, null);
+    expect(materialRepository.updateExternalSymbol).toHaveBeenCalledWith(1, null, 10);
     expect(result.externalSymbol).toBeNull();
   });
 
