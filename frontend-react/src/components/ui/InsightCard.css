@@ -580,3 +580,124 @@
 .insight-card__insufficient .insight-card__empty-icon {
   color: var(--color-warning);
 }
+
+/* ── V2-01C: Procurement Action Recommendations ─────────────────── */
+
+.insight-procurement-block {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background-color: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.insight-procurement__action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.insight-action-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+.insight-action-badge__icon {
+  font-size: 0.7rem;
+}
+
+.insight-action--accelerate {
+  background-color: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.insight-action--delay {
+  background-color: var(--color-success-subtle);
+  color: var(--color-success);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.insight-action--buffer {
+  background-color: var(--color-warning-subtle);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.insight-action--monitor {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.insight-horizon-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.insight-downgrade-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+  color: var(--color-warning);
+  background-color: var(--color-warning-subtle);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.insight-procurement__rationale {
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+
+.insight-procurement__rationale-label {
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-semibold);
+}
+
+.insight-procurement__disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background-color: rgba(245, 158, 11, 0.05);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-1);
+}
+
+.insight-procurement__disclaimer-icon {
+  color: var(--color-warning);
+  font-size: 0.8rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.insight-procurement__disclaimer-text {
+  font-size: 0.7rem;
+  line-height: var(--leading-normal);
+  color: var(--color-text-secondary);
+  margin: 0;
+}

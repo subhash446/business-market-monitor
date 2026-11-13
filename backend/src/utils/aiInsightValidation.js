@@ -9,14 +9,22 @@
 
 'use strict';
 
-const { OUTLOOK, INSIGHT_CONFIDENCE } = require('../constants/enums');
+const {
+  OUTLOOK,
+  INSIGHT_CONFIDENCE,
+  ACTION_RECOMMENDATION,
+  RECOMMENDATION_HORIZON,
+} = require('../constants/enums');
 
 const MAX_HEADLINE_CHARS = 500;
 const MAX_BODY_FIELD_CHARS = 4000;
+const MAX_RATIONALE_CHARS = 2000;
 const MAX_ERROR_LOG_CHARS = 240;
 
 const VALID_OUTLOOKS = new Set(Object.values(OUTLOOK));
 const VALID_CONFIDENCES = new Set(Object.values(INSIGHT_CONFIDENCE));
+const VALID_ACTIONS = new Set(Object.values(ACTION_RECOMMENDATION));
+const VALID_HORIZONS = new Set(Object.values(RECOMMENDATION_HORIZON));
 
 // Unsafe invisible / bidirectional / control formatting characters
 // (includes ASCII control bytes, zero-width joiners/markers, Unicode line/para separators, BOM, bidi isolates/overrides)
@@ -243,6 +251,68 @@ function validateInsightOutput(obj, { knownSecrets = [] } = {}) {
     throw createValidationError(`Gemini insight has invalid confidence value: "${sanitizeInlineContext(obj.confidence, 40)}"`);
   }
 
+  // V2-01C: Procurement Action Recommendations validation with backward-compatible defaults
+  let action;
+  if (obj.action_recommendation === undefined || obj.action_recommendation === null) {
+    if (obj.outlook === OUTLOOK.BULLISH) {
+      action = ACTION_RECOMMENDATION.ACCELERATE_PURCHASE;
+    } else if (obj.outlook === OUTLOOK.BEARISH) {
+      action = ACTION_RECOMMENDATION.DELAY_PURCHASE;
+    } else if (obj.outlook === OUTLOOK.VOLATILE) {
+      action = ACTION_RECOMMENDATION.MAINTAIN_BUFFER;
+    } else {
+      action = ACTION_RECOMMENDATION.MONITOR_ONLY;
+    }
+  } else {
+    if (!VALID_ACTIONS.has(obj.action_recommendation)) {
+      throw createValidationError(`Gemini insight has invalid action_recommendation value: "${sanitizeInlineContext(obj.action_recommendation, 40)}"`);
+    }
+    action = obj.action_recommendation;
+  }
+
+  let horizon;
+  if (obj.recommendation_horizon === undefined || obj.recommendation_horizon === null) {
+    horizon = RECOMMENDATION_HORIZON.SHORT_TERM;
+  } else {
+    if (!VALID_HORIZONS.has(obj.recommendation_horizon)) {
+      throw createValidationError(`Gemini insight has invalid recommendation_horizon value: "${sanitizeInlineContext(obj.recommendation_horizon, 40)}"`);
+    }
+    horizon = obj.recommendation_horizon;
+  }
+
+  let rationale;
+  if (obj.recommendation_rationale === undefined || obj.recommendation_rationale === null) {
+    rationale = sanitized.business_impact.slice(0, MAX_RATIONALE_CHARS);
+  } else {
+    const rawRationale = obj.recommendation_rationale;
+    if (typeof rawRationale !== 'string' || rawRationale.trim() === '') {
+      throw createValidationError('Gemini insight response missing or empty field: recommendation_rationale');
+    }
+    if (UNSAFE_OUTPUT_CONTROL_RE.test(rawRationale)) {
+      throw createValidationError('Gemini insight field "recommendation_rationale" contains disallowed control characters');
+    }
+    const trimmedRationale = rawRationale.trim();
+    if (trimmedRationale.length > MAX_RATIONALE_CHARS) {
+      throw createValidationError(`Gemini insight field "recommendation_rationale" exceeds ${MAX_RATIONALE_CHARS} characters (${trimmedRationale.length})`);
+    }
+    for (const pattern of UNSAFE_HTML_PATTERNS) {
+      if (pattern.test(trimmedRationale)) {
+        throw createValidationError('Gemini insight field "recommendation_rationale" contains unsafe markup or script content');
+      }
+    }
+    for (const secretPattern of OUTPUT_SECRET_PATTERNS) {
+      if (secretPattern.test(trimmedRationale)) {
+        throw createValidationError('Gemini insight field "recommendation_rationale" contains prohibited credential/key pattern');
+      }
+    }
+    for (const secret of knownSecrets) {
+      if (typeof secret === 'string' && secret.length >= 8 && trimmedRationale.includes(secret)) {
+        throw createValidationError('Gemini insight field "recommendation_rationale" leaked a runtime secret');
+      }
+    }
+    rationale = trimmedRationale;
+  }
+
   return {
     headline: sanitized.headline,
     what_happened: sanitized.what_happened,
@@ -250,15 +320,21 @@ function validateInsightOutput(obj, { knownSecrets = [] } = {}) {
     business_impact: sanitized.business_impact,
     outlook: obj.outlook,
     confidence: obj.confidence,
+    action_recommendation: action,
+    recommendation_rationale: rationale,
+    recommendation_horizon: horizon,
   };
 }
 
 module.exports = {
   MAX_HEADLINE_CHARS,
   MAX_BODY_FIELD_CHARS,
+  MAX_RATIONALE_CHARS,
   MAX_ERROR_LOG_CHARS,
   VALID_OUTLOOKS,
   VALID_CONFIDENCES,
+  VALID_ACTIONS,
+  VALID_HORIZONS,
   stripUnsafeControlChars,
   sanitizeInlineContext,
   sanitizeHeadlineText,

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for aiInsightQuery.service.js (Phase H)
  *
  * All DB dependencies mocked. No real DB or auth calls.
@@ -274,5 +274,39 @@ describe('formatInsight()', () => {
   test('17. preserves null evidence_price_range', () => {
     const result = service.formatInsight(makeDbRow({ evidence_price_range: null }));
     expect(result.evidence_price_range).toBeNull();
+  });
+
+  test('18. includes procurement fields and caveat disclaimer when action_recommendation is present', () => {
+    const row = makeDbRow({
+      action_recommendation: 'ACCELERATE_PURCHASE',
+      recommendation_rationale: 'Prices rising rapidly.',
+      recommendation_horizon: 'SHORT_TERM',
+      is_downgraded: 1,
+      downgrade_reason: 'CONTRADICTORY_SIGNALS',
+    });
+    const result = service.formatInsight(row);
+    expect(result.action_recommendation).toBe('ACCELERATE_PURCHASE');
+    expect(result.recommendation_rationale).toBe('Prices rising rapidly.');
+    expect(result.recommendation_horizon).toBe('SHORT_TERM');
+    expect(result.is_downgraded).toBe(true);
+    expect(result.downgrade_reason).toBe('CONTRADICTORY_SIGNALS');
+    expect(result.disclaimer).toBe(service.MANDATORY_PROCUREMENT_DISCLAIMER);
+  });
+
+  test('19. formats legacy row with null procurement fields and null disclaimer cleanly', () => {
+    const legacyRow = makeDbRow({
+      action_recommendation: null,
+      recommendation_rationale: null,
+      recommendation_horizon: null,
+      is_downgraded: 0,
+      downgrade_reason: null,
+    });
+    const result = service.formatInsight(legacyRow);
+    expect(result.action_recommendation).toBeNull();
+    expect(result.recommendation_rationale).toBeNull();
+    expect(result.recommendation_horizon).toBeNull();
+    expect(result.is_downgraded).toBe(false);
+    expect(result.downgrade_reason).toBeNull();
+    expect(result.disclaimer).toBeNull();
   });
 });

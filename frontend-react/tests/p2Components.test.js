@@ -287,4 +287,140 @@ describe('P2 JSX Component Verification (InsightCard & TrendsPage)', () => {
     assert.equal(modalSrc.includes('handleModalBackdropClick(e, backdropRef.current, onClose)'), true);
     assert.equal(modalSrc.includes('safeInvokeClose(onClose)'), true);
   });
+
+  test('V2-01C — InsightCard renders procurement action badge, horizon pill, rationale, and caveat disclaimer', async () => {
+    const { InsightCard } = await viteServer.ssrLoadModule('/src/components/ui/InsightCard.jsx');
+
+    const html = renderToStaticMarkup(
+      React.createElement(InsightCard, {
+        insight: {
+          id: 101,
+          headline: 'Polyethylene feedstock surged 6% on packaging demand.',
+          what_happened: 'HDPE prices rose from INR 94/kg to INR 100/kg.',
+          why_it_happened: 'Crude oil benchmark rally drove petrochemical costs.',
+          business_impact: 'Packaging cost pressure expected next quarter.',
+          outlook: 'BULLISH',
+          confidence: 'HIGH',
+          action_recommendation: 'ACCELERATE_PURCHASE',
+          recommendation_horizon: 'IMMEDIATE',
+          recommendation_rationale: 'Secure raw material volume before impending price adjustments take effect.',
+          is_downgraded: false,
+          downgrade_reason: null,
+          disclaimer: 'Procurement Action Caveat: Directional market intelligence only. Does not constitute financial, investment, or legal advice.',
+          evidence_price_points_count: 5,
+          evidence_news_count: 2,
+          generated_at: '2026-11-12T10:00:00Z',
+          model_used: 'gemini-2.5-flash',
+        },
+      })
+    );
+
+    assert.equal(html.includes('Accelerate Purchase'), true);
+    assert.equal(html.includes('insight-action--accelerate'), true);
+    assert.equal(html.includes('Immediate (1-2 wks)'), true);
+    assert.equal(html.includes('Procurement Rationale:'), true);
+    assert.equal(html.includes('Secure raw material volume before impending price adjustments take effect.'), true);
+    assert.equal(html.includes('Procurement Action Caveat: Directional market intelligence only.'), true);
+    assert.equal(html.includes('Downgraded'), false);
+  });
+
+  test('V2-01C — InsightCard renders downgrade warning badge when is_downgraded is true', async () => {
+    const { InsightCard } = await viteServer.ssrLoadModule('/src/components/ui/InsightCard.jsx');
+
+    const html = renderToStaticMarkup(
+      React.createElement(InsightCard, {
+        insight: {
+          id: 102,
+          headline: 'Mild steel prices stabilized after seasonal surge.',
+          what_happened: 'Steel spot prices remained unchanged at INR 48,000/ton.',
+          why_it_happened: 'Construction demand balanced against fresh domestic mill output.',
+          business_impact: 'Immediate cost stability for structural fabrications.',
+          outlook: 'NEUTRAL',
+          confidence: 'MEDIUM',
+          action_recommendation: 'MONITOR_ONLY',
+          recommendation_horizon: 'SHORT_TERM',
+          recommendation_rationale: 'Observe incoming auction data before placing bulk orders.',
+          is_downgraded: true,
+          downgrade_reason: 'STALE_PRICE_OBSERVATION',
+          disclaimer: 'Procurement Action Caveat: Directional market intelligence only.',
+          evidence_price_points_count: 4,
+          evidence_news_count: 1,
+          generated_at: '2026-11-12T10:00:00Z',
+          model_used: 'gemini-2.5-flash',
+        },
+      })
+    );
+
+    assert.equal(html.includes('Monitor Only'), true);
+    assert.equal(html.includes('insight-action--monitor'), true);
+    assert.equal(html.includes('Short Term (1-3 mos)'), true);
+    assert.equal(html.includes('Downgraded'), true);
+    assert.equal(html.includes('insight-downgrade-badge'), true);
+  });
+
+  test('V2-01C — InsightCard backward-compatibility: omits procurement block when action_recommendation is null', async () => {
+    const { InsightCard } = await viteServer.ssrLoadModule('/src/components/ui/InsightCard.jsx');
+
+    const html = renderToStaticMarkup(
+      React.createElement(InsightCard, {
+        insight: {
+          id: 103,
+          headline: 'Legacy insight row without procurement fields.',
+          what_happened: 'Historical price observations.',
+          why_it_happened: 'Historical market news.',
+          business_impact: 'Historical cost impact.',
+          outlook: 'VOLATILE',
+          confidence: 'LOW',
+          action_recommendation: null,
+          recommendation_horizon: null,
+          recommendation_rationale: null,
+          is_downgraded: false,
+          downgrade_reason: null,
+          disclaimer: null,
+          evidence_price_points_count: 3,
+          evidence_news_count: 0,
+          generated_at: '2026-09-01T10:00:00Z',
+          model_used: 'gemini-1.5-flash',
+        },
+      })
+    );
+
+    assert.equal(html.includes('data-testid="procurement-guidance"'), false);
+    assert.equal(html.includes('insight-procurement-block'), false);
+    assert.equal(html.includes('Procurement Rationale:'), false);
+  });
+
+  test('V2-01C — InsightCard compact mode: renders badge & horizon, suppresses rationale & disclaimer', async () => {
+    const { InsightCard } = await viteServer.ssrLoadModule('/src/components/ui/InsightCard.jsx');
+
+    const html = renderToStaticMarkup(
+      React.createElement(InsightCard, {
+        compact: true,
+        insight: {
+          id: 104,
+          headline: 'Crude feedstock prices elevated.',
+          what_happened: 'Brief description.',
+          why_it_happened: 'Brief explanation.',
+          business_impact: 'Brief impact.',
+          outlook: 'BULLISH',
+          confidence: 'MEDIUM',
+          action_recommendation: 'MAINTAIN_BUFFER',
+          recommendation_horizon: 'MEDIUM_TERM',
+          recommendation_rationale: 'Lengthy rationale text that should be suppressed in compact dashboard mode.',
+          is_downgraded: false,
+          downgrade_reason: null,
+          disclaimer: 'Caveat text that should be suppressed in compact mode.',
+          evidence_price_points_count: 6,
+          evidence_news_count: 1,
+          generated_at: '2026-11-12T10:00:00Z',
+          model_used: 'gemini-2.5-flash',
+        },
+      })
+    );
+
+    assert.equal(html.includes('Maintain Buffer'), true);
+    assert.equal(html.includes('Medium Term (3-6 mos)'), true);
+    assert.equal(html.includes('Lengthy rationale text that should be suppressed in compact dashboard mode.'), false);
+    assert.equal(html.includes('Caveat text that should be suppressed in compact mode.'), false);
+  });
 });

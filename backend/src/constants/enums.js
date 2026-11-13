@@ -56,7 +56,7 @@ module.exports = {
   },
 
   // Phase H — AI Market Intelligence Agent.
-  // Mirrors ENUM columns in ai_insights table (migration 020).
+  // Mirrors ENUM columns in ai_insights table (migration 020 & 028).
   // Must stay in sync with the DB ENUM definition.
   OUTLOOK: {
     BEARISH:  'BEARISH',
@@ -69,5 +69,19 @@ module.exports = {
     LOW:    'LOW',
     MEDIUM: 'MEDIUM',
     HIGH:   'HIGH',
+  },
+
+  // V2-01C — Procurement Action Recommendations (migration 028)
+  ACTION_RECOMMENDATION: {
+    ACCELERATE_PURCHASE: 'ACCELERATE_PURCHASE',
+    DELAY_PURCHASE:      'DELAY_PURCHASE',
+    MAINTAIN_BUFFER:     'MAINTAIN_BUFFER',
+    MONITOR_ONLY:        'MONITOR_ONLY',
+  },
+
+  RECOMMENDATION_HORIZON: {
+    IMMEDIATE:   'IMMEDIATE',
+    SHORT_TERM:  'SHORT_TERM',
+    MEDIUM_TERM: 'MEDIUM_TERM',
   },
 };

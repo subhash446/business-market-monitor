@@ -55,6 +55,35 @@ const CONFIDENCE_CONFIG = {
   LOW:    { label: 'Low',    cls: 'insight-confidence--low'    },
 };
 
+const ACTION_CONFIG = {
+  ACCELERATE_PURCHASE: {
+    label: 'Accelerate Purchase',
+    icon: 'fa-solid fa-forward',
+    badgeCls: 'insight-action--accelerate',
+  },
+  DELAY_PURCHASE: {
+    label: 'Delay Purchase',
+    icon: 'fa-solid fa-pause',
+    badgeCls: 'insight-action--delay',
+  },
+  MAINTAIN_BUFFER: {
+    label: 'Maintain Buffer',
+    icon: 'fa-solid fa-shield-halved',
+    badgeCls: 'insight-action--buffer',
+  },
+  MONITOR_ONLY: {
+    label: 'Monitor Only',
+    icon: 'fa-solid fa-eye',
+    badgeCls: 'insight-action--monitor',
+  },
+};
+
+const HORIZON_CONFIG = {
+  IMMEDIATE:   { label: 'Immediate (1-2 wks)' },
+  SHORT_TERM:  { label: 'Short Term (1-3 mos)' },
+  MEDIUM_TERM: { label: 'Medium Term (3-6 mos)' },
+};
+
 /* ── Component ────────────────────────────────────────────────────── */
 
 export function InsightCard({
@@ -195,6 +224,54 @@ export function InsightCard({
 
             {/* Headline */}
             <p className="insight-card__headline">{insight.headline}</p>
+
+            {/* Procurement Action Guidance (V2-01C) */}
+            {insight.action_recommendation && (
+              <div className="insight-procurement-block" data-testid="procurement-guidance">
+                <div className="insight-procurement__action-row">
+                  <span
+                    className={`insight-action-badge ${ACTION_CONFIG[insight.action_recommendation]?.badgeCls || 'insight-action--monitor'}`}
+                    aria-label={`Procurement Action: ${ACTION_CONFIG[insight.action_recommendation]?.label || insight.action_recommendation}`}
+                  >
+                    <i
+                      className={`${ACTION_CONFIG[insight.action_recommendation]?.icon || 'fa-solid fa-eye'} insight-action-badge__icon`}
+                      aria-hidden="true"
+                    />
+                    {ACTION_CONFIG[insight.action_recommendation]?.label || insight.action_recommendation}
+                  </span>
+                  {insight.recommendation_horizon && (
+                    <span className="insight-horizon-pill" aria-label={`Horizon: ${insight.recommendation_horizon}`}>
+                      <i className="fa-regular fa-clock" aria-hidden="true" />
+                      {HORIZON_CONFIG[insight.recommendation_horizon]?.label || insight.recommendation_horizon}
+                    </span>
+                  )}
+                  {Boolean(insight.is_downgraded) && (
+                    <span
+                      className="insight-downgrade-badge"
+                      title={insight.downgrade_reason ? `Downgraded by guardrail: ${insight.downgrade_reason}` : 'Posture downgraded by safety guardrail'}
+                      aria-label="Downgraded posture"
+                    >
+                      <i className="fa-solid fa-shield-virus" aria-hidden="true" />
+                      Downgraded
+                    </span>
+                  )}
+                </div>
+
+                {!compact && insight.recommendation_rationale && (
+                  <div className="insight-procurement__rationale">
+                    <strong className="insight-procurement__rationale-label">Procurement Rationale:</strong>{' '}
+                    <span>{insight.recommendation_rationale}</span>
+                  </div>
+                )}
+
+                {!compact && insight.disclaimer && (
+                  <div className="insight-procurement__disclaimer" role="note">
+                    <i className="fa-solid fa-circle-exclamation insight-procurement__disclaimer-icon" aria-hidden="true" />
+                    <p className="insight-procurement__disclaimer-text">{insight.disclaimer}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Detail rows */}
             <dl className="insight-card__details">

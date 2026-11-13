@@ -34,12 +34,15 @@ const { generateInsight, ProviderError } = require('../src/providers/gemini.prov
 
 // Minimal valid InsightResponse fixture
 const VALID_INSIGHT = {
-  headline:        'WTI crude oil prices rose 4% this week on supply concerns.',
-  what_happened:   'WTI spot price increased from 71.2 to 74.1 over 7 days.',
-  why_it_happened: 'Recent news indicates production disruptions in key regions.',
-  business_impact: 'Raw material costs may increase by 3-5% in the near term.',
-  outlook:         'BULLISH',
-  confidence:      'MEDIUM',
+  headline:                 'WTI crude oil prices rose 4% this week on supply concerns.',
+  what_happened:            'WTI spot price increased from 71.2 to 74.1 over 7 days.',
+  why_it_happened:          'Recent news indicates production disruptions in key regions.',
+  business_impact:          'Raw material costs may increase by 3-5% in the near term.',
+  outlook:                  'BULLISH',
+  confidence:               'MEDIUM',
+  action_recommendation:    'ACCELERATE_PURCHASE',
+  recommendation_rationale: 'Sustained price rises and regional supply outages support accelerating purchases.',
+  recommendation_horizon:   'SHORT_TERM',
 };
 
 /** Build a mock fetch response with JSON mode Gemini response body */
@@ -262,6 +265,33 @@ test('throws PROVIDER_INVALID when required field is empty string', async () => 
   });
 });
 
+test('throws PROVIDER_INVALID for invalid action_recommendation value', async () => {
+  const bad = { ...VALID_INSIGHT, action_recommendation: 'STRONG_BUY_IMMEDIATE' };
+  jest.spyOn(global, 'fetch').mockReturnValueOnce(mockGeminiResponse(bad));
+  await expect(generateInsight('prompt')).rejects.toMatchObject({
+    code:    'PROVIDER_INVALID',
+    message: expect.stringContaining('action_recommendation'),
+  });
+});
+
+test('throws PROVIDER_INVALID for invalid recommendation_horizon value', async () => {
+  const bad = { ...VALID_INSIGHT, recommendation_horizon: 'NEXT_DECADE' };
+  jest.spyOn(global, 'fetch').mockReturnValueOnce(mockGeminiResponse(bad));
+  await expect(generateInsight('prompt')).rejects.toMatchObject({
+    code:    'PROVIDER_INVALID',
+    message: expect.stringContaining('recommendation_horizon'),
+  });
+});
+
+test('throws PROVIDER_INVALID when recommendation_rationale exceeds 2000 chars', async () => {
+  const bad = { ...VALID_INSIGHT, recommendation_rationale: 'R'.repeat(2001) };
+  jest.spyOn(global, 'fetch').mockReturnValueOnce(mockGeminiResponse(bad));
+  await expect(generateInsight('prompt')).rejects.toMatchObject({
+    code:    'PROVIDER_INVALID',
+    message: expect.stringContaining('recommendation_rationale'),
+  });
+});
+
 test('throws PROVIDER_INVALID when response is not an object', async () => {
   jest.spyOn(global, 'fetch').mockReturnValueOnce(
     Promise.resolve({
@@ -383,6 +413,9 @@ describe('T-04: Prompt security boundary, output validation & error redaction', 
       business_impact: 'Margins may update by 2-3%; costs > 100 INR/kg remain an indicative upper band.',
       outlook: 'NEUTRAL',
       confidence: 'MEDIUM',
+      action_recommendation: 'MONITOR_ONLY',
+      recommendation_rationale: 'Margins may update by 2-3%; costs > 100 INR/kg remain an indicative upper band.',
+      recommendation_horizon: 'SHORT_TERM',
     };
 
     jest.spyOn(global, 'fetch').mockReturnValueOnce(mockGeminiResponse(legitimateInsight));

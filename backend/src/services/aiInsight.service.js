@@ -52,6 +52,10 @@
 const geminiProvider = require('../providers/gemini.provider');
 const aiInsightRepo = require('../repositories/aiInsight.repository');
 const env = require('../config/env');
+const {
+  ACTION_RECOMMENDATION,
+  RECOMMENDATION_HORIZON,
+} = require('../constants/enums');
 const { isStrictPositiveInteger } = require('../utils/validationHelpers');
 const { buildPromptKbContext, assessEvidenceSignals } = require('./kbImpact.service');
 const {
@@ -210,21 +214,69 @@ async function generateAndStore({
       knownSecrets: collectRuntimeSecrets(env),
     });
 
+    // -- V2-01C: Server-Side Guardrail Downgrades -----------------------------
+    // Evaluates empirical evidence signals for price staleness (> 30 days) and
+    // directional contradictions between price trends and news sentiment.
+    const evidenceSignals = assessEvidenceSignals({
+      prices: validPrices,
+      newsHeadlines: safeHeadlines,
+      kbImpact,
+    });
+
+    let actionRecommendation = insightResponse.action_recommendation;
+    let recommendationRationale = insightResponse.recommendation_rationale;
+    let recommendationHorizon = insightResponse.recommendation_horizon;
+    let isDowngraded = false;
+    let downgradeReason = null;
+
+    if (evidenceSignals.isPriceStale === true) {
+      actionRecommendation = ACTION_RECOMMENDATION.MONITOR_ONLY;
+      isDowngraded = true;
+      downgradeReason = 'STALE_PRICE_OBSERVATION';
+      if (recommendationHorizon === RECOMMENDATION_HORIZON.IMMEDIATE) {
+        recommendationHorizon = RECOMMENDATION_HORIZON.SHORT_TERM;
+      }
+      recommendationRationale = (recommendationRationale ? recommendationRationale + ' ' : '') +
+        '[Guardrail Downgrade: Latest price observation is over 30 days old. Action clamped to MONITOR_ONLY pending fresh price confirmation.]';
+      if (recommendationRationale.length > 2000) {
+        recommendationRationale = recommendationRationale.slice(0, 1997) + '...';
+      }
+    } else if (evidenceSignals.hasContradictorySignals === true) {
+      if (
+        actionRecommendation === ACTION_RECOMMENDATION.ACCELERATE_PURCHASE ||
+        actionRecommendation === ACTION_RECOMMENDATION.DELAY_PURCHASE
+      ) {
+        actionRecommendation = ACTION_RECOMMENDATION.MAINTAIN_BUFFER;
+        isDowngraded = true;
+        downgradeReason = 'CONTRADICTORY_SIGNALS';
+        recommendationRationale = (recommendationRationale ? recommendationRationale + ' ' : '') +
+          '[Guardrail Downgrade: Divergent market signals detected between price trend and headline news. Aggressive posture downgraded to MAINTAIN_BUFFER.]';
+        if (recommendationRationale.length > 2000) {
+          recommendationRationale = recommendationRationale.slice(0, 1997) + '...';
+        }
+      }
+    }
+
     // -- Store the validated insight -----------------------------------------
     const model = env.gemini.model;
     const stored = await aiInsightRepo.create({
       trackedMaterialId,
       businessId,
-      headline:                insightResponse.headline,
-      whatHappened:            insightResponse.what_happened,
-      whyItHappened:           insightResponse.why_it_happened,
-      businessImpact:          insightResponse.business_impact,
-      outlook:                 insightResponse.outlook,
-      confidence:              insightResponse.confidence,
-      evidencePriceRange:      evidencePriceRange,
+      headline:                 insightResponse.headline,
+      whatHappened:             insightResponse.what_happened,
+      whyItHappened:            insightResponse.why_it_happened,
+      businessImpact:           insightResponse.business_impact,
+      outlook:                  insightResponse.outlook,
+      confidence:               insightResponse.confidence,
+      actionRecommendation,
+      recommendationRationale,
+      recommendationHorizon,
+      isDowngraded,
+      downgradeReason,
+      evidencePriceRange:       evidencePriceRange,
       evidencePricePointsCount: evidencePriceCount,
-      evidenceNewsCount:       evidenceNewsCount,
-      modelUsed:               model,
+      evidenceNewsCount:        evidenceNewsCount,
+      modelUsed:                model,
     });
 
     // -- Link evidence junction tables (Phase 3 Traceability) ----------------

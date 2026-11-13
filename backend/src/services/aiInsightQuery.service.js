@@ -136,6 +136,9 @@ async function getInsightEvidence(businessId, insightId) {
   };
 }
 
+const MANDATORY_PROCUREMENT_DISCLAIMER =
+  'Procurement Action Caveat: Directional market intelligence only. Does not constitute financial, investment, or legal advice. Verify supplier quotes, operational carrying costs, and lead times independently before making purchasing commitments.';
+
 /**
  * Shape the DB row into a clean public response object.
  *
@@ -160,6 +163,12 @@ function formatInsight(row, evidence = null) {
     business_impact:              row.business_impact,
     outlook:                      row.outlook,
     confidence:                   row.confidence,
+    action_recommendation:        row.action_recommendation ?? null,
+    recommendation_rationale:     row.recommendation_rationale ?? null,
+    recommendation_horizon:       row.recommendation_horizon ?? null,
+    is_downgraded:                Boolean(row.is_downgraded),
+    downgrade_reason:             row.downgrade_reason ?? null,
+    disclaimer:                   row.action_recommendation ? MANDATORY_PROCUREMENT_DISCLAIMER : null,
     evidence_price_range:         row.evidence_price_range,
     evidence_price_points_count:  row.evidence_price_points_count,
     evidence_news_count:          row.evidence_news_count,
@@ -180,6 +189,7 @@ function formatInsight(row, evidence = null) {
 }
 
 module.exports = {
+  MANDATORY_PROCUREMENT_DISCLAIMER,
   getLatestInsight,
   getInsightEvidence,
   listInsightHistory,

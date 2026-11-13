@@ -951,4 +951,84 @@ describe('T-05 Multi-Hop KB Integration in aiInsight.service', () => {
     expect(result.status).toBe('error');
     expect(repo.create).not.toHaveBeenCalled();
   });
+
+  describe('V2-01C: Procurement Action Recommendations & Guardrail Downgrades', () => {
+    test('applies staleness downgrade when prices are > 30 days old', async () => {
+      const repo = require('../src/repositories/aiInsight.repository');
+      const prov = require('../src/providers/gemini.provider');
+
+      // Prices from 60 days ago
+      const stalePrices = [
+        { price: '70.00', recorded_at: '2026-06-01T00:00:00Z', is_valid: 1 },
+        { price: '72.00', recorded_at: '2026-06-05T00:00:00Z', is_valid: 1 },
+        { price: '74.00', recorded_at: '2026-06-10T00:00:00Z', is_valid: 1 },
+      ];
+
+      prov.generateInsight.mockResolvedValueOnce({
+        ...VALID_RESPONSE,
+        outlook: 'BULLISH',
+        action_recommendation: 'ACCELERATE_PURCHASE',
+        recommendation_horizon: 'IMMEDIATE',
+        recommendation_rationale: 'Prices are trending up aggressively.',
+      });
+
+      repo.create.mockResolvedValueOnce({ id: 101, ...STORED_ROW });
+
+      const result = await service.generateAndStore({
+        ...BASE_ARGS,
+        prices: stalePrices,
+        newsHeadlines: [],
+      });
+
+      expect(result.status).toBe('generated');
+      expect(repo.create).toHaveBeenCalledTimes(1);
+
+      const createdArgs = repo.create.mock.calls[0][0];
+      expect(createdArgs.actionRecommendation).toBe('MONITOR_ONLY');
+      expect(createdArgs.isDowngraded).toBe(true);
+      expect(createdArgs.downgradeReason).toBe('STALE_PRICE_OBSERVATION');
+      expect(createdArgs.recommendationHorizon).toBe('SHORT_TERM'); // IMMEDIATE normalized to SHORT_TERM
+      expect(createdArgs.recommendationRationale).toContain('[Guardrail Downgrade: Latest price observation is over 30 days old');
+    });
+
+    test('applies contradictory signals downgrade when upward price trend clashes with bearish news', async () => {
+      const repo = require('../src/repositories/aiInsight.repository');
+      const prov = require('../src/providers/gemini.provider');
+
+      const recentPrices = [
+        { price: '100.00', recorded_at: new Date(Date.now() - 3 * 86400000).toISOString(), is_valid: 1 },
+        { price: '103.00', recorded_at: new Date(Date.now() - 2 * 86400000).toISOString(), is_valid: 1 },
+        { price: '106.00', recorded_at: new Date(Date.now() - 1 * 86400000).toISOString(), is_valid: 1 },
+      ];
+
+      const conflictingNews = [
+        { title: 'Global chemical demand drop and steep decline in orders slump', source_name: 'Reuters', published_at: new Date().toISOString() },
+      ];
+
+      prov.generateInsight.mockResolvedValueOnce({
+        ...VALID_RESPONSE,
+        outlook: 'BULLISH',
+        action_recommendation: 'ACCELERATE_PURCHASE',
+        recommendation_horizon: 'SHORT_TERM',
+        recommendation_rationale: 'Prices are climbing steadily.',
+      });
+
+      repo.create.mockResolvedValueOnce({ id: 102, ...STORED_ROW });
+
+      const result = await service.generateAndStore({
+        ...BASE_ARGS,
+        prices: recentPrices,
+        newsHeadlines: conflictingNews,
+      });
+
+      expect(result.status).toBe('generated');
+      expect(repo.create).toHaveBeenCalledTimes(1);
+
+      const createdArgs = repo.create.mock.calls[0][0];
+      expect(createdArgs.actionRecommendation).toBe('MAINTAIN_BUFFER');
+      expect(createdArgs.isDowngraded).toBe(true);
+      expect(createdArgs.downgradeReason).toBe('CONTRADICTORY_SIGNALS');
+      expect(createdArgs.recommendationRationale).toContain('[Guardrail Downgrade: Divergent market signals detected');
+    });
+  });
 });

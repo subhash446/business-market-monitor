@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Unit tests for aiInsight.repository.js (Phase H)
  *
  * All DB calls are mocked via jest.mock('../src/database/connection').
@@ -64,6 +64,11 @@ function makeInsightRow(overrides = {}) {
     business_impact:             'Raw material costs may rise 3-5% near term.',
     outlook:                     'BULLISH',
     confidence:                  'MEDIUM',
+    action_recommendation:       null,
+    recommendation_rationale:    null,
+    recommendation_horizon:      null,
+    is_downgraded:               0,
+    downgrade_reason:            null,
     evidence_price_range:        '71.2-74.1',
     evidence_price_points_count: 14,
     evidence_news_count:         4,
@@ -111,7 +116,7 @@ describe('create()', () => {
     const [insertSql, insertParams] = mockPool.execute.mock.calls[0];
     expect(insertSql).toMatch(/INSERT INTO ai_insights/i);
 
-    // All 12 value columns in the expected order
+    // All 17 value columns in the expected order
     expect(insertParams).toEqual([
       10,              // tracked_material_id
       5,               // business_id
@@ -121,6 +126,11 @@ describe('create()', () => {
       'Raw material costs may rise 3-5% near term.',
       'BULLISH',
       'MEDIUM',
+      null,            // action_recommendation
+      null,            // recommendation_rationale
+      null,            // recommendation_horizon
+      0,               // is_downgraded
+      null,            // downgrade_reason
       '71.2-74.1',
       14,
       4,
@@ -146,8 +156,8 @@ describe('create()', () => {
     await repo.create(input);
 
     const [, insertParams] = mockPool.execute.mock.calls[0];
-    // evidence_price_range is the 9th param (index 8)
-    expect(insertParams[8]).toBeNull();
+    // evidence_price_range is the 14th param (index 13)
+    expect(insertParams[13]).toBeNull();
   });
 
   test('uses default 0 for evidence counts when omitted', async () => {
@@ -162,8 +172,8 @@ describe('create()', () => {
     await repo.create(input);
 
     const [, params] = mockPool.execute.mock.calls[0];
-    expect(params[9]).toBe(0);  // evidence_price_points_count
-    expect(params[10]).toBe(0); // evidence_news_count
+    expect(params[14]).toBe(0); // evidence_price_points_count
+    expect(params[15]).toBe(0); // evidence_news_count
   });
 
   test('returns null when SELECT-back finds no row', async () => {
