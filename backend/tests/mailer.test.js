@@ -484,5 +484,101 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
       expect(() => env.resend.validate()).toThrow('RESEND_FROM_EMAIL is not configured');
     });
   });
+
+  describe('buildAlertNotification() HTML escaping & date safety (T-01.1)', () => {
+    const { buildAlertNotification } = require('../src/email/templates/alertNotification.template');
+
+    test('escapes HTML-sensitive characters in materialName and unitSuffix once without double-escaping', () => {
+      const maliciousMaterial = '<script>alert("xss")</script> & \'PET\'';
+      const maliciousUnit = 'kg <img src=x onerror="alert(1)"> & \'unit\'';
+
+      const { subject, html } = buildAlertNotification({
+        materialName: maliciousMaterial,
+        conditionType: 'PRICE_ABOVE',
+        thresholdType: 'ABSOLUTE',
+        thresholdPrice: 120,
+        triggeredPrice: 135.75,
+        currency: 'INR',
+        unitLabel: maliciousUnit,
+        triggeredAt: '2026-11-11T10:30:00Z',
+      });
+
+      // Raw HTML tags must never appear in HTML body
+      expect(html).not.toContain('<script>');
+      expect(html).not.toContain('<img src=x');
+
+      // Escaped values must appear once (no double escaping like &amp;lt; or &amp;amp;)
+      expect(html).toContain('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt; &amp; &#39;PET&#39;');
+      expect(html).toContain(' / kg &lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; &#39;unit&#39;');
+      expect(html).not.toContain('&amp;lt;');
+      expect(html).not.toContain('&amp;amp;');
+
+      // Plain-text email subject should preserve readable text without HTML entities
+      expect(subject).toContain('Price Alert: <script>alert("xss")</script> & \'PET\'');
+    });
+
+    test('formats valid Date and ISO triggeredAt strings into ISO-8601 UTC output', () => {
+      const fromIso = buildAlertNotification({
+        materialName: 'Wheat',
+        conditionType: 'PRICE_ABOVE',
+        thresholdPrice: 2500,
+        triggeredPrice: 2650,
+        triggeredAt: '2026-09-18T10:00:00Z',
+      });
+      expect(fromIso.html).toContain('2026-09-18T10:00:00.000Z');
+
+      const fromDateObj = buildAlertNotification({
+        materialName: 'Sugar',
+        conditionType: 'PRICE_BELOW',
+        thresholdPrice: 4000,
+        triggeredPrice: 3900,
+        triggeredAt: new Date('2026-10-01T12:15:30Z'),
+      });
+      expect(fromDateObj.html).toContain('2026-10-01T12:15:30.000Z');
+    });
+
+    test('handles null, undefined, and invalid triggeredAt dates safely without RangeError or 1970 fallback', () => {
+      for (const badDate of [null, undefined, '', 'not-a-date', new Date('invalid'), {}, true]) {
+        expect(() => buildAlertNotification({
+          materialName: 'HDPE Granules',
+          conditionType: 'PRICE_ABOVE',
+          thresholdPrice: 100,
+          triggeredPrice: 110,
+          triggeredAt: badDate,
+        })).not.toThrow();
+
+        const res = buildAlertNotification({
+          materialName: 'HDPE Granules',
+          conditionType: 'PRICE_ABOVE',
+          thresholdPrice: 100,
+          triggeredPrice: 110,
+          triggeredAt: badDate,
+        });
+        expect(res.html).toContain('>N/A<');
+        expect(res.html).not.toContain('1970-01-01');
+      }
+    });
+
+    test('handles null, undefined, and unexpected types for materialName, unitLabel, currency, and numeric fields safely', () => {
+      const res = buildAlertNotification({
+        materialName: { unexpected: true },
+        conditionType: 'PRICE_ABOVE',
+        thresholdType: 'PERCENTAGE',
+        thresholdPrice: null,
+        triggeredPrice: undefined,
+        triggeredChangePercent: 'not-a-number',
+        currency: 'USD<script>',
+        unitLabel: { bad: 1 },
+        triggeredAt: null,
+      });
+
+      expect(res.html).toContain('Tracked Material');
+      expect(res.html).not.toContain('[object Object]');
+      expect(res.html).not.toContain('<script>');
+      expect(res.html).toContain('USD&lt;script&gt;');
+      expect(res.html).toContain('>N/A<');
+      expect(() => buildAlertNotification()).not.toThrow();
+    });
+  });
 });
 

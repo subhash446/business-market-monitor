@@ -19,7 +19,15 @@ import {
   createLatestRequestGuard,
   runLatestIndustryPreview,
 } from '../src/utils/requestGuard.js';
-import { classifyInsightBenchmarkDisclosure } from '../src/utils/insightDisclosure.js';
+import {
+  classifyEvidencePriceBadge,
+  classifyInsightBenchmarkDisclosure,
+} from '../src/utils/insightDisclosure.js';
+import {
+  handleModalBackdropClick,
+  handleModalEscapeKey,
+  safeInvokeClose,
+} from '../src/utils/modalHelpers.js';
 
 describe('P2 Fix #1 — AlertsPage validation error mapping (err.details)', () => {
   test('maps backend ApiError err.details to field-level alert rule errors', () => {
@@ -483,5 +491,126 @@ describe('Task 2 — InsightCard GOI vs Crude Proxy Disclosure Classifier', () =
       ],
     };
     assert.equal(classifyInsightBenchmarkDisclosure(manualOnly), 'NONE');
+  });
+});
+
+describe('T-01.4 — Modal safe dismiss handlers', () => {
+  test('Escape and backdrop interactions with undefined or non-function onClose do not crash', () => {
+    const backdrop = { id: 'backdrop' };
+    const dialogChild = { id: 'dialog' };
+
+    assert.doesNotThrow(() => safeInvokeClose(undefined));
+    assert.doesNotThrow(() => safeInvokeClose('not-a-function'));
+    assert.equal(safeInvokeClose(undefined), false);
+
+    assert.doesNotThrow(() => handleModalEscapeKey({ key: 'Escape' }, undefined));
+    assert.doesNotThrow(() => handleModalEscapeKey({ key: 'Escape' }, null));
+    assert.equal(handleModalEscapeKey({ key: 'Escape' }, undefined), true);
+    assert.equal(handleModalEscapeKey({ key: 'Enter' }, () => { throw new Error('Should not run'); }), false);
+
+    assert.doesNotThrow(() => handleModalBackdropClick({ target: backdrop }, backdrop, undefined));
+    assert.equal(handleModalBackdropClick({ target: dialogChild }, backdrop, undefined), false);
+  });
+
+  test('valid onClose callback is invoked normally on Escape and direct backdrop click', () => {
+    const backdrop = { id: 'backdrop' };
+    const dialogChild = { id: 'dialog' };
+    let closeCalls = 0;
+    const onClose = () => { closeCalls += 1; };
+
+    assert.equal(handleModalEscapeKey({ key: 'Escape' }, onClose), true);
+    assert.equal(closeCalls, 1);
+
+    // Clicking inside child element does NOT close
+    assert.equal(handleModalBackdropClick({ target: dialogChild }, backdrop, onClose), false);
+    assert.equal(closeCalls, 1);
+
+    // Clicking backdrop directly closes
+    assert.equal(handleModalBackdropClick({ target: backdrop }, backdrop, onClose), true);
+    assert.equal(closeCalls, 2);
+
+    assert.equal(safeInvokeClose(onClose), true);
+    assert.equal(closeCalls, 3);
+  });
+});
+
+describe('T-01.5 — Evidence price badge & disclosure consistency', () => {
+  test('never labels non-proxy GOI MARKET_INDICATIVE records as Proxy Benchmark', () => {
+    const goiWheat = {
+      id: 1,
+      currency: 'INR',
+      unit_label: 'INR/quintal',
+      source: 'GOVERNMENT_DATASET',
+      data_class: 'MARKET_INDICATIVE',
+      provider_name: 'Data.gov.in (Agmarknet / MoAFW)',
+      source_url: 'https://data.gov.in',
+      isProxy: false,
+    };
+    assert.equal(classifyEvidencePriceBadge(goiWheat), 'Mandi Benchmark');
+
+    // Also when source is omitted or THIRD_PARTY_API and no explicit isProxy boolean (current DB row shape)
+    const goiDbRow = {
+      id: 2,
+      currency: 'INR',
+      unit_label: 'INR/quintal',
+      source: 'THIRD_PARTY_API',
+      data_class: 'MARKET_INDICATIVE',
+      provider_name: 'Data.gov.in (Agmarknet / MoAFW)',
+    };
+    assert.equal(classifyEvidencePriceBadge(goiDbRow), 'Mandi Benchmark');
+
+    const genericNonProxyIndicative = {
+      id: 3,
+      currency: 'INR',
+      data_class: 'MARKET_INDICATIVE',
+      is_proxy: false,
+      provider_name: 'Regional Spot Index',
+    };
+    assert.equal(classifyEvidencePriceBadge(genericNonProxyIndicative), 'Market Indicative');
+  });
+
+  test('preserves Proxy Benchmark for genuine proxy MARKET_INDICATIVE records and respects isProxy/source flags', () => {
+    const eiaProxyIndicative = {
+      id: 10,
+      currency: 'USD',
+      unit_label: 'USD/bbl',
+      source: 'THIRD_PARTY_API',
+      data_class: 'MARKET_INDICATIVE',
+      provider_name: 'U.S. Energy Information Administration (EIA)',
+    };
+    assert.equal(classifyEvidencePriceBadge(eiaProxyIndicative), 'Proxy Benchmark');
+
+    const explicitProxyTrue = {
+      id: 11,
+      currency: 'INR',
+      data_class: 'MARKET_INDICATIVE',
+      is_proxy: true,
+    };
+    assert.equal(classifyEvidencePriceBadge(explicitProxyTrue), 'Proxy Benchmark');
+    assert.equal(
+      classifyInsightBenchmarkDisclosure({ headline: 'Test', what_happened: 'Test' }, [explicitProxyTrue]),
+      'CRUDE_PROXY'
+    );
+
+    const manualIndicative = {
+      id: 12,
+      currency: 'INR',
+      source: 'MANUAL',
+      data_class: 'MARKET_INDICATIVE',
+    };
+    assert.equal(classifyEvidencePriceBadge(manualIndicative), 'Market Indicative');
+
+    const manualInrQuintalQuote = {
+      id: 13,
+      currency: 'INR',
+      unit_label: 'INR/quintal',
+      source: 'MANUAL',
+      data_class: 'SUPPLIER_QUOTE',
+    };
+    assert.equal(classifyEvidencePriceBadge(manualInrQuintalQuote), 'Supplier Quote');
+    assert.equal(
+      classifyInsightBenchmarkDisclosure({ headline: 'Wheat quote', what_happened: 'Local quote' }, [manualInrQuintalQuote]),
+      'NONE'
+    );
   });
 });

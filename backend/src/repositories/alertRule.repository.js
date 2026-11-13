@@ -14,6 +14,13 @@
  * by alert_events.alert_rule_id being ON DELETE RESTRICT).
  */
 const { pool } = require('../database/connection');
+const { isStrictPositiveInteger } = require('../utils/validationHelpers');
+
+function assertBusinessId(businessId, operation) {
+  if (!isStrictPositiveInteger(businessId)) {
+    throw new Error(`businessId must be a positive integer for ${operation}`);
+  }
+}
 
 // Newest-first, consistent with this project's other time-oriented lists
 // (news, alert events) — Document 5 doesn't mandate a specific order here.
@@ -81,28 +88,37 @@ async function update(ruleId, {
   thresholdType = 'ABSOLUTE',
   cooldownHours = 24,
   isActive,
-}) {
-  await pool.execute(
+}, businessId) {
+  assertBusinessId(businessId, 'update');
+  const [result] = await pool.execute(
     `UPDATE alert_rules
      SET condition_type = ?, threshold_price = ?, threshold_type = ?,
          cooldown_hours = ?, is_active = ?
-     WHERE id = ?`,
-    [conditionType, thresholdPrice, thresholdType, cooldownHours, isActive, ruleId]
+     WHERE id = ? AND business_id = ? AND deleted_at IS NULL`,
+    [conditionType, thresholdPrice, thresholdType, cooldownHours, isActive, ruleId, businessId]
   );
-  return findById(ruleId);
+  if (result && result.affectedRows === 0) {
+    return null;
+  }
+  return findByIdForBusiness(ruleId, businessId);
 }
 
-async function updateLastTriggeredAt(ruleId, timestamp = new Date()) {
-  await pool.execute(
-    `UPDATE alert_rules SET last_triggered_at = ? WHERE id = ?`,
-    [timestamp, ruleId]
+async function updateLastTriggeredAt(ruleId, timestamp = new Date(), businessId) {
+  assertBusinessId(businessId, 'updateLastTriggeredAt');
+  const [result] = await pool.execute(
+    `UPDATE alert_rules SET last_triggered_at = ? WHERE id = ? AND business_id = ?`,
+    [timestamp, ruleId, businessId]
   );
+  if (result && result.affectedRows !== undefined) {
+    return result.affectedRows === 1;
+  }
   return true;
 }
 
 /**
  * Atomically claim trigger cooldown for an alert rule using conditional UPDATE.
  * Prevents concurrent workers from creating duplicate alert events/emails for the same trigger window.
+ * Strictly scoped by business_id alongside active/non-deleted predicates.
  * Returns true strictly if this invocation updated the row (affectedRows === 1).
  *
  * Timezone consistency note:
@@ -112,31 +128,45 @@ async function updateLastTriggeredAt(ruleId, timestamp = new Date()) {
  *   the connection's local timezone. Switching only SQL to UTC_TIMESTAMP() would introduce clock
  *   skew against JS Date pre-checks and serialized API timestamps on non-UTC hosts.
  */
-async function claimTriggerCooldown(ruleId, timestamp = new Date()) {
+async function claimTriggerCooldown(ruleId, timestamp = new Date(), businessId) {
+  assertBusinessId(businessId, 'claimTriggerCooldown');
   const [result] = await pool.execute(
     `UPDATE alert_rules
      SET last_triggered_at = ?
      WHERE id = ?
+       AND business_id = ?
        AND is_active = TRUE
        AND deleted_at IS NULL
        AND (
          last_triggered_at IS NULL
          OR TIMESTAMPDIFF(SECOND, last_triggered_at, ?) >= COALESCE(cooldown_hours, 24) * 3600
        )`,
-    [timestamp, ruleId, timestamp]
+    [timestamp, ruleId, businessId, timestamp]
   );
   return Boolean(result && result.affectedRows === 1);
 }
 
-async function softDelete(ruleId) {
-  await pool.execute('UPDATE alert_rules SET deleted_at = NOW() WHERE id = ?', [ruleId]);
-  const [rows] = await pool.execute('SELECT deleted_at FROM alert_rules WHERE id = ?', [ruleId]);
-  return rows[0].deleted_at;
+async function softDelete(ruleId, businessId) {
+  assertBusinessId(businessId, 'softDelete');
+  const [result] = await pool.execute(
+    'UPDATE alert_rules SET deleted_at = NOW() WHERE id = ? AND business_id = ? AND deleted_at IS NULL',
+    [ruleId, businessId]
+  );
+  if (result && result.affectedRows === 0) {
+    return null;
+  }
+  const [rows] = await pool.execute(
+    'SELECT deleted_at FROM alert_rules WHERE id = ? AND business_id = ? LIMIT 1',
+    [ruleId, businessId]
+  );
+  return rows[0]?.deleted_at ?? null;
 }
 
 /**
  * List all active rules across all businesses for materials that are tracked.
- * Used by the scheduled background alert evaluation cron job.
+ * Intentionally cross-tenant read-only scheduler query: includes `ar.business_id` on every
+ * returned row so `alertEvaluationService.evaluateAllActive()` delegates into strictly
+ * business-scoped `evaluateMaterial(businessId, trackedMaterialId)` execution.
  */
 async function listAllActive() {
   const [rows] = await pool.execute(

@@ -673,24 +673,27 @@ describe('Phase 6 — Material Tracking & Custom Materials', () => {
       expect(params).toEqual([15]);
     });
 
-    test('6.3 updateMaterial constructs UPDATE with provided subset of columns', async () => {
+    test('6.3 updateMaterial constructs UPDATE scoped by id AND business_id', async () => {
       const executeSpy = jest.spyOn(pool, 'execute').mockResolvedValue([[]]);
 
       await materialRepository.updateMaterial(101, {
         isTracked: false,
         customName: 'Clean Name',
         unitId: 3,
-      });
+      }, 42);
 
-      // Two execute calls: one for UPDATE, one for findById
+      // Two execute calls: one for scoped UPDATE, one for findByIdForBusiness
       expect(executeSpy).toHaveBeenCalledTimes(2);
       const [updateSql, updateParams] = executeSpy.mock.calls[0];
+      const [selectSql, selectParams] = executeSpy.mock.calls[1];
       expect(updateSql).toContain('UPDATE tracked_materials SET');
       expect(updateSql).toContain('is_tracked = ?');
       expect(updateSql).toContain('custom_name = ?');
       expect(updateSql).toContain('unit_id = ?');
-      expect(updateSql).toContain('WHERE id = ?');
-      expect(updateParams).toEqual([false, 'Clean Name', 3, 101]);
+      expect(updateSql).toContain('WHERE id = ? AND business_id = ?');
+      expect(updateParams).toEqual([false, 'Clean Name', 3, 101, 42]);
+      expect(selectSql).toContain('WHERE tm.id = ? AND tm.business_id = ?');
+      expect(selectParams).toEqual([101, 42]);
     });
 
     test('6.4 findCustomByNameForBusiness uses LOWER() and raw_material_id IS NULL', async () => {
@@ -703,6 +706,38 @@ describe('Phase 6 — Material Tracking & Custom Materials', () => {
       expect(sql).toContain('raw_material_id IS NULL');
       expect(sql).toContain('LOWER(custom_name) = LOWER(?)');
       expect(params).toEqual([15, 'Recycled Resin']);
+    });
+
+    test('6.5 tenant-scoped mutations reject missing businessId and deny cross-tenant mutation', async () => {
+      await expect(
+        materialRepository.updateMaterial(101, { isTracked: false })
+      ).rejects.toThrow(/businessId must be a positive integer/);
+      await expect(
+        materialRepository.updateTrackingStatus(101, false, null)
+      ).rejects.toThrow(/businessId must be a positive integer/);
+      await expect(
+        materialRepository.updateExternalSymbol(101, 'WTI', undefined)
+      ).rejects.toThrow(/businessId must be a positive integer/);
+
+      // Cross-tenant attempt (wrong businessId -> affectedRows: 0) must return null and never read via findById
+      const executeSpy = jest.spyOn(pool, 'execute').mockResolvedValue([{ affectedRows: 0 }]);
+
+      await expect(
+        materialRepository.updateMaterial(101, { customName: 'Hijacked' }, 999)
+      ).resolves.toBeNull();
+      await expect(
+        materialRepository.updateTrackingStatus(101, false, 999)
+      ).resolves.toBeNull();
+      await expect(
+        materialRepository.updateExternalSymbol(101, 'WTI', 999)
+      ).resolves.toBeNull();
+
+      // Each rejected mutation ran only the single scoped UPDATE without falling back to unscoped SELECT
+      expect(executeSpy).toHaveBeenCalledTimes(3);
+      for (const [sql, params] of executeSpy.mock.calls) {
+        expect(sql).toContain('AND business_id = ?');
+        expect(params[params.length - 1]).toBe(999);
+      }
     });
 
   });

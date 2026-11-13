@@ -66,9 +66,13 @@ async function updateMaterial(businessId, materialId, { isTracked, customName, u
       isTracked,
       customName: trimmedCustomName,
       unitId,
-    });
+    }, businessId);
   } else {
-    updated = await materialRepository.updateTrackingStatus(materialId, isTracked);
+    updated = await materialRepository.updateTrackingStatus(materialId, isTracked, businessId);
+  }
+
+  if (!updated) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
   }
 
   return toPublicMaterial(updated);
@@ -102,7 +106,10 @@ async function setExternalSymbol(businessId, materialId, externalSymbol) {
     throw new AppError(404, 'NOT_FOUND', 'Material not found');
   }
 
-  const updated = await materialRepository.updateExternalSymbol(materialId, externalSymbol);
+  const updated = await materialRepository.updateExternalSymbol(materialId, externalSymbol, businessId);
+  if (!updated) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
+  }
   return toPublicMaterial(updated);
 }
 

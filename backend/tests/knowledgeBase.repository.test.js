@@ -101,3 +101,86 @@ describe('knowledgeBase.repository - getDependenciesForRawMaterial', () => {
     ).rejects.toThrow('Database unavailable');
   });
 });
+
+
+describe('knowledgeBase.repository.getMultiHopImpactEdges()', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('executes recursive CTE scoped strictly by industry_id and rawMaterialId with cycle guard', async () => {
+    const sampleRows = [
+      {
+        dependency_id: 11,
+        depth: 1,
+        source_entity_type: 'RAW_MATERIAL',
+        source_entity_id: 10,
+        source_entity_name: 'PET Resin',
+        target_entity_type: 'COST_DRIVER',
+        target_entity_id: 20,
+        target_entity_name: 'Transportation',
+        dependency_type: 'INFLUENCES',
+        description: null,
+        visited_path: '|RAW_MATERIAL:10|COST_DRIVER:20|',
+        edge_path: '11',
+      },
+      {
+        dependency_id: 12,
+        depth: 2,
+        source_entity_type: 'COST_DRIVER',
+        source_entity_id: 20,
+        source_entity_name: 'Transportation',
+        target_entity_type: 'EXTERNAL_FACTOR',
+        target_entity_id: 30,
+        target_entity_name: 'Fuel Price Changes',
+        dependency_type: 'DRIVES_COST',
+        description: null,
+        visited_path: '|RAW_MATERIAL:10|COST_DRIVER:20|EXTERNAL_FACTOR:30|',
+        edge_path: '11>12',
+      },
+    ];
+    pool.execute.mockResolvedValueOnce([sampleRows]);
+
+    const rows = await knowledgeBaseRepository.getMultiHopImpactEdges(10, 2);
+
+    expect(rows).toEqual(sampleRows);
+    expect(pool.execute).toHaveBeenCalledTimes(1);
+    const [sql, params] = pool.execute.mock.calls[0];
+    expect(sql).toContain('WITH RECURSIVE kb_walk');
+    expect(sql).toContain('LOCATE(');
+    expect(sql).toContain('kw.depth < 3');
+    expect(sql).toContain('ORDER BY kw.depth ASC, kw.edge_path ASC');
+    expect(sql).toContain('LIMIT 75');
+    expect(params).toEqual([2, 10, 2]);
+  });
+
+  test('clamps maxDepth up to hard limit 4 and maxPaths up to 25', async () => {
+    pool.execute.mockResolvedValueOnce([[]]);
+
+    await knowledgeBaseRepository.getMultiHopImpactEdges(10, 2, {
+      maxDepth: 99,
+      maxPaths: 999,
+    });
+
+    const [sql, params] = pool.execute.mock.calls[0];
+    expect(sql).toContain('kw.depth < 4');
+    expect(sql).toContain('LIMIT 100');
+    expect(params).toEqual([2, 10, 2]);
+  });
+
+  test('returns empty array without executing SQL for missing or invalid IDs', async () => {
+    expect(await knowledgeBaseRepository.getMultiHopImpactEdges(null, 2)).toEqual([]);
+    expect(await knowledgeBaseRepository.getMultiHopImpactEdges(10, null)).toEqual([]);
+    expect(await knowledgeBaseRepository.getMultiHopImpactEdges('abc', 2)).toEqual([]);
+    expect(await knowledgeBaseRepository.getMultiHopImpactEdges(10, 0)).toEqual([]);
+    expect(pool.execute).not.toHaveBeenCalled();
+  });
+
+  test('propagates database errors from getMultiHopImpactEdges', async () => {
+    pool.execute.mockRejectedValueOnce(new Error('CTE error'));
+
+    await expect(
+      knowledgeBaseRepository.getMultiHopImpactEdges(10, 2)
+    ).rejects.toThrow('CTE error');
+  });
+});

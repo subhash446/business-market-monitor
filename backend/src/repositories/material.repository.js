@@ -10,6 +10,13 @@
  * bare id alone — this is what enforces business isolation (Document 5 §2.4).
  */
 const { pool } = require('../database/connection');
+const { isStrictPositiveInteger } = require('../utils/validationHelpers');
+
+function assertBusinessId(businessId, operation) {
+  if (!isStrictPositiveInteger(businessId)) {
+    throw new Error(`businessId must be a positive integer for ${operation}`);
+  }
+}
 
 const BASE_SELECT = `
   SELECT tm.id, tm.raw_material_id, tm.unit_id, COALESCE(rm.name, tm.custom_name) AS name,
@@ -51,7 +58,8 @@ async function findById(materialId) {
   return rows[0] || null;
 }
 
-async function updateMaterial(materialId, { isTracked, customName, unitId }) {
+async function updateMaterial(materialId, { isTracked, customName, unitId }, businessId) {
+  assertBusinessId(businessId, 'updateMaterial');
   const updates = [];
   const params = [];
 
@@ -69,19 +77,29 @@ async function updateMaterial(materialId, { isTracked, customName, unitId }) {
   }
 
   if (updates.length > 0) {
-    params.push(materialId);
-    await pool.execute(
-      `UPDATE tracked_materials SET ${updates.join(', ')} WHERE id = ?`,
+    params.push(materialId, businessId);
+    const [result] = await pool.execute(
+      `UPDATE tracked_materials SET ${updates.join(', ')} WHERE id = ? AND business_id = ?`,
       params
     );
+    if (result && result.affectedRows === 0) {
+      return null;
+    }
   }
 
-  return findById(materialId);
+  return findByIdForBusiness(materialId, businessId);
 }
 
-async function updateTrackingStatus(materialId, isTracked) {
-  await pool.execute('UPDATE tracked_materials SET is_tracked = ? WHERE id = ?', [isTracked, materialId]);
-  return findById(materialId);
+async function updateTrackingStatus(materialId, isTracked, businessId) {
+  assertBusinessId(businessId, 'updateTrackingStatus');
+  const [result] = await pool.execute(
+    'UPDATE tracked_materials SET is_tracked = ? WHERE id = ? AND business_id = ?',
+    [isTracked, materialId, businessId]
+  );
+  if (result && result.affectedRows === 0) {
+    return null;
+  }
+  return findByIdForBusiness(materialId, businessId);
 }
 
 // Added in Phase 6B (Custom Materials) — purely additive, nothing above changed.
@@ -182,6 +200,8 @@ async function bulkCreateFromTemplate(businessId, rawMaterials) {
 // custom materials (raw_material_id IS NULL) are included if they
 // happen to have external_symbol set — this is intentional: a user
 // can track a custom "Crude Oil" material and link it to WTI.
+// Intentionally system-wide read-only discovery query for scheduled price ingestion:
+// returns (id, business_id) so downstream ingestion & alert evaluation remain tenant-scoped.
 async function findTrackedByExternalSymbol(symbol) {
   const [rows] = await pool.execute(
     `SELECT id, business_id
@@ -194,16 +214,21 @@ async function findTrackedByExternalSymbol(symbol) {
 
 // Added in Phase B (External Symbol Management) — purely additive.
 //
-// Sets or clears the external_symbol for a tracked material. Ownership MUST
-// have already been confirmed via findByIdForBusiness() before calling this —
-// same contract as updateTrackingStatus(). Never updates a row by id alone.
-async function updateExternalSymbol(materialId, externalSymbol) {
-  await pool.execute(
-    'UPDATE tracked_materials SET external_symbol = ? WHERE id = ?',
-    [externalSymbol, materialId] // externalSymbol may be null (clears the column)
+// Sets or clears the external_symbol for a tracked material, strictly scoped by business_id.
+async function updateExternalSymbol(materialId, externalSymbol, businessId) {
+  assertBusinessId(businessId, 'updateExternalSymbol');
+  const [result] = await pool.execute(
+    'UPDATE tracked_materials SET external_symbol = ? WHERE id = ? AND business_id = ?',
+    [externalSymbol, materialId, businessId] // externalSymbol may be null (clears the column)
   );
-  return findById(materialId);
+  if (result && result.affectedRows === 0) {
+    return null;
+  }
+  return findByIdForBusiness(materialId, businessId);
 }
+
+// Intentionally system-wide read-only discovery query for scheduled AI insight generation:
+// returns material.business_id + industry_id per row so generated insights are strictly tenant-scoped.
 
 // Added in Phase H (AI Insights Job) -- purely additive, nothing above changed.
 //

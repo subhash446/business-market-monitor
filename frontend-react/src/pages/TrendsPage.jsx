@@ -39,7 +39,7 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -667,6 +667,14 @@ export function TrendsPage() {
             independent of the chart load state */}
         {phMaterialId && (
           <div className="trends-insight-section">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-2)' }}>
+              <Link
+                to={`/materials/${phMaterialId}/impact`}
+                className="btn btn--sm btn--secondary"
+              >
+                View Impact Chains
+              </Link>
+            </div>
             <InsightCard
               insight={insight ?? null}
               loading={insightLoading}

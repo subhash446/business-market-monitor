@@ -169,7 +169,7 @@ describe('Phase 2 — Alert Rule Engine & Notification Pipeline', () => {
       const events = await alertEvaluationService.evaluateMaterial(10, 1);
       expect(events).toHaveLength(1);
       expect(events[0].delivery_status).toBe('SENT');
-      expect(alertRuleRepository.claimTriggerCooldown).toHaveBeenCalledWith(101, expect.any(Date));
+      expect(alertRuleRepository.claimTriggerCooldown).toHaveBeenCalledWith(101, expect.any(Date), 10);
       expect(notificationService.sendAlertNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'sme@example.com',
@@ -903,22 +903,23 @@ describe('Phase 2 — Alert Rule Engine & Notification Pipeline', () => {
       expect(eventsValid).toHaveLength(1);
     });
 
-    test('claimTriggerCooldown SQL handles elapsed, active, NULL cooldown_hours, and inactive/deleted rules consistently', async () => {
+    test('claimTriggerCooldown SQL enforces business_id alongside active, cooldown, and soft-delete predicates', async () => {
       const { pool } = require('../src/database/connection');
       const now = new Date('2026-11-11T10:00:00Z');
       const rowsById = new Map([
-        [1, { id: 1, is_active: true, deleted_at: null, cooldown_hours: 24, last_triggered_at: new Date('2026-11-10T09:59:59Z') }], // 24h+1s elapsed
-        [2, { id: 2, is_active: true, deleted_at: null, cooldown_hours: 24, last_triggered_at: new Date('2026-11-11T05:00:00Z') }], // only 5h elapsed
-        [3, { id: 3, is_active: true, deleted_at: null, cooldown_hours: null, last_triggered_at: new Date('2026-11-11T08:00:00Z') }], // NULL -> COALESCE 24h -> 2h elapsed (blocked)
-        [4, { id: 4, is_active: true, deleted_at: null, cooldown_hours: null, last_triggered_at: new Date('2026-11-09T00:00:00Z') }], // NULL -> COALESCE 24h -> >24h elapsed (claimed)
-        [5, { id: 5, is_active: false, deleted_at: null, cooldown_hours: 24, last_triggered_at: null }], // inactive (blocked)
-        [6, { id: 6, is_active: true, deleted_at: new Date('2026-11-01T00:00:00Z'), cooldown_hours: 24, last_triggered_at: null }], // soft-deleted (blocked)
+        [1, { id: 1, business_id: 10, is_active: true, deleted_at: null, cooldown_hours: 24, last_triggered_at: new Date('2026-11-10T09:59:59Z') }], // 24h+1s elapsed
+        [2, { id: 2, business_id: 10, is_active: true, deleted_at: null, cooldown_hours: 24, last_triggered_at: new Date('2026-11-11T05:00:00Z') }], // only 5h elapsed
+        [3, { id: 3, business_id: 10, is_active: true, deleted_at: null, cooldown_hours: null, last_triggered_at: new Date('2026-11-11T08:00:00Z') }], // NULL -> COALESCE 24h -> 2h elapsed (blocked)
+        [4, { id: 4, business_id: 10, is_active: true, deleted_at: null, cooldown_hours: null, last_triggered_at: new Date('2026-11-09T00:00:00Z') }], // NULL -> COALESCE 24h -> >24h elapsed (claimed)
+        [5, { id: 5, business_id: 10, is_active: false, deleted_at: null, cooldown_hours: 24, last_triggered_at: null }], // inactive (blocked)
+        [6, { id: 6, business_id: 10, is_active: true, deleted_at: new Date('2026-11-01T00:00:00Z'), cooldown_hours: 24, last_triggered_at: null }], // soft-deleted (blocked)
       ]);
 
       const execSpy = jest.spyOn(pool, 'execute').mockImplementation(async (sql, params) => {
         expect(sql).toContain('SET last_triggered_at = ?');
+        expect(sql).toContain('AND business_id = ?');
         expect(sql).toContain('TIMESTAMPDIFF(SECOND, last_triggered_at, ?) >= COALESCE(cooldown_hours, 24) * 3600');
-        const [setTs, targetId, cmpTs] = params;
+        const [setTs, targetId, targetBizId, cmpTs] = params;
         expect(setTs).toBe(cmpTs);
 
         const r = rowsById.get(targetId);
@@ -928,6 +929,7 @@ describe('Phase 2 — Alert Rule Engine & Notification Pipeline', () => {
           : Infinity;
         const matched = Boolean(
           r &&
+          r.business_id === targetBizId &&
           r.is_active === true &&
           r.deleted_at === null &&
           (r.last_triggered_at === null || diffSec >= effCooldownSec)
@@ -939,13 +941,14 @@ describe('Phase 2 — Alert Rule Engine & Notification Pipeline', () => {
         return [{ affectedRows: 0 }];
       });
 
-      expect(await alertRuleRepository.claimTriggerCooldown(1, now)).toBe(true);
-      expect(await alertRuleRepository.claimTriggerCooldown(2, now)).toBe(false);
-      expect(await alertRuleRepository.claimTriggerCooldown(3, now)).toBe(false);
-      expect(await alertRuleRepository.claimTriggerCooldown(4, now)).toBe(true);
-      expect(await alertRuleRepository.claimTriggerCooldown(5, now)).toBe(false);
-      expect(await alertRuleRepository.claimTriggerCooldown(6, now)).toBe(false);
-      expect(execSpy).toHaveBeenCalledTimes(6);
+      expect(await alertRuleRepository.claimTriggerCooldown(1, now, 10)).toBe(true);
+      expect(await alertRuleRepository.claimTriggerCooldown(2, now, 10)).toBe(false);
+      expect(await alertRuleRepository.claimTriggerCooldown(3, now, 10)).toBe(false);
+      expect(await alertRuleRepository.claimTriggerCooldown(4, now, 999)).toBe(false); // wrong tenant denied
+      expect(await alertRuleRepository.claimTriggerCooldown(4, now, 10)).toBe(true);  // real owning tenant succeeds
+      expect(await alertRuleRepository.claimTriggerCooldown(5, now, 10)).toBe(false);
+      expect(await alertRuleRepository.claimTriggerCooldown(6, now, 10)).toBe(false);
+      expect(execSpy).toHaveBeenCalledTimes(7);
     });
   });
 });

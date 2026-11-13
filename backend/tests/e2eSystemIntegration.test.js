@@ -84,50 +84,83 @@ describe('Phase 12 — End-to-End System Integration QA', () => {
     // -----------------------------------------------------------------------
     // Step 2: Business Onboarding & Profile Creation (FR-BIZ-01, 02)
     // -----------------------------------------------------------------------
-    jest.spyOn(businessRepository, 'findByUserId').mockResolvedValueOnce(null); // No existing business
-    jest.spyOn(businessRepository, 'industryExists').mockResolvedValueOnce(true);
-    jest.spyOn(knowledgeBaseRepository, 'findIndustryById').mockResolvedValueOnce({
-      id: 1,
-      name: 'Packaged Drinking Water',
-      slug: 'packaged-drinking-water',
+    jest.spyOn(businessRepository, 'findByUserId').mockImplementationOnce(async (uid) => {
+      expect(uid).toBe(101);
+      return null;
     });
-    jest.spyOn(businessRepository, 'create').mockResolvedValueOnce({
-      id: 42,
-      user_id: 101,
-      industry_id: 1,
-      name: 'PureAqua Bottlers Pvt Ltd',
-      city: 'Indore',
-      country: 'India',
+    jest.spyOn(businessRepository, 'industryExists').mockImplementationOnce(async (indId) => {
+      expect(indId).toBe(1);
+      return true;
+    });
+    jest.spyOn(businessRepository, 'create').mockImplementationOnce(async (payload) => {
+      expect(payload).toEqual({
+        userId: 101,
+        industryId: 1,
+        name: 'PureAqua Bottlers Pvt Ltd',
+        contactEmail: 'procurement@pureaqua.in',
+        contactPhone: undefined,
+        address: 'Indore, India',
+      });
+      return {
+        id: 42,
+        user_id: 101,
+        industry_id: 1,
+        name: 'PureAqua Bottlers Pvt Ltd',
+        contact_email: 'procurement@pureaqua.in',
+        address: 'Indore, India',
+      };
     });
 
-    // Mock template material generation during onboarding
-    jest.spyOn(knowledgeBaseRepository, 'getRawMaterialsForTemplateGeneration').mockResolvedValueOnce([
-      { id: 1, name: 'PET Resin', default_unit_id: 1, default_external_symbol: 'WTI', industry_slug: 'packaged-drinking-water' },
-      { id: 2, name: 'Bottle Caps', default_unit_id: 2, default_external_symbol: null, industry_slug: 'packaged-drinking-water' },
-      { id: 3, name: 'Labels', default_unit_id: 2, default_external_symbol: null, industry_slug: 'packaged-drinking-water' },
-      { id: 4, name: 'Cartons', default_unit_id: 2, default_external_symbol: null, industry_slug: 'packaged-drinking-water' },
-      { id: 5, name: 'Shrink Film', default_unit_id: 1, default_external_symbol: 'WTI', industry_slug: 'packaged-drinking-water' },
-    ]);
-    jest.spyOn(materialRepository, 'bulkCreateFromTemplate').mockResolvedValueOnce(5);
+    // Strict template material generation mocks matching real signatures and return structure
+    jest.spyOn(knowledgeBaseRepository, 'getRawMaterialsForTemplateGeneration').mockImplementationOnce(async (indId) => {
+      expect(indId).toBe(1);
+      return [
+        { id: 1, name: 'PET Resin', default_unit_id: 1, default_external_symbol: 'WTI', industry_slug: 'packaged-drinking-water' },
+        { id: 2, name: 'Bottle Caps', default_unit_id: 2, default_external_symbol: null, industry_slug: 'packaged-drinking-water' },
+        { id: 3, name: 'Labels', default_unit_id: 2, default_external_symbol: null, industry_slug: 'packaged-drinking-water' },
+        { id: 4, name: 'Cartons', default_unit_id: 2, default_external_symbol: null, industry_slug: 'packaged-drinking-water' },
+        { id: 5, name: 'Shrink Film', default_unit_id: 1, default_external_symbol: 'WTI', industry_slug: 'packaged-drinking-water' },
+      ];
+    });
+    jest.spyOn(materialRepository, 'bulkCreateFromTemplate').mockImplementationOnce(async (bizId, rawMaterials) => {
+      expect(bizId).toBe(42);
+      expect(Array.isArray(rawMaterials)).toBe(true);
+      expect(rawMaterials).toHaveLength(5);
+      expect(rawMaterials[0]).toEqual(expect.objectContaining({ id: 1, external_symbol: 'WTI' }));
+      return {
+        materialsGenerated: 5,
+        createdMaterials: [
+          { id: 501, rawMaterialId: 1, businessId: 42, unitId: 1, externalSymbol: 'WTI' },
+          { id: 502, rawMaterialId: 2, businessId: 42, unitId: 2, externalSymbol: null },
+          { id: 503, rawMaterialId: 3, businessId: 42, unitId: 2, externalSymbol: null },
+          { id: 504, rawMaterialId: 4, businessId: 42, unitId: 2, externalSymbol: null },
+          { id: 505, rawMaterialId: 5, businessId: 42, unitId: 1, externalSymbol: 'WTI' },
+        ],
+      };
+    });
+    jest.spyOn(priceRepository, 'findLatestPriceByExternalSymbol').mockResolvedValue(null);
 
     const mockTrackedMaterials = [
-      { id: 501, business_id: 42, raw_material_id: 1, name: 'PET Resin', is_tracked: 1, external_symbol: 'WTI' },
-      { id: 502, business_id: 42, raw_material_id: 2, name: 'Bottle Caps', is_tracked: 1, external_symbol: null },
-      { id: 503, business_id: 42, raw_material_id: 3, name: 'Labels', is_tracked: 1, external_symbol: null },
-      { id: 504, business_id: 42, raw_material_id: 4, name: 'Cartons', is_tracked: 1, external_symbol: null },
-      { id: 505, business_id: 42, raw_material_id: 5, name: 'Shrink Film', is_tracked: 1, external_symbol: 'WTI' },
+      { id: 501, business_id: 42, raw_material_id: 1, name: 'PET Resin', unit_abbreviation: 'kg', is_tracked: 1, external_symbol: 'WTI' },
+      { id: 502, business_id: 42, raw_material_id: 2, name: 'Bottle Caps', unit_abbreviation: 'pcs', is_tracked: 1, external_symbol: null },
+      { id: 503, business_id: 42, raw_material_id: 3, name: 'Labels', unit_abbreviation: 'pcs', is_tracked: 1, external_symbol: null },
+      { id: 504, business_id: 42, raw_material_id: 4, name: 'Cartons', unit_abbreviation: 'pcs', is_tracked: 1, external_symbol: null },
+      { id: 505, business_id: 42, raw_material_id: 5, name: 'Shrink Film', unit_abbreviation: 'kg', is_tracked: 1, external_symbol: 'WTI' },
     ];
     jest.spyOn(materialRepository, 'listByBusinessId').mockResolvedValue(mockTrackedMaterials);
 
-    const createdBusiness = await businessService.createBusiness(101, {
+    const createdBusiness = await businessService.createBusiness({
+      userId: 101,
       name: 'PureAqua Bottlers Pvt Ltd',
       industryId: 1,
-      city: 'Indore',
-      country: 'India',
+      contactEmail: 'procurement@pureaqua.in',
+      address: 'Indore, India',
     });
 
     expect(createdBusiness.id).toBe(42);
     expect(createdBusiness.industryId).toBe(1);
+    expect(createdBusiness.materialsGenerated).toBe(5);
+    expect(createdBusiness.materials).toHaveLength(5);
 
     // -----------------------------------------------------------------------
     // Step 3: Verify Automated Template Material Tracking (FR-TPL-01–03, FR-MAT-01)
@@ -255,7 +288,7 @@ describe('Phase 12 — End-to-End System Integration QA', () => {
     expect(triggeredEvents).toHaveLength(1);
     expect(triggeredEvents[0].id).toBe(1001);
     expect(notificationService.sendAlertNotification).toHaveBeenCalled();
-    expect(alertRuleRepository.claimTriggerCooldown).toHaveBeenCalledWith(801, expect.any(Date));
+    expect(alertRuleRepository.claimTriggerCooldown).toHaveBeenCalledWith(801, expect.any(Date), 42);
 
     // Verify cooldown defense: subsequent evaluation within 24h skips notification
     jest.spyOn(alertRuleRepository, 'listActiveByBusinessId').mockResolvedValueOnce([
@@ -299,7 +332,7 @@ describe('Phase 12 — End-to-End System Integration QA', () => {
       { id: 801, condition_type: 'PRICE_ABOVE', threshold_price: '0.50', is_active: 1 },
     ]);
     jest.spyOn(alertEventRepository, 'listByBusinessId').mockResolvedValueOnce([
-      { id: 1001, triggered_price: '0.55', created_at: '2026-07-18' },
+      { id: 1001, triggered_price: '0.55', triggered_at: '2026-07-18' },
     ]);
     jest.spyOn(syncStatusRepository, 'findAll').mockResolvedValueOnce([
       { job_type: 'PRICE_INGESTION', last_run_at: '2026-07-18', last_success_at: '2026-07-18', last_status: 'SUCCESS' },
@@ -312,6 +345,7 @@ describe('Phase 12 — End-to-End System Integration QA', () => {
     expect(dashboard.recentNews).toHaveLength(1);
     expect(dashboard.activeAlertRules).toHaveLength(1);
     expect(dashboard.recentAlertEvents).toHaveLength(1);
+    expect(dashboard.recentAlertEvents[0].triggeredAt).toBe('2026-07-18');
     expect(dashboard.sync.lastPriceSyncAt).toBe('2026-07-18');
 
     // -----------------------------------------------------------------------

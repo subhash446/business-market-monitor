@@ -80,7 +80,10 @@ async function updateRule(businessId, ruleId, updates) {
   };
   assertValidRuleConfig(merged);
 
-  const updated = await alertRuleRepository.update(ruleId, merged);
+  const updated = await alertRuleRepository.update(ruleId, merged, businessId);
+  if (!updated) {
+    throw new AppError(404, 'NOT_FOUND', 'Alert rule not found');
+  }
   return toPublicRule(updated);
 }
 
@@ -90,7 +93,10 @@ async function deleteRule(businessId, ruleId) {
     throw new AppError(404, 'NOT_FOUND', 'Alert rule not found');
   }
 
-  const deletedAt = await alertRuleRepository.softDelete(ruleId);
+  const deletedAt = await alertRuleRepository.softDelete(ruleId, businessId);
+  if (!deletedAt) {
+    throw new AppError(404, 'NOT_FOUND', 'Alert rule not found');
+  }
   const formattedDeletedAt = deletedAt instanceof Date ? deletedAt.toISOString() : deletedAt;
   return { id: Number(ruleId), deletedAt: formattedDeletedAt };
 }

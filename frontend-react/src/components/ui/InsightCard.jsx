@@ -33,7 +33,10 @@
 
 import { useState } from 'react';
 import { formatRelativeTime, formatDate, formatPrice, getSafeExternalUrl } from '../../utils/format.js';
-import { classifyInsightBenchmarkDisclosure } from '../../utils/insightDisclosure.js';
+import {
+  classifyEvidencePriceBadge,
+  classifyInsightBenchmarkDisclosure,
+} from '../../utils/insightDisclosure.js';
 import { getInsightEvidence } from '../../api/aiInsights.api.js';
 import './InsightCard.css';
 
@@ -291,11 +294,7 @@ export function InsightCard({
                                   </td>
                                   <td>
                                     <span className={`evidence-class-badge evidence-class-badge--${(pt.data_class || 'quote').toLowerCase()}`}>
-                                      {pt.data_class === 'OFFICIAL_BENCHMARK'
-                                        ? 'Official Benchmark'
-                                        : pt.data_class === 'MARKET_INDICATIVE'
-                                        ? 'Proxy Benchmark'
-                                        : 'Supplier Quote'}
+                                      {classifyEvidencePriceBadge(pt)}
                                     </span>
                                   </td>
                                   <td>

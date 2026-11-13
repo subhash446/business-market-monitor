@@ -8,30 +8,90 @@
  */
 
 const GOI_PROVIDER_HINT = 'data.gov.in';
+const GOI_SOURCE_HINTS = ['data.gov.in', 'agmarknet', 'moafw'];
 const GOI_TEXT_HINTS = ['mandi', 'agmarknet', 'inr/quintal', 'data.gov.in'];
 const CRUDE_TEXT_HINTS = ['wti', 'brent', 'crude', 'usd/bbl', 'global commodity proxy', 'upstream benchmark'];
 
-function isGoiPriceEvidence(point) {
-  if (!point || point.currency !== 'INR') return false;
-  if (point.data_class === 'MARKET_INDICATIVE' || point.data_class === 'OFFICIAL_BENCHMARK') {
-    return true;
-  }
+function getExplicitProxyFlag(point) {
+  if (typeof point?.is_proxy === 'boolean') return point.is_proxy;
+  if (typeof point?.isProxy === 'boolean') return point.isProxy;
+  return null;
+}
+
+function hasGoiSourceMarkers(point) {
+  if (!point) return false;
+  if (point.source === 'GOVERNMENT_DATASET') return true;
   if (point.unit_label === 'INR/quintal') return true;
-  if (typeof point.provider_name === 'string' && point.provider_name.toLowerCase().includes(GOI_PROVIDER_HINT)) {
-    return true;
+  if (typeof point.provider_name === 'string') {
+    const providerLower = point.provider_name.toLowerCase();
+    if (GOI_SOURCE_HINTS.some((hint) => providerLower.includes(hint))) {
+      return true;
+    }
   }
-  if (typeof point.source_url === 'string' && point.source_url.includes(GOI_PROVIDER_HINT)) {
+  if (typeof point.source_url === 'string' && point.source_url.toLowerCase().includes(GOI_PROVIDER_HINT)) {
     return true;
   }
   return false;
 }
 
+function isGoiPriceEvidence(point) {
+  if (!point) return false;
+  if (point.source === 'MANUAL' || point.data_class === 'SUPPLIER_QUOTE') return false;
+  if (getExplicitProxyFlag(point) === true) return false;
+  if (hasGoiSourceMarkers(point) && point.currency !== 'USD') {
+    return true;
+  }
+  if (point.currency !== 'INR') return false;
+  return point.data_class === 'MARKET_INDICATIVE' || point.data_class === 'OFFICIAL_BENCHMARK';
+}
+
 function isCrudeProxyPriceEvidence(point) {
   if (!point) return false;
-  if (point.is_proxy === true) return true;
+  const explicitProxy = getExplicitProxyFlag(point);
+  if (explicitProxy !== null) return explicitProxy;
+  if (point.source === 'MANUAL' || point.data_class === 'SUPPLIER_QUOTE') return false;
   if (point.currency === 'USD' || point.unit_label === 'USD/bbl') return true;
-  if (point.currency === 'INR') return false;
+  if (hasGoiSourceMarkers(point) || point.currency === 'INR') return false;
   return point.data_class === 'OFFICIAL_BENCHMARK' || point.data_class === 'MARKET_INDICATIVE';
+}
+
+/**
+ * Classify the evidence table badge label for a single price point consistently
+ * with InsightCard benchmark disclosures and source/isProxy provenance.
+ *
+ * @param {object|null|undefined} point
+ * @returns {'Official Benchmark' | 'Proxy Benchmark' | 'Mandi Benchmark' | 'Market Indicative' | 'Supplier Quote'}
+ */
+export function classifyEvidencePriceBadge(point) {
+  if (!point) return 'Supplier Quote';
+
+  if (point.data_class === 'OFFICIAL_BENCHMARK') {
+    return 'Official Benchmark';
+  }
+
+  if (point.data_class === 'MARKET_INDICATIVE') {
+    const explicitProxy = getExplicitProxyFlag(point);
+    if (explicitProxy === true) {
+      return 'Proxy Benchmark';
+    }
+    if (explicitProxy === false) {
+      return hasGoiSourceMarkers(point)
+        ? 'Mandi Benchmark'
+        : 'Market Indicative';
+    }
+    if (point.source === 'MANUAL') {
+      return 'Market Indicative';
+    }
+    if (isCrudeProxyPriceEvidence(point)) {
+      return 'Proxy Benchmark';
+    }
+    if (isGoiPriceEvidence(point)) {
+      return hasGoiSourceMarkers(point) ? 'Mandi Benchmark' : 'Market Indicative';
+    }
+    return 'Market Indicative';
+  }
+
+  return 'Supplier Quote';
 }
 
 /**

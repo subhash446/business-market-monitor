@@ -21,6 +21,7 @@
 
 const env = require('../config/env');
 const { SUPPORTED_SYMBOLS, COMMODITY_METADATA } = require('../config/commodityMapping');
+const { PRICE_SOURCE } = require('../constants/enums');
 
 // Mapping of internal symbols to data.gov.in query parameters
 const GOI_MAPPINGS = Object.freeze({
@@ -264,6 +265,7 @@ async function fetchLatestPrices(symbols) {
       symbol,
       price: roundedPrice,
       recordedAt: latestDate,
+      source: meta.priceSource || PRICE_SOURCE.GOVERNMENT_DATASET,
       currency: meta.currency || 'INR',
       unitLabel: meta.unitLabel || 'INR/quintal',
       dataClass: meta.dataClass || 'MARKET_INDICATIVE',

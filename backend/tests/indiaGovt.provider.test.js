@@ -154,6 +154,7 @@ describe('indiaGovt.provider', () => {
       expect(results).toHaveLength(1);
       const wheat = results[0];
       expect(wheat.symbol).toBe('WHEAT_GOI');
+      expect(wheat.source).toBe('GOVERNMENT_DATASET');
       // Latest date is 09/11/2026 -> 2026-11-09. Khanna (2600) + Karnal (2700) / 2 = 2650.00
       expect(wheat.recordedAt).toBe('2026-11-09');
       expect(wheat.price).toBe(2650);

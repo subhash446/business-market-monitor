@@ -36,6 +36,7 @@ import { ResetPasswordPage }  from './pages/auth/ResetPasswordPage.jsx';
 import { OnboardingPage }     from './pages/OnboardingPage.jsx';
 import { DashboardPage }     from './pages/DashboardPage.jsx';
 import { MaterialsPage }     from './pages/MaterialsPage.jsx';
+import { MaterialImpactPage } from './pages/MaterialImpactPage.jsx';
 import { PricesPage }        from './pages/PricesPage.jsx';
 import { TrendsPage }        from './pages/TrendsPage.jsx';
 import { NewsPage }          from './pages/NewsPage.jsx';
@@ -75,6 +76,7 @@ function App() {
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/materials" element={<MaterialsPage />} />
+                <Route path="/materials/:materialId/impact" element={<MaterialImpactPage />} />
                 <Route path="/prices"    element={<PricesPage />} />
                 <Route path="/trends"    element={<TrendsPage />} />
                 <Route path="/alerts"    element={<AlertsPage />} />

@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router  = express.Router();
 const aiInsightController = require('../controllers/aiInsight.controller');
 const authMiddleware      = require('../middleware/auth.middleware');
@@ -17,6 +17,14 @@ router.get(
   '/:materialId/ai-insights',
   authMiddleware,
   aiInsightController.listHistory
+);
+
+// GET /api/v1/materials/:materialId/impact-analysis
+// Read-only multi-hop Knowledge Base impact analysis for one tracked material
+router.get(
+  '/:materialId/impact-analysis',
+  authMiddleware,
+  aiInsightController.getImpactAnalysis
 );
 
 module.exports = router;

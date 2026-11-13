@@ -360,16 +360,17 @@ export function OnboardingPage() {
                             justifyContent: 'space-between',
                             alignItems: 'center',
                             padding: 'var(--space-2) var(--space-3)',
-                            backgroundColor: 'var(--color-surface-subtle, #f9fafb)',
-                            borderRadius: 'var(--radius-sm, 6px)',
-                            border: '1px solid var(--color-border-subtle, #f3f4f6)',
+                            backgroundColor: 'var(--color-bg-elevated)',
+                            color: 'var(--color-text-primary)',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--color-border)',
                           }}
                         >
                           <div>
-                            <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{mat.name}</span>{' '}
-                            <span className="text-xs text-muted">({mat.defaultUnit || mat.unit})</span>
+                            <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>{mat.name}</span>{' '}
+                            <span className="text-xs text-secondary">({mat.defaultUnit || mat.unit})</span>
                             {mat.disclaimer && (
-                              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px', maxWidth: '420px', lineHeight: 1.25 }}>
+                              <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '2px', maxWidth: '420px', lineHeight: 1.25 }}>
                                 {mat.disclaimer}
                               </span>
                             )}
@@ -390,7 +391,7 @@ export function OnboardingPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-muted" style={{ margin: 0 }}>
+                    <p className="text-xs text-secondary" style={{ margin: 0 }}>
                       {selectedIndustryName === 'FMCG'
                         ? 'FMCG is configured as a flexible generic template. You can track custom materials tailored to your specific product lines after setup.'
                         : 'No default materials pre-configured. Custom materials can be added from the Materials tab.'}
@@ -596,8 +597,8 @@ export function OnboardingPage() {
                     </strong>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                       {createdBusiness.materials.map((m) => (
-                        <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)', padding: 'var(--space-1) 0', borderBottom: '1px solid var(--color-border-subtle, #f3f4f6)' }}>
-                          <span><strong>{m.name}</strong> <span className="text-muted">({m.unit})</span></span>
+                        <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-xs)', padding: 'var(--space-1) 0', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
+                          <span><strong>{m.name}</strong> <span className="text-secondary">({m.unit})</span></span>
                           {m.hasAutomatedFeed ? (
                             <span className="badge badge--info" style={{ fontSize: '10px' }}>
                               <i className="fa-solid fa-bolt" style={{ marginRight: '3px' }} aria-hidden="true" />

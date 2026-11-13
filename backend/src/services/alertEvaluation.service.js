@@ -149,7 +149,7 @@ async function evaluateMaterial(businessId, trackedMaterialId) {
     }
 
     // 3. Atomically claim trigger cooldown before creating event or dispatching notification
-    const claimed = await alertRuleRepository.claimTriggerCooldown(rule.id, new Date());
+    const claimed = await alertRuleRepository.claimTriggerCooldown(rule.id, new Date(), businessId);
     if (!claimed) {
       continue;
     }

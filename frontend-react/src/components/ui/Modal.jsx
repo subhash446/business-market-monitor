@@ -25,6 +25,11 @@
 
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  handleModalBackdropClick,
+  handleModalEscapeKey,
+  safeInvokeClose,
+} from '../../utils/modalHelpers.js';
 
 /* Focusable element selector — mirrors dom.js getFocusableElements() */
 const FOCUSABLE_SELECTOR = [
@@ -97,10 +102,7 @@ export function Modal({
     if (!isOpen) return;
 
     function handleKeyDown(e) {
-      if (e.key === 'Escape') {
-        onClose();
-        return;
-      }
+      if (handleModalEscapeKey(e, onClose)) return;
       if (e.key === 'Tab' && backdropRef.current) {
         const focusable = getFocusable(backdropRef.current);
         if (focusable.length === 0) return;
@@ -134,7 +136,7 @@ export function Modal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={`${id}-title`}
-      onClick={e => { if (e.target === backdropRef.current) onClose(); }}
+      onClick={e => handleModalBackdropClick(e, backdropRef.current, onClose)}
     >
       <div className={`modal${sizeClass}`} id={id}>
         {/* Header */}
@@ -144,7 +146,7 @@ export function Modal({
             type="button"
             className="modal__close"
             aria-label="Close dialog"
-            onClick={onClose}
+            onClick={() => safeInvokeClose(onClose)}
           >
             <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>

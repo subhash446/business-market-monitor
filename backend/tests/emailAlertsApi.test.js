@@ -426,7 +426,7 @@ describe('Phase 9 — Email Alerts API', () => {
       expect(alertRuleRepository.findByIdForBusiness).toHaveBeenCalledWith('200', 42);
       expect(alertRuleRepository.update).toHaveBeenCalledWith('200', expect.objectContaining({
         isActive: false,
-      }));
+      }), 42);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: expect.objectContaining({
@@ -464,7 +464,7 @@ describe('Phase 9 — Email Alerts API', () => {
       expect(alertRuleRepository.update).toHaveBeenCalledWith('200', expect.objectContaining({
         conditionType: 'PRICE_BELOW',
         thresholdPrice: '140.00',
-      }));
+      }), 42);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: expect.objectContaining({
@@ -566,7 +566,7 @@ describe('Phase 9 — Email Alerts API', () => {
       await alertController.deleteAlertRule(req, res, next);
 
       expect(alertRuleRepository.findByIdForBusiness).toHaveBeenCalledWith('200', 42);
-      expect(alertRuleRepository.softDelete).toHaveBeenCalledWith('200');
+      expect(alertRuleRepository.softDelete).toHaveBeenCalledWith('200', 42);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: {
@@ -617,17 +617,20 @@ describe('Phase 9 — Email Alerts API', () => {
       );
     });
 
-    test('5.4 repository softDelete sets deleted_at = NOW() (never hard deletes)', async () => {
+    test('5.4 repository softDelete sets deleted_at = NOW() scoped by business_id (never hard deletes)', async () => {
       const executeSpy = jest.spyOn(pool, 'execute')
-        .mockResolvedValueOnce([{}])
+        .mockResolvedValueOnce([{ affectedRows: 1 }])
         .mockResolvedValueOnce([[{ deleted_at: '2026-07-18T10:00:00Z' }]]);
 
-      const deletedAt = await alertRuleRepository.softDelete(200);
+      const deletedAt = await alertRuleRepository.softDelete(200, 42);
 
       expect(executeSpy).toHaveBeenCalledTimes(2);
       const [updateSql, updateParams] = executeSpy.mock.calls[0];
-      expect(updateSql).toContain('UPDATE alert_rules SET deleted_at = NOW() WHERE id = ?');
-      expect(updateParams).toEqual([200]);
+      const [selectSql, selectParams] = executeSpy.mock.calls[1];
+      expect(updateSql).toContain('UPDATE alert_rules SET deleted_at = NOW() WHERE id = ? AND business_id = ? AND deleted_at IS NULL');
+      expect(updateParams).toEqual([200, 42]);
+      expect(selectSql).toContain('WHERE id = ? AND business_id = ?');
+      expect(selectParams).toEqual([200, 42]);
       expect(deletedAt).toBe('2026-07-18T10:00:00Z');
     });
 
@@ -809,6 +812,39 @@ describe('Phase 9 — Email Alerts API', () => {
 
       expect(eventsA.items[0].id).toBe(50);
       expect(eventsB.items[0].id).toBe(60);
+    });
+
+    test('7.3 tenant-scoped alertRule repository mutations reject missing businessId and block cross-tenant updates', async () => {
+      await expect(
+        alertRuleRepository.update(200, { thresholdPrice: 99 })
+      ).rejects.toThrow(/businessId must be a positive integer/);
+      await expect(
+        alertRuleRepository.softDelete(200, null)
+      ).rejects.toThrow(/businessId must be a positive integer/);
+      await expect(
+        alertRuleRepository.updateLastTriggeredAt(200, new Date(), undefined)
+      ).rejects.toThrow(/businessId must be a positive integer/);
+      await expect(
+        alertRuleRepository.claimTriggerCooldown(200, new Date(), 0)
+      ).rejects.toThrow(/businessId must be a positive integer/);
+
+      const executeSpy = jest.spyOn(pool, 'execute').mockResolvedValue([{ affectedRows: 0 }]);
+
+      await expect(
+        alertRuleRepository.update(200, { thresholdPrice: 99, isActive: false }, 999)
+      ).resolves.toBeNull();
+      await expect(
+        alertRuleRepository.softDelete(200, 999)
+      ).resolves.toBeNull();
+      await expect(
+        alertRuleRepository.updateLastTriggeredAt(200, new Date(), 999)
+      ).resolves.toBe(false);
+
+      expect(executeSpy).toHaveBeenCalledTimes(3);
+      for (const [sql, params] of executeSpy.mock.calls) {
+        expect(sql).toContain('AND business_id = ?');
+        expect(params[params.length - 1]).toBe(999);
+      }
     });
 
   });

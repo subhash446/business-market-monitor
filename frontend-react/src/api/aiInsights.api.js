@@ -36,11 +36,55 @@
  *   generated_at:                string,  -- ISO datetime
  * }
  *
- * SECURITY: This module only reads stored insights. It never triggers
- * AI generation. The Gemini API key never appears here.
+ * SECURITY: This module only reads stored insights and structural impact analyses.
+ * It never triggers AI generation. The Gemini API key never appears here.
  */
 
-import { get } from './client.js';
+import { ApiError, get } from './client.js';
+
+export const DEFAULT_IMPACT_MAX_DEPTH = 3;
+export const HARD_IMPACT_MAX_DEPTH = 4;
+
+/**
+ * Fetch read-only multi-hop Knowledge Base impact analysis, empirical evidence,
+ * and latest stored AI insight for one tracked material.
+ *
+ * GET /api/v1/materials/:materialId/impact-analysis[?maxDepth=1..4]
+ *
+ * @param {number|string} materialId — tracked_materials.id
+ * @param {{ maxDepth?: number|string }} [options]
+ * @returns {Promise<object>}
+ */
+export async function getMaterialImpactAnalysis(materialId, { maxDepth } = {}) {
+  const matStr = String(materialId ?? '').trim();
+  if (!/^[1-9]\d*$/.test(matStr)) {
+    throw new ApiError('Invalid material ID.', 'VALIDATION_ERROR', 400);
+  }
+
+  let resolvedDepth = DEFAULT_IMPACT_MAX_DEPTH;
+  if (maxDepth !== undefined) {
+    const rawStr = typeof maxDepth === 'string' ? maxDepth.trim() : maxDepth;
+    if (maxDepth === null || typeof maxDepth === 'boolean' || rawStr === '') {
+      throw new ApiError(
+        `Invalid maxDepth value. Expected an integer between 1 and ${HARD_IMPACT_MAX_DEPTH}.`,
+        'VALIDATION_ERROR',
+        400
+      );
+    }
+    const parsedDepth = typeof maxDepth === 'number' ? maxDepth : Number(rawStr);
+    if (!Number.isInteger(parsedDepth) || parsedDepth < 1 || parsedDepth > HARD_IMPACT_MAX_DEPTH) {
+      throw new ApiError(
+        `Invalid maxDepth value "${String(maxDepth)}". Expected an integer between 1 and ${HARD_IMPACT_MAX_DEPTH}.`,
+        'VALIDATION_ERROR',
+        400
+      );
+    }
+    resolvedDepth = parsedDepth;
+  }
+
+  const { data } = await get(`/materials/${matStr}/impact-analysis`, { maxDepth: resolvedDepth });
+  return data;
+}
 
 /**
  * Fetch the latest AI insight for one tracked material.

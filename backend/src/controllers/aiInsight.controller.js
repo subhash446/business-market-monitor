@@ -8,6 +8,7 @@
  * material ownership is verified inside aiInsightQuery.service.
  */
 const aiInsightQueryService = require('../services/aiInsightQuery.service');
+const kbImpactService = require('../services/kbImpact.service');
 const resolveBusinessId = require('../utils/resolveBusinessId');
 const { parsePagination } = require('../utils/pagination');
 const { sendSuccess } = require('../utils/response');
@@ -78,4 +79,27 @@ async function getEvidence(req, res, next) {
   }
 }
 
-module.exports = { getLatest, listHistory, listLatestForBusiness, getEvidence };
+// GET /api/v1/materials/:materialId/impact-analysis
+// Read-only multi-hop KB impact analysis + empirical evidence + latest stored insight.
+// Never triggers synchronous LLM generation.
+async function getImpactAnalysis(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const analysis = await kbImpactService.getMaterialImpactAnalysis(
+      businessId,
+      req.params.materialId,
+      req.query
+    );
+    sendSuccess(res, analysis);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getLatest,
+  listHistory,
+  listLatestForBusiness,
+  getEvidence,
+  getImpactAnalysis,
+};

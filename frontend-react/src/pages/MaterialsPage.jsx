@@ -627,6 +627,12 @@ function ActionLinks({ material }) {
       >
         History
       </Link>
+      <Link
+        to={`/materials/${material.id}/impact`}
+        className="btn btn--sm btn--ghost"
+      >
+        Impact
+      </Link>
     </div>
   );
 }

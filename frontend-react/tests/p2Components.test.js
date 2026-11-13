@@ -96,6 +96,46 @@ describe('P2 JSX Component Verification (InsightCard & TrendsPage)', () => {
     assert.equal(html.includes('Domestic Mandi Benchmark Disclosure'), true);
     assert.equal(html.includes('global commodity proxy pricing (USD/bbl)'), false);
 
+    // Non-proxy GOI MARKET_INDICATIVE rows must render Mandi Benchmark, NEVER Proxy Benchmark
+    assert.equal(html.includes('Mandi Benchmark'), true);
+    assert.equal(html.includes('Proxy Benchmark'), false);
+
+    // Genuine proxy MARKET_INDICATIVE records MUST still render Proxy Benchmark alongside Upstream disclosure
+    const proxyIndicativeHtml = renderToStaticMarkup(
+      React.createElement(InsightCard, {
+        defaultShowEvidence: true,
+        insight: {
+          id: 12,
+          headline: 'Crude feedstock proxy climbed.',
+          what_happened: 'EIA backfill benchmark moved upward.',
+          why_it_happened: 'Supply tightening.',
+          business_impact: 'Downstream polymer pressure.',
+          outlook: 'BULLISH',
+          confidence: 'MEDIUM',
+          evidence_price_points_count: 1,
+          evidence_news_count: 0,
+          generated_at: '2026-11-10T10:00:00Z',
+          model_used: 'gemini-3.6-flash',
+          evidence_prices: [
+            {
+              id: 21,
+              recorded_at: '2026-11-10',
+              price: 68.4,
+              currency: 'USD',
+              unit_label: 'USD/bbl',
+              source: 'THIRD_PARTY_API',
+              data_class: 'MARKET_INDICATIVE',
+              provider_name: 'U.S. Energy Information Administration (EIA)',
+              source_url: 'https://www.eia.gov',
+            },
+          ],
+        },
+      })
+    );
+    assert.equal(proxyIndicativeHtml.includes('Upstream Benchmark Disclosure'), true);
+    assert.equal(proxyIndicativeHtml.includes('Proxy Benchmark'), true);
+    assert.equal(proxyIndicativeHtml.includes('Domestic Mandi Benchmark Disclosure'), false);
+
     // Provider name and article title remain rendered safely as non-link spans
     assert.equal(html.includes('<span>Malicious Price Provider</span>'), true);
     assert.equal(html.includes('<span class="insight-evidence__article-title">XSS News Headline</span>'), true);
@@ -155,5 +195,96 @@ describe('P2 JSX Component Verification (InsightCard & TrendsPage)', () => {
 
     assert.equal(html.includes('Select a material\u2026'), true);
     assert.equal(html.includes('\u00e2\u20ac\u00a6'), false);
+  });
+
+  test('T-01.2 — NewsCard preserves safe http/https links and blocks javascript:/data: schemes', async () => {
+    const { NewsCard } = await viteServer.ssrLoadModule('/src/pages/NewsPage.jsx');
+
+    const safeHttpsHtml = renderToStaticMarkup(
+      React.createElement(NewsCard, {
+        item: {
+          id: 1,
+          title: 'Global Packaging Resin Outlook',
+          url: 'https://example.com/news/resin',
+          sourceName: 'Market Wire',
+          publishedAt: '2026-11-10T08:00:00Z',
+        },
+      })
+    );
+    assert.equal(safeHttpsHtml.includes('<a '), true);
+    assert.equal(safeHttpsHtml.includes('href="https://example.com/news/resin"'), true);
+    assert.equal(safeHttpsHtml.includes('target="_blank"'), true);
+    assert.equal(safeHttpsHtml.includes('rel="noopener noreferrer"'), true);
+
+    const safeHttpHtml = renderToStaticMarkup(
+      React.createElement(NewsCard, {
+        item: {
+          id: 2,
+          title: 'Local Freight Update',
+          url: 'http://example.org/freight',
+          sourceName: 'Freight Daily',
+        },
+      })
+    );
+    assert.equal(safeHttpHtml.includes('href="http://example.org/freight"'), true);
+    assert.equal(safeHttpHtml.includes('rel="noopener noreferrer"'), true);
+
+    for (const unsafeUrl of [
+      'javascript:alert(1)',
+      '  JaVaScRiPt:alert(document.cookie)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+    ]) {
+      const unsafeHtml = renderToStaticMarkup(
+        React.createElement(NewsCard, {
+          item: {
+            id: 3,
+            title: 'Untrusted News Item',
+            url: unsafeUrl,
+            sourceName: 'Suspicious Feed',
+          },
+        })
+      );
+      assert.equal(unsafeHtml.includes('<a '), false);
+      assert.equal(unsafeHtml.includes('<a>'), false);
+      assert.equal(unsafeHtml.includes('href='), false);
+      assert.equal(unsafeHtml.includes('Untrusted News Item'), true);
+    }
+  });
+
+  test('T-01.3 — OnboardingPage uses defined dark theme tokens from variables.css', () => {
+    const onboardingPath = path.join(frontendRoot, 'src/pages/OnboardingPage.jsx');
+    const variablesPath = path.join(frontendRoot, 'src/styles/variables.css');
+    const onboardingSrc = fs.readFileSync(onboardingPath, 'utf8');
+    const variablesSrc = fs.readFileSync(variablesPath, 'utf8');
+
+    assert.equal(onboardingSrc.includes('--color-surface-subtle'), false);
+    assert.equal(onboardingSrc.includes('--color-border-subtle'), false);
+    assert.equal(onboardingSrc.includes('#f9fafb'), false);
+    assert.equal(onboardingSrc.includes('#f3f4f6'), false);
+    assert.equal(onboardingSrc.includes('text-muted'), false);
+
+    assert.equal(onboardingSrc.includes('var(--color-bg-elevated)'), true);
+    assert.equal(onboardingSrc.includes('var(--color-border)'), true);
+
+    const definedTokens = new Set(
+      Array.from(variablesSrc.matchAll(/(--[a-z0-9-]+)\s*:/g), (m) => m[1])
+    );
+    for (const match of onboardingSrc.matchAll(/var\((--[a-z0-9-]+)/g)) {
+      assert.equal(definedTokens.has(match[1]), true, `Undefined CSS variable ${match[1]} in OnboardingPage.jsx`);
+    }
+  });
+
+  test('T-01.4 — Modal compiles safely and wires Escape/backdrop/close through safe dismiss helpers', async () => {
+    const { Modal } = await viteServer.ssrLoadModule('/src/components/ui/Modal.jsx');
+    const closedMarkup = renderToStaticMarkup(
+      React.createElement(Modal, { isOpen: false, onClose: undefined, title: 'Settings' })
+    );
+    assert.equal(closedMarkup, '');
+
+    const modalSrc = fs.readFileSync(path.join(frontendRoot, 'src/components/ui/Modal.jsx'), 'utf8');
+    assert.equal(modalSrc.includes('handleModalEscapeKey(e, onClose)'), true);
+    assert.equal(modalSrc.includes('handleModalBackdropClick(e, backdropRef.current, onClose)'), true);
+    assert.equal(modalSrc.includes('safeInvokeClose(onClose)'), true);
   });
 });

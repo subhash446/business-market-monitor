@@ -32,11 +32,15 @@ const materialRepository = require('../repositories/material.repository');
 const priceRepository = require('../repositories/price.repository');
 const newsRepository = require('../repositories/news.repository');
 const syncStatusRepository = require('../repositories/syncStatus.repository');
-const knowledgeBaseRepository = require('../repositories/knowledgeBase.repository');
+const kbImpactService = require('../services/kbImpact.service');
 
 const { filterRelevantNews } = require('../utils/newsRelevance');
 const { generateAndStore } = require('../services/aiInsight.service');
 const { JOB_TYPE, JOB_STATUS } = require('../constants/enums');
+const {
+  collectRuntimeSecrets,
+  sanitizeErrorMessage,
+} = require('../utils/aiInsightValidation');
 
 // In-memory overlap prevention flag.
 // Reset in finally -- no stale lock on restart.
@@ -44,6 +48,10 @@ let isRunning = false;
 
 // Price history window for evidence.
 const PRICE_HISTORY_DAYS = 30;
+
+function formatSafeJobError(err) {
+  return sanitizeErrorMessage(err, collectRuntimeSecrets(env)) || 'Unknown error';
+}
 
 /**
  * Core insights generation logic.
@@ -97,7 +105,7 @@ async function runInsights() {
   } catch (syncErr) {
     logger.warn(
       '[ai-insights] Could not write run-start to sync_statuses:',
-      syncErr.message
+      formatSafeJobError(syncErr)
     );
   }
 
@@ -155,7 +163,7 @@ async function runInsights() {
             '[ai-insights] Could not fetch prices for materialId=' +
               material.id +
               ':',
-            priceErr.message
+            formatSafeJobError(priceErr)
           );
 
           totalErrors++;
@@ -165,11 +173,42 @@ async function runInsights() {
         }
 
         // ---------------------------------------------------------------
-        // 2b. Fetch and filter news evidence
+        // 2b. Resolve multi-hop KB dependencies + fetch/filter news evidence
         // ---------------------------------------------------------------
+        let kbImpact = null;
         let newsHeadlines = [];
 
         if (material.industry_id) {
+          // Built-in raw materials have KB dependency relationships.
+          // Custom materials have no raw_material_id and therefore use
+          // material-name matching only.
+          if (material.raw_material_id) {
+            try {
+              kbImpact = await kbImpactService.fetchMultiHopImpactForMaterial({
+                rawMaterialId: material.raw_material_id,
+                industryId: material.industry_id,
+                materialName: material.name,
+              });
+
+              if (kbImpact && kbImpact.coverage === 'kb_unavailable') {
+                logger.warn(
+                  '[ai-insights] Could not fetch KB dependencies for materialId=' +
+                    material.id +
+                    ': ' +
+                    (kbImpact.errorNote || 'KB unavailable')
+                );
+              }
+            } catch (kbErr) {
+              // KB lookup failure is non-fatal.
+              logger.warn(
+                '[ai-insights] Could not fetch KB dependencies for materialId=' +
+                  material.id +
+                  ': ' +
+                  formatSafeJobError(kbErr)
+              );
+            }
+          }
+
           try {
             const candidateNews =
               await newsRepository.listRecentByIndustry(
@@ -183,40 +222,14 @@ async function runInsights() {
               ? candidateNews
               : [];
 
-            let externalFactorNames = [];
-
-            // Built-in raw materials have KB dependency relationships.
-            // Custom materials have no raw_material_id and therefore use
-            // material-name matching only.
-            if (material.raw_material_id) {
-              try {
-                const dependencies =
-                  await knowledgeBaseRepository.getDependenciesForRawMaterial(
-                    material.raw_material_id,
-                    material.industry_id
-                  );
-
-                externalFactorNames = dependencies
-                  .map(
-                    (dependency) =>
-                      dependency.external_factor_name
-                  )
-                  .filter(Boolean);
-              } catch (kbErr) {
-                // KB lookup failure is non-fatal.
-                logger.warn(
-                  '[ai-insights] Could not fetch KB dependencies for materialId=' +
-                    material.id +
-                    ': ' +
-                    kbErr.message
-                );
-              }
-            }
+            const kbTerms = Array.isArray(kbImpact?.relevanceTerms)
+              ? kbImpact.relevanceTerms
+              : [];
 
             newsHeadlines = filterRelevantNews(
               safeCandidateNews,
               material.name,
-              externalFactorNames,
+              kbTerms,
               5
             );
 
@@ -227,8 +240,10 @@ async function runInsights() {
                 safeCandidateNews.length +
                 ' relevant=' +
                 newsHeadlines.length +
-                ' externalFactors=' +
-                externalFactorNames.length
+                ' kbTerms=' +
+                kbTerms.length +
+                ' kbChains=' +
+                (kbImpact?.chains?.length || 0)
             );
           } catch (newsErr) {
             // News failure is non-fatal.
@@ -238,7 +253,7 @@ async function runInsights() {
                 ' industryId=' +
                 material.industry_id +
                 ' (proceeding with prices only): ' +
-                newsErr.message
+                formatSafeJobError(newsErr)
             );
           }
         }
@@ -252,6 +267,7 @@ async function runInsights() {
           materialName: material.name,
           prices,
           newsHeadlines,
+          kbImpact,
         });
 
         if (result.status === 'generated') {
@@ -285,7 +301,7 @@ async function runInsights() {
             businessId: material.business_id,
             code:       result.error?.code || 'UNKNOWN',
             statusCode: result.error?.statusCode || result.error?.status || null,
-            message:    result.error?.message || String(result.error),
+            message:    result.error ? formatSafeJobError(result.error) : 'AI insight generation failed',
           };
           errorDetails.push(errorInfo);
 
@@ -308,7 +324,7 @@ async function runInsights() {
 
     logger.error(
       '[ai-insights] Unexpected run-level error:',
-      unexpectedErr.message
+      formatSafeJobError(unexpectedErr)
     );
   } finally {
     // Always release the overlap guard.
@@ -345,7 +361,7 @@ async function runInsights() {
   } catch (syncErr) {
     logger.warn(
       '[ai-insights] Could not write run-end to sync_statuses:',
-      syncErr.message
+      formatSafeJobError(syncErr)
     );
   }
 

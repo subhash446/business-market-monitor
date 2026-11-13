@@ -30,7 +30,7 @@ import { Skeleton }    from '../components/ui/Skeleton.jsx';
 import { EmptyState }  from '../components/ui/EmptyState.jsx';
 import { ErrorState }  from '../components/ui/ErrorState.jsx';
 import { Pagination }  from '../components/ui/Pagination.jsx';
-import { formatDate }  from '../utils/format.js';
+import { formatDate, getSafeExternalUrl } from '../utils/format.js';
 import '../styles/pages/news.css';
 
 const STATUS = { LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
@@ -119,16 +119,17 @@ export function NewsPage() {
  * url may be null — render plain text title when absent.
  * External links: target="_blank" rel="noopener noreferrer"
  * ================================================================ */
-function NewsCard({ item }) {
+export function NewsCard({ item }) {
+  const safeUrl = getSafeExternalUrl(item?.url);
   return (
     <article className="news-card">
 
       {/* Title — external link if url present, plain text otherwise */}
       <h3 className="news-card__title">
-        {item.url ? (
+        {safeUrl ? (
           <>
             <a
-              href={item.url}
+              href={safeUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -140,7 +141,7 @@ function NewsCard({ item }) {
             />
           </>
         ) : (
-          item.title
+          item?.title
         )}
       </h3>
 

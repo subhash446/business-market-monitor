@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for aiInsights.job.js -- runInsights()
  *
  * Covers:
@@ -423,4 +423,129 @@ test('15. start() registers cron with correct expression and UTC timezone', () =
     expect.any(Function),
     expect.objectContaining({ timezone: 'UTC' })
   );
+});
+
+test('16. T-04: redacts secrets in error logs/details while isolating failure per material', async () => {
+  const logger = require('../src/utils/logger');
+  materialRepo.findAllTracked.mockResolvedValue([makeMaterial(10, 5, 2), makeMaterial(11, 6, 2)]);
+  priceRepo.findHistoryForMaterial.mockResolvedValue(makePrices(10));
+  newsRepo.listRecentByIndustry.mockResolvedValue([]);
+
+  aiInsightService.generateAndStore
+    .mockResolvedValueOnce({
+      status: 'error',
+      error: new Error('Request failed for https://api.example.com?key=AIzaSyLeakSecretKey1234567890abcdef password=SuperSecretPassword'),
+      materialId: 10,
+      businessId: 5,
+    })
+    .mockResolvedValueOnce(GENERATED_RESULT(11, 6));
+
+  const result = await runInsights();
+
+  expect(result.status).toBe('FAILED');
+  expect(result.errors).toBe(1);
+  expect(result.generated).toBe(1);
+  expect(result.errorDetails[0].message).not.toContain('AIzaSyLeakSecretKey1234567890abcdef');
+  expect(result.errorDetails[0].message).not.toContain('SuperSecretPassword');
+  expect(result.errorDetails[0].message).toContain('***');
+
+  const errorLogs = logger.error.mock.calls.flat().join(' ');
+  expect(errorLogs).not.toContain('AIzaSyLeakSecretKey1234567890abcdef');
+  expect(errorLogs).not.toContain('SuperSecretPassword');
+});
+
+
+test('17. T-05: resolves multi-hop KB impact chains for news filtering and passes kbImpact to generateAndStore', async () => {
+  knowledgeBaseRepo.getMultiHopImpactEdges = jest.fn().mockResolvedValue([
+    {
+      dependency_id: 1,
+      depth: 1,
+      source_entity_type: 'RAW_MATERIAL',
+      source_entity_id: 3,
+      source_entity_name: 'Cartons',
+      target_entity_type: 'COST_DRIVER',
+      target_entity_id: 21,
+      target_entity_name: 'Packaging Cost',
+      dependency_type: 'DRIVES_COST',
+      description: null,
+    },
+    {
+      dependency_id: 2,
+      depth: 2,
+      source_entity_type: 'COST_DRIVER',
+      source_entity_id: 21,
+      source_entity_name: 'Packaging Cost',
+      target_entity_type: 'EXTERNAL_FACTOR',
+      target_entity_id: 31,
+      target_entity_name: 'GST / Regulatory Changes',
+      dependency_type: 'INFLUENCES',
+      description: 'GST slab adjustments impact packaging margins.',
+    },
+  ]);
+
+  materialRepo.findAllTracked.mockResolvedValue([
+    { ...makeMaterial(10, 5, 2), raw_material_id: 3, name: 'Cartons' },
+  ]);
+  priceRepo.findHistoryForMaterial.mockResolvedValue(makePrices(10));
+  newsRepo.listRecentByIndustry.mockResolvedValue([
+    {
+      id: 41,
+      title: 'GST changes expected to impact corrugated packaging costs',
+      source_name: 'Business Standard',
+      published_at: '2026-11-10',
+    },
+    {
+      id: 42,
+      title: 'Unrelated textile retail update',
+      source_name: 'Daily',
+      published_at: '2026-11-10',
+    },
+  ]);
+  aiInsightService.generateAndStore.mockResolvedValue(GENERATED_RESULT(10, 5));
+
+  const result = await runInsights();
+
+  expect(result.status).toBe('SUCCESS');
+  expect(result.generated).toBe(1);
+  expect(knowledgeBaseRepo.getMultiHopImpactEdges).toHaveBeenCalledWith(
+    3,
+    2,
+    { maxDepth: 3, maxPaths: 25 }
+  );
+
+  const call = aiInsightService.generateAndStore.mock.calls[0][0];
+  expect(call.newsHeadlines).toHaveLength(1);
+  expect(call.newsHeadlines[0].id).toBe(41);
+  expect(call.kbImpact.coverage).toBe('multi_hop');
+  expect(call.kbImpact.chains[0].depth).toBe(2);
+  expect(call.kbImpact.externalFactors).toContain('GST / Regulatory Changes');
+});
+
+test('18. T-05: multi-hop KB error is non-fatal and proceeds cleanly with prices and material-name news', async () => {
+  knowledgeBaseRepo.getMultiHopImpactEdges = jest
+    .fn()
+    .mockRejectedValue(new Error('CTE recursion error'));
+
+  materialRepo.findAllTracked.mockResolvedValue([
+    { ...makeMaterial(10, 5, 2), raw_material_id: 3 },
+  ]);
+  priceRepo.findHistoryForMaterial.mockResolvedValue(makePrices(10));
+  newsRepo.listRecentByIndustry.mockResolvedValue([
+    {
+      id: 51,
+      title: 'WTI Crude Oil benchmark rises moderately',
+      source_name: 'Reuters',
+      published_at: '2026-11-10',
+    },
+  ]);
+  aiInsightService.generateAndStore.mockResolvedValue(GENERATED_RESULT(10, 5));
+
+  const result = await runInsights();
+
+  expect(result.status).toBe('SUCCESS');
+  expect(result.generated).toBe(1);
+  const call = aiInsightService.generateAndStore.mock.calls[0][0];
+  expect(call.kbImpact.coverage).toBe('kb_unavailable');
+  expect(call.kbImpact.chains).toEqual([]);
+  expect(call.newsHeadlines).toHaveLength(1);
 });
