@@ -17,4 +17,7 @@ router.patch('/:materialId', authMiddleware, validate(validateUpdateMaterial), m
 // PATCH before /:materialId/... to avoid shadowing the general /:materialId route.
 router.patch('/:materialId/external-symbol', authMiddleware, validate(validateSetExternalSymbol), materialController.setExternalSymbol);
 
+// T-08: Supplier recommendations for a tracked material
+router.get('/:materialId/supplier-recommendations', authMiddleware, materialController.getSupplierRecommendations);
+
 module.exports = router;

@@ -102,3 +102,15 @@ export async function getUnitsOfMeasurement() {
   const { data } = await get('/units-of-measurement');
   return data;
 }
+
+/**
+ * Fetch supplier sourcing recommendations for a single tracked material (T-08).
+ * GET /api/v1/materials/:materialId/supplier-recommendations
+ *
+ * @param {number|string} materialId
+ * @returns {Promise<Object>}
+ */
+export async function getMaterialSupplierRecommendations(materialId) {
+  const { data } = await get(`/materials/${materialId}/supplier-recommendations`);
+  return data;
+}

@@ -89,6 +89,63 @@ function formatAlertMessage({
 }
 
 /**
+ * Format human-readable WhatsApp news & procurement digest text.
+ */
+function formatNewsDigestMessage({
+  businessName,
+  industryName,
+  frequency = 'WEEKLY',
+  topMovers = [],
+  topNews = [],
+  procurementActions = [],
+  generatedAt = null,
+}) {
+  const safeBusiness = businessName || 'Your Business';
+  const safeIndustry = industryName || 'Industry';
+  const freqLabel = String(frequency).toUpperCase() === 'DAILY' ? 'Daily' : (String(frequency).toUpperCase() === 'MONTHLY' ? 'Monthly' : 'Weekly');
+  const dt = generatedAt ? new Date(generatedAt) : new Date();
+  const dateStr = dt.toISOString().slice(0, 10);
+
+  const lines = [
+    `📰 *Business Market Monitor — ${freqLabel} Digest*`,
+    `🏢 *${safeBusiness}* (${safeIndustry}) | ${dateStr}`,
+    '',
+    `📊 *7-Day Price Movers:*`,
+  ];
+
+  if (topMovers && topMovers.length > 0) {
+    topMovers.slice(0, 5).forEach((m) => {
+      const sign = Number(m.changePercent) > 0 ? '+' : '';
+      const unit = m.unit ? `/${m.unit}` : '';
+      lines.push(`• *${m.materialName}*: ${m.currency || 'INR'} ${Number(m.latestPrice || 0).toFixed(2)}${unit} (${sign}${Number(m.changePercent || 0).toFixed(1)}%) [${m.trend || 'STABLE'}]`);
+    });
+  } else {
+    lines.push(`• All tracked materials stable.`);
+  }
+
+  lines.push('', `🎯 *Sourcing Actions:*`);
+  if (procurementActions && procurementActions.length > 0) {
+    procurementActions.slice(0, 3).forEach((a) => {
+      const action = String(a.actionRecommendation || a.action || 'MONITOR_ONLY').replace(/_/g, ' ');
+      lines.push(`• *${a.materialName}*: ${action} — ${a.rationale || a.bufferStrategy?.summary || 'Standard replenishment buffer.'}`);
+    });
+  } else {
+    lines.push(`• Standard inventory replenishment buffers maintained.`);
+  }
+
+  if (topNews && topNews.length > 0) {
+    lines.push('', `🗞️ *Industry Headlines:*`);
+    topNews.slice(0, 3).forEach((n) => {
+      lines.push(`• *${n.title}* (${n.sourceName || 'News'})`);
+    });
+  }
+
+  lines.push('', `_Open BMM dashboard for live trends, graphs & supplier benchmarks._`);
+
+  return lines.join('\n');
+}
+
+/**
  * Send a message via Meta WhatsApp Cloud API.
  *
  * @param {Object} options
@@ -189,5 +246,6 @@ module.exports = {
   redactPhoneNumber,
   sanitizeErrorMessage,
   formatAlertMessage,
+  formatNewsDigestMessage,
   sendMessage,
 };

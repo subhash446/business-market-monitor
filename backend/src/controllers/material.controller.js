@@ -9,6 +9,7 @@
  * Uses shared resolveBusinessId utility for tenant isolation.
  */
 const materialTrackingService = require('../services/materialTracking.service');
+const supplierRecommendationService = require('../services/supplierRecommendation.service');
 const resolveBusinessId = require('../utils/resolveBusinessId');
 const { sendSuccess } = require('../utils/response');
 
@@ -68,4 +69,18 @@ async function setExternalSymbol(req, res, next) {
   }
 }
 
-module.exports = { listMaterials, updateMaterial, addMaterial, setExternalSymbol };
+// GET /api/v1/materials/:materialId/supplier-recommendations — T-08
+async function getSupplierRecommendations(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const recommendation = await supplierRecommendationService.getMaterialSupplierRecommendations(
+      businessId,
+      req.params.materialId
+    );
+    sendSuccess(res, recommendation);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listMaterials, updateMaterial, addMaterial, setExternalSymbol, getSupplierRecommendations };

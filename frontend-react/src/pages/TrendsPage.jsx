@@ -51,7 +51,7 @@ import {
   Legend,
 } from 'chart.js';
 
-import { getMaterials }                    from '../api/materials.api.js';
+import { getMaterials, getMaterialSupplierRecommendations } from '../api/materials.api.js';
 import { getPriceHistory, comparePrices }  from '../api/trends.api.js';
 import { getLatestInsight }               from '../api/aiInsights.api.js';
 import { Skeleton }    from '../components/ui/Skeleton.jsx';
@@ -122,6 +122,11 @@ export function TrendsPage() {
   const [insightLoading, setInsightLoading] = useState(false);
   const [insightError,   setInsightError]   = useState(null);
 
+  /* Supplier recommendation state for Tab 1 */
+  const [supplierRec,        setSupplierRec]        = useState(null);
+  const [supplierRecLoading, setSupplierRecLoading] = useState(false);
+  const [supplierRecError,   setSupplierRecError]   = useState(null);
+
   /* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const checkedCount = useMemo(
     () => Object.values(checkedIds).filter(Boolean).length,
@@ -171,6 +176,27 @@ export function TrendsPage() {
         if (!cancelled) {
           setInsightError('Could not load AI insight for this material.');
           setInsightLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [phMaterialId]);
+
+  /* Fetch supplier recommendations when material selection changes */
+  useEffect(() => {
+    if (!phMaterialId) {
+      setSupplierRec(null);
+      setSupplierRecError(null);
+      return;
+    }
+    let cancelled = false;
+    setSupplierRecLoading(true);
+    setSupplierRecError(null);
+    getMaterialSupplierRecommendations(phMaterialId)
+      .then(data => { if (!cancelled) { setSupplierRec(data); setSupplierRecLoading(false); } })
+      .catch(() => {
+        if (!cancelled) {
+          setSupplierRecError('Could not load supplier sourcing recommendations.');
+          setSupplierRecLoading(false);
         }
       });
     return () => { cancelled = true; };
@@ -699,6 +725,12 @@ export function TrendsPage() {
               error={insightError}
               title={`AI Insight -- ${selectedHistMaterial?.name ?? 'Selected Material'}`}
             />
+            <SupplierGuidanceCard
+              rec={supplierRec}
+              loading={supplierRecLoading}
+              error={supplierRecError}
+              materialName={selectedHistMaterial?.name}
+            />
           </div>
         )}
       </div>
@@ -937,5 +969,158 @@ function CompareTable({ comparison }) {
         </tbody>
       </table>
     </>
+  );
+}
+
+/* ================================================================
+ * SUPPLIER SOURCING GUIDANCE CARD (T-08 / FR-ALERT-06)
+ * ================================================================ */
+export function SupplierGuidanceCard({ rec, loading, error, materialName }) {
+  if (loading) {
+    return (
+      <div className="card" style={{ marginTop: '16px' }}>
+        <div className="card__body">
+          <Skeleton type="card" rows={3} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card" style={{ marginTop: '16px' }}>
+        <div className="card__body">
+          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+            <i className="fa-solid fa-circle-exclamation mr-1" /> {error}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!rec) return null;
+
+  const action = rec.actionRecommendation || 'MONITOR_ONLY';
+  const actionLabel = action.replace(/_/g, ' ');
+
+  const badgeColor =
+    action === 'ACCELERATE_PURCHASE' ? '#f85149' :
+    action === 'DELAY_PURCHASE'      ? '#d29922' :
+    action === 'MAINTAIN_BUFFER'     ? '#58a6ff' : '#8b949e';
+
+  const badgeBg =
+    action === 'ACCELERATE_PURCHASE' ? 'rgba(248,81,73,0.15)' :
+    action === 'DELAY_PURCHASE'      ? 'rgba(210,153,34,0.15)' :
+    action === 'MAINTAIN_BUFFER'     ? 'rgba(88,166,255,0.15)' : 'rgba(139,148,158,0.15)';
+
+  return (
+    <div className="card" style={{ marginTop: '16px' }} id="supplier-guidance-card">
+      <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+        <h3 className="card__title" style={{ margin: 0, fontSize: '15px' }}>
+          <i className="fa-solid fa-boxes-packing mr-2" style={{ color: '#58a6ff' }} />
+          Supplier Sourcing &amp; Inventory Guidance — {materialName || 'Tracked Material'}
+        </h3>
+        <span style={{
+          padding: '4px 10px',
+          borderRadius: '12px',
+          fontSize: '11px',
+          fontWeight: 700,
+          background: badgeBg,
+          color: badgeColor,
+          letterSpacing: '0.03em',
+        }}>
+          {actionLabel}
+        </span>
+      </div>
+
+      <div className="card__body">
+        {/* Buffer strategy overview */}
+        <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: '6px', padding: '14px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#f0f6fc' }}>
+              Target Inventory Buffer: {rec.bufferStrategy?.targetBufferDays || 15} Days
+            </span>
+            <span style={{ fontSize: '11px', color: '#8b949e' }}>
+              Priority: <strong style={{ color: badgeColor }}>{rec.bufferStrategy?.priority || 'MEDIUM'}</strong>
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: '13px', color: '#c9d1d9', lineHeight: '1.5' }}>
+            {rec.bufferStrategy?.detailedGuidance || rec.rationale}
+          </p>
+        </div>
+
+        {/* Benchmark vs Supplier Quote Comparison */}
+        {rec.quoteComparison && (
+          <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: '6px', padding: '14px', marginBottom: '14px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#f0f6fc', marginBottom: '8px' }}>
+              <i className="fa-solid fa-scale-balanced mr-2" style={{ color: '#a855f7' }} />
+              Supplier Quote vs Market Benchmark
+            </div>
+
+            {rec.quoteComparison.variancePercent !== null ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', alignItems: 'center' }}>
+                <div style={{ background: '#0d1117', padding: '10px 12px', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '11px', color: '#8b949e' }}>Domestic Supplier Quote</div>
+                  <div style={{ fontSize: '15px', fontFamily: 'monospace', fontWeight: 600, color: '#f0f6fc' }}>
+                    {rec.quoteComparison.latestQuote?.currency || 'INR'} {Number(rec.quoteComparison.latestQuote?.price || 0).toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ background: '#0d1117', padding: '10px 12px', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '11px', color: '#8b949e' }}>Market Benchmark</div>
+                  <div style={{ fontSize: '15px', fontFamily: 'monospace', fontWeight: 600, color: '#f0f6fc' }}>
+                    {rec.quoteComparison.latestBenchmark?.currency || 'INR'} {Number(rec.quoteComparison.latestBenchmark?.price || 0).toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ background: '#0d1117', padding: '10px 12px', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '11px', color: '#8b949e' }}>Calculated Variance</div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: rec.quoteComparison.variancePercent > 0 ? '#f85149' : '#3fb950' }}>
+                    {rec.quoteComparison.variancePercent > 0 ? '+' : ''}{rec.quoteComparison.variancePercent}%
+                  </div>
+                </div>
+              </div>
+            ) : rec.quoteComparison.crossCurrencyNote ? (
+              <div style={{ background: 'rgba(210,153,34,0.1)', border: '1px solid rgba(210,153,34,0.3)', padding: '10px 12px', borderRadius: '4px', fontSize: '12px', color: '#d29922' }}>
+                <i className="fa-solid fa-circle-info mr-1" /> {rec.quoteComparison.crossCurrencyNote}
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: '#8b949e' }}>
+                Single price stream active. Ingest or upload domestic quotes to evaluate procurement variance against benchmarks.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Indian Market Diversification & Checklist */}
+        {rec.diversification && (
+          <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: '6px', padding: '14px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#f0f6fc', marginBottom: '6px' }}>
+              <i className="fa-solid fa-shield-halved mr-2" style={{ color: '#22c55e' }} />
+              Supply Chain Resilience ({rec.diversification.category})
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#8b949e', lineHeight: '1.4' }}>
+              <strong>Primary Hubs:</strong> {rec.diversification.primarySources}
+            </p>
+            <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#c9d1d9', lineHeight: '1.4' }}>
+              <strong>Sourcing Strategy:</strong> {rec.diversification.sourcingStrategy}
+            </p>
+
+            {rec.diversification.checklist && rec.diversification.checklist.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8b949e', marginBottom: '6px', fontWeight: 600 }}>
+                  Procurement Checklist
+                </div>
+                <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: '#c9d1d9' }}>
+                  {rec.diversification.checklist.map((item, idx) => (
+                    <li key={idx} style={{ marginBottom: '4px' }}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

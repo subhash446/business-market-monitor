@@ -69,6 +69,8 @@ const env = {
     // AI insights run after price ingestion (5 AM UTC) so fresh prices are
     // available. Default: 6 AM UTC daily.
     aiInsights: process.env.AI_INSIGHTS_CRON || '0 6 * * *',
+    // Periodic news digest runs daily at 7 AM UTC (after AI insights).
+    newsDigest: process.env.NEWS_DIGEST_CRON || '0 7 * * *',
   },
 
   govDataApiKey: process.env.GOV_DATA_API_KEY || '',
@@ -179,6 +181,12 @@ const env = {
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
     baseUrl: process.env.WHATSAPP_BASE_URL || 'https://graph.facebook.com/v20.0',
     timeoutMs: parseInt(process.env.WHATSAPP_TIMEOUT_MS, 10) || 15000,
+  },
+
+  // Periodic News & Market Digest job (FR-ALERT-06 / T-08).
+  // Opt-in: disabled by default (NEWS_DIGEST_ENABLED=true to activate).
+  newsDigest: {
+    enabled: (process.env.NEWS_DIGEST_ENABLED || 'false').toLowerCase() === 'true',
   },
 };
 

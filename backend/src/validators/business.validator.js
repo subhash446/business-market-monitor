@@ -7,6 +7,7 @@
 const { isValidEmail } = require('./auth.validator');
 
 const DIGEST_FREQUENCIES = ['DAILY', 'WEEKLY', 'MONTHLY'];
+const DIGEST_CHANNELS = ['EMAIL', 'WHATSAPP', 'BOTH'];
 
 // Production Hardening Phase B, finding C3: matches businesses.name
 // VARCHAR(200) (Document 4 §5.2) — rejected here before it ever reaches
@@ -54,6 +55,10 @@ function validateUpdateBusiness(body) {
 
   if (body.newsDigestFrequency !== undefined && !DIGEST_FREQUENCIES.includes(body.newsDigestFrequency)) {
     errors.push({ field: 'newsDigestFrequency', issue: `must be one of ${DIGEST_FREQUENCIES.join(', ')}` });
+  }
+
+  if (body.newsDigestChannel !== undefined && !DIGEST_CHANNELS.includes(body.newsDigestChannel)) {
+    errors.push({ field: 'newsDigestChannel', issue: `must be one of ${DIGEST_CHANNELS.join(', ')}` });
   }
 
   if (body.contactEmail !== undefined && body.contactEmail !== null && body.contactEmail !== '' && !isValidEmail(body.contactEmail)) {

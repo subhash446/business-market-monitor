@@ -34,11 +34,13 @@ import { useEffect, useRef, useState } from 'react';
 import { getBusiness, updateBusiness } from '../../api/business.api.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { isEmail } from '../../utils/validate.js';
+import { formatDateTime } from '../../utils/format.js';
 import { Modal } from './Modal.jsx';
 import { Skeleton } from './Skeleton.jsx';
 import { useToast } from './Toast.jsx';
 
 const DIGEST_VALUES = ['DAILY', 'WEEKLY', 'MONTHLY'];
+const DIGEST_CHANNELS = ['EMAIL', 'WHATSAPP', 'BOTH'];
 
 const EMPTY_FORM = {
   name:                '',
@@ -47,6 +49,8 @@ const EMPTY_FORM = {
   address:             '',
   newsDigestEnabled:   false,
   newsDigestFrequency: 'WEEKLY',
+  newsDigestChannel:   'EMAIL',
+  lastDigestSentAt:    null,
   industryDisplay:     '',
 };
 
@@ -60,6 +64,10 @@ function initFormFromBusiness(business) {
     newsDigestFrequency: DIGEST_VALUES.includes(business.newsDigestFrequency)
       ? business.newsDigestFrequency
       : 'WEEKLY',
+    newsDigestChannel:   DIGEST_CHANNELS.includes(business.newsDigestChannel)
+      ? business.newsDigestChannel
+      : 'EMAIL',
+    lastDigestSentAt:    business.lastDigestSentAt    ?? null,
     industryDisplay:     business.industryName        ?? '',
   };
 }
@@ -165,6 +173,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
     if (contactEmail) body.contactEmail = contactEmail;
     if (contactPhone) body.contactPhone = contactPhone;
     if (address)      body.address      = address;
+    if (digestOn && form.newsDigestChannel) body.newsDigestChannel = form.newsDigestChannel;
     if (digestOn && DIGEST_VALUES.includes(digestFreq)) {
       body.newsDigestFrequency = digestFreq;
     }
@@ -343,7 +352,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
                 onChange={handleChange}
               />
               <label className="form-check__label" htmlFor="bs-digest-enabled">
-                Enable news digest emails
+                Enable periodic news & sourcing digest
               </label>
             </div>
           </div>
@@ -367,6 +376,35 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Digest Channel — select */}
+          <div className="form-group">
+            <label className="form-label" htmlFor="bs-digest-channel">
+              Digest delivery channel
+            </label>
+            <select
+              id="bs-digest-channel"
+              name="newsDigestChannel"
+              className="form-control"
+              disabled={!form.newsDigestEnabled}
+              value={form.newsDigestChannel}
+              onChange={handleChange}
+            >
+              <option value="EMAIL">Email only</option>
+              <option value="WHATSAPP">WhatsApp only</option>
+              <option value="BOTH">Both Email &amp; WhatsApp</option>
+            </select>
+            {form.newsDigestEnabled && (form.newsDigestChannel === 'WHATSAPP' || form.newsDigestChannel === 'BOTH') && !form.contactPhone.trim() && (
+              <p className="text-warning text-xs mt-1" style={{ color: '#d97706', fontSize: '12px', marginTop: '6px' }}>
+                <i className="fa-solid fa-triangle-exclamation mr-1" /> WhatsApp alerts require a contact phone in E.164 format (e.g. +91 98765 43210).
+              </p>
+            )}
+            {form.lastDigestSentAt && (
+              <p className="text-muted text-xs mt-1" style={{ color: '#6b7280', fontSize: '12px', marginTop: '6px' }}>
+                <i className="fa-regular fa-clock mr-1" /> Last digest dispatched: {formatDateTime(form.lastDigestSentAt)}
+              </p>
+            )}
           </div>
 
         </form>

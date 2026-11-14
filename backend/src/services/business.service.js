@@ -68,6 +68,7 @@ async function updateBusiness(userId, updates) {
     address: updates.address ?? business.address,
     newsDigestEnabled: updates.newsDigestEnabled ?? !!business.news_digest_enabled,
     newsDigestFrequency: updates.newsDigestFrequency ?? business.news_digest_frequency,
+    newsDigestChannel: updates.newsDigestChannel ?? business.news_digest_channel ?? 'EMAIL',
   });
 
   return toPublicBusiness(updated);
@@ -84,6 +85,8 @@ function toPublicBusiness(business) {
     address: business.address,
     newsDigestEnabled: !!business.news_digest_enabled,
     newsDigestFrequency: business.news_digest_frequency,
+    newsDigestChannel: business.news_digest_channel || 'EMAIL',
+    lastDigestSentAt: business.last_digest_sent_at || null,
   };
 }
 

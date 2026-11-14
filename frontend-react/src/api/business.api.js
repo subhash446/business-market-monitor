@@ -106,3 +106,37 @@ export async function updateBusiness(fields) {
   const { data } = await put('/business', fields);
   return data;
 }
+
+/**
+ * Fetch structured preview of periodic news & procurement digest (T-08).
+ * GET /api/v1/business/news-digest/preview — requires auth
+ *
+ * @returns {Promise<Object>}
+ */
+export async function getDigestPreview() {
+  const { data } = await get('/business/news-digest/preview');
+  return data;
+}
+
+/**
+ * Trigger immediate dispatch of news digest for current business (T-08).
+ * POST /api/v1/business/news-digest/send-now — requires auth
+ *
+ * @param {{ channelOverride?: 'EMAIL'|'WHATSAPP'|'BOTH' }} [options]
+ * @returns {Promise<{ success: boolean, sentAt: string, channelUsed: string, digest: Object }>}
+ */
+export async function sendDigestNow(options = {}) {
+  const { data } = await post('/business/news-digest/send-now', options);
+  return data;
+}
+
+/**
+ * Fetch supplier sourcing recommendations across all tracked materials (T-08).
+ * GET /api/v1/business/supplier-recommendations — requires auth
+ *
+ * @returns {Promise<{ summary: Object, recommendations: Array<Object> }>}
+ */
+export async function getBusinessSupplierRecommendations() {
+  const { data } = await get('/business/supplier-recommendations');
+  return data;
+}

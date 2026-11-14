@@ -20,6 +20,7 @@ const priceIngestionJob = require('./src/jobs/priceIngestion.job');
 const newsIngestionJob  = require('./src/jobs/newsIngestion.job');
 const aiInsightsJob     = require('./src/jobs/aiInsights.job');
 const alertEvaluationJob = require('./src/jobs/alertEvaluation.job');
+const newsDigestJob      = require('./src/jobs/newsDigest.job');
 
 // Production Hardening Phase B, finding H4: graceful shutdown. Captures
 // the http.Server instance returned by app.listen() so it can be closed
@@ -29,10 +30,11 @@ const alertEvaluationJob = require('./src/jobs/alertEvaluation.job');
 // forever on a stuck shutdown.
 const SHUTDOWN_TIMEOUT_MS = 10000;
 let server;
-let priceJob; // node-cron ScheduledTask -- stopped during shutdown
-let newsJob;  // node-cron ScheduledTask -- stopped during shutdown
-let aiJob;    // node-cron ScheduledTask -- stopped during shutdown
-let alertJob; // node-cron ScheduledTask -- stopped during shutdown
+let priceJob;  // node-cron ScheduledTask -- stopped during shutdown
+let newsJob;   // node-cron ScheduledTask -- stopped during shutdown
+let aiJob;     // node-cron ScheduledTask -- stopped during shutdown
+let alertJob;  // node-cron ScheduledTask -- stopped during shutdown
+let digestJob; // node-cron ScheduledTask -- stopped during shutdown
 
 function shutdown(signal) {
   logger.info(`[server] Received ${signal}, shutting down gracefully...`);
@@ -62,6 +64,10 @@ function shutdown(signal) {
   if (alertJob) {
     alertJob.stop();
     logger.info('[server] Alert evaluation job stopped.');
+  }
+  if (digestJob) {
+    digestJob.stop();
+    logger.info('[server] News digest job stopped.');
   }
 
   if (!server) {
@@ -102,10 +108,11 @@ async function start() {
     // Start cron jobs after the server is confirmed listening — ensures
     // the DB pool is connected and the app is fully initialised before
     // the first job tick runs.
-    priceJob = priceIngestionJob.start();
-    newsJob  = newsIngestionJob.start();
-    aiJob    = aiInsightsJob.start();
-    alertJob = alertEvaluationJob.start();
+    priceJob  = priceIngestionJob.start();
+    newsJob   = newsIngestionJob.start();
+    aiJob     = aiInsightsJob.start();
+    alertJob  = alertEvaluationJob.start();
+    digestJob = newsDigestJob.start();
   });
 }
 

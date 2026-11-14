@@ -590,6 +590,21 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '030_add_news_digest_enhancements.js': {
+    tables: {
+      businesses: {
+        columns: {
+          news_digest_channel: { dataType: 'enum', columnTypeIncludes: ['EMAIL', 'WHATSAPP', 'BOTH'], isNullable: 'NO' },
+          last_digest_sent_at: { dataType: ['datetime', 'timestamp'], isNullable: 'YES' },
+        },
+      },
+      sync_statuses: {
+        columns: {
+          job_type: { dataType: 'enum', columnTypeIncludes: ['NEWS_DIGEST'], isNullable: 'NO' },
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {
