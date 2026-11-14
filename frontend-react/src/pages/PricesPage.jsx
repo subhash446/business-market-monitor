@@ -11,12 +11,13 @@
  *  - Supports optional currency, grade, and region in manual price entry
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getMaterials, updateMaterialTracking } from '../api/materials.api.js';
-import { getLatestPrice, getPriceSourceInfo, logPrice } from '../api/prices.api.js';
+import { getLatestPrice, getPriceSourceInfo, logPrice, bulkUploadPrices } from '../api/prices.api.js';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
+import { Modal } from '../components/ui/Modal.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
 import { formatPriceDisplay, formatUnitLabel, formatDate, toIsoDateString } from '../utils/format.js';
 import { resolveIsProxyPrice, refreshSourceInfoAfterManualQuote } from '../utils/priceSource.js';
@@ -37,8 +38,19 @@ export function PricesPage() {
   const [loadStatus, setLoadStatus] = useState(LOAD.LOADING);
   const [loadErrMsg, setLoadErrMsg] = useState('');
   const [material, setMaterial] = useState(null); // { id, name, unit, isTracked, ... }
+  const [allMaterials, setAllMaterials] = useState([]); // all tracked materials
   const [latestPrice, setLatestPrice] = useState(null); // { price, recordedAt, source, currency, ... } | null
   const [sourceInfo, setSourceInfo] = useState(null);
+
+  /* ── Bulk Upload Modal state ────────────────────────────────── */
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkMaterialId, setBulkMaterialId] = useState(materialId || '');
+  const [rawCsvText, setRawCsvText] = useState('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+  const [bulkError, setBulkError] = useState('');
+
+  const [todayIso] = useState(() => toIsoDateString(new Date()));
 
   /* ── Form state ─────────────────────────────────────────────── */
   const [price, setPrice] = useState('');
@@ -74,6 +86,8 @@ export function PricesPage() {
         getPriceSourceInfo(materialId),
       ]);
 
+      const trackedMaterials = (materials || []).filter((m) => m.isTracked);
+      setAllMaterials(trackedMaterials);
       const found = materials.find((m) => String(m.id) === String(materialId));
 
       if (!found) {
@@ -82,6 +96,7 @@ export function PricesPage() {
       }
 
       setMaterial(found);
+      setBulkMaterialId((prev) => prev || String(found.id));
       setLatestPrice(latest);
       setSourceInfo(srcInfo);
       setRecordedAt(toIsoDateString(new Date()));
@@ -107,6 +122,160 @@ export function PricesPage() {
       showToast({ type: 'success', message: `Tracking enabled for ${material.name}.` });
     } catch {
       showToast({ type: 'error', message: 'Failed to enable tracking. Please try again.' });
+    }
+  }
+
+  /* ── Parse CSV text whenever text or default material changes ──── */
+  const parsedRows = useMemo(() => {
+    if (!rawCsvText.trim()) {
+      return [];
+    }
+    const lines = rawCsvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      return [];
+    }
+
+    const firstLine = lines[0].toLowerCase();
+    const isHeader = firstLine.includes('date') || firstLine.includes('price') || firstLine.includes('material');
+    const dataLines = isHeader ? lines.slice(1) : lines;
+
+    return dataLines.map((line, idx) => {
+      const sep = line.includes('\t') ? '\t' : (line.includes(';') ? ';' : ',');
+      const parts = line.split(sep).map((p) => p.trim().replace(/^["']|["']$/g, ''));
+
+      let rowMatId = bulkMaterialId;
+      let rowDate = '';
+      let rowPrice = '';
+      let rowCurrency = 'INR';
+      let rowGrade = '';
+      let rowRegion = '';
+
+      if (parts.length >= 3 && /^\d+$/.test(parts[0]) && !Number.isNaN(Date.parse(parts[1]))) {
+        rowMatId = parts[0];
+        rowDate = parts[1];
+        rowPrice = parts[2];
+        if (parts[3]) rowCurrency = parts[3].toUpperCase();
+        if (parts[4]) rowGrade = parts[4];
+        if (parts[5]) rowRegion = parts[5];
+      } else {
+        rowDate = parts[0] || '';
+        rowPrice = parts[1] || '';
+        if (parts[2]) rowCurrency = parts[2].toUpperCase();
+        if (parts[3]) rowGrade = parts[3];
+        if (parts[4]) rowRegion = parts[4];
+      }
+
+      const errors = [];
+      const targetMat = allMaterials.find((m) => String(m.id) === String(rowMatId));
+      if (!rowMatId || !targetMat) {
+        errors.push('Unknown or untracked material');
+      }
+
+      const pNum = parseFloat(rowPrice);
+      if (!rowPrice || Number.isNaN(pNum) || pNum <= 0) {
+        errors.push('Price must be > 0');
+      }
+
+      const d = new Date(rowDate);
+      if (!rowDate || Number.isNaN(d.getTime())) {
+        errors.push('Invalid date');
+      } else if (rowDate.slice(0, 10) > todayIso) {
+        errors.push('Future date not allowed');
+      }
+
+      if (rowCurrency && !/^[A-Za-z]{3}$/.test(rowCurrency)) {
+        errors.push('Currency must be 3 letters (e.g. INR)');
+      }
+
+      return {
+        rowNumber: idx + 1,
+        trackedMaterialId: rowMatId ? Number(rowMatId) : null,
+        materialName: targetMat ? targetMat.name : (rowMatId ? `Material #${rowMatId}` : 'None'),
+        date: rowDate,
+        price: pNum,
+        rawPrice: rowPrice,
+        currency: rowCurrency || 'INR',
+        grade: rowGrade || '',
+        region: rowRegion || '',
+        isValid: errors.length === 0,
+        error: errors.join(', '),
+      };
+    });
+  }, [rawCsvText, bulkMaterialId, allMaterials, todayIso]);
+
+  function handleLoadSampleCsv() {
+    const today = new Date();
+    const d1 = toIsoDateString(new Date(today.getTime() - 2 * 86400000));
+    const d2 = toIsoDateString(new Date(today.getTime() - 86400000));
+    const d3 = toIsoDateString(today);
+    const sample = `Date, Price, Currency, Grade, Region\n${d1}, 112.50, INR, Standard FAQ, Gujarat Domestic\n${d2}, 113.20, INR, Standard FAQ, Gujarat Domestic\n${d3}, 114.00, INR, Premium Grade, Mumbai Domestic`;
+    setRawCsvText(sample);
+    setBulkResult(null);
+    setBulkError('');
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result;
+      if (typeof text === 'string') {
+        setRawCsvText(text);
+        setBulkResult(null);
+        setBulkError('');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleBulkSubmit() {
+    setBulkError('');
+    const validRows = parsedRows.filter((r) => r.isValid);
+    if (validRows.length === 0) {
+      setBulkError('No valid rows to upload. Please fix the errors highlighted in the preview.');
+      return;
+    }
+
+    if (validRows.length > 200) {
+      setBulkError('Maximum batch size is 200 rows. Please reduce your batch.');
+      return;
+    }
+
+    const payload = validRows.map((r) => ({
+      trackedMaterialId: r.trackedMaterialId,
+      price: r.price,
+      recordedAt: r.date,
+      currency: r.currency || 'INR',
+      grade: r.grade || null,
+      region: r.region || null,
+    }));
+
+    setBulkSubmitting(true);
+    try {
+      const res = await bulkUploadPrices(payload);
+      setBulkResult(res);
+      if (res.summary.inserted > 0) {
+        showToast({
+          type: 'success',
+          message: `Bulk upload completed: ${res.summary.inserted} price(s) recorded successfully.`,
+        });
+        await loadPage();
+      } else if (res.summary.skipped > 0 && res.summary.failed === 0) {
+        showToast({
+          type: 'info',
+          message: `All ${res.summary.skipped} row(s) were duplicates and skipped safely.`,
+        });
+      } else {
+        showToast({
+          type: 'warning',
+          message: `Upload finished: ${res.summary.inserted} inserted, ${res.summary.skipped} skipped, ${res.summary.failed} failed.`,
+        });
+      }
+    } catch (err) {
+      setBulkError(err?.message || 'Failed to upload price batch. Please try again.');
+    } finally {
+      setBulkSubmitting(false);
     }
   }
 
@@ -420,8 +589,21 @@ export function PricesPage() {
 
           {/* Price entry form */}
           <div className="card">
-            <div className="card__header">
+            <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
               <h2 className="card__title">Log a Price (Supplier Quote)</h2>
+              <button
+                type="button"
+                className="btn btn--sm btn--secondary"
+                id="pe-open-bulk-btn"
+                onClick={() => {
+                  setShowBulkModal(true);
+                  setBulkResult(null);
+                  setBulkError('');
+                }}
+              >
+                <i className="fa-solid fa-file-csv" style={{ marginRight: '6px' }} />
+                Bulk Upload Prices
+              </button>
             </div>
             <div className="card__body">
               {formErr && (
@@ -567,6 +749,249 @@ export function PricesPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Upload Modal */}
+      <Modal
+        isOpen={showBulkModal}
+        onClose={() => {
+          setShowBulkModal(false);
+          setBulkResult(null);
+          setBulkError('');
+        }}
+        title="Bulk Price Upload (CSV / Spreadsheet)"
+        size="lg"
+        id="bulk-price-upload-modal"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Instructions and Controls */}
+          <div>
+            <p className="text-sm text-secondary" style={{ margin: '0 0 0.75rem 0' }}>
+              Import multiple supplier quotes at once. Paste tabular data from Excel/Google Sheets, upload a CSV file, or load a sample template below.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+              {/* Default Material Selector */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" htmlFor="bulk-mat-select">
+                  Target Material (if omitted in CSV)
+                </label>
+                <select
+                  id="bulk-mat-select"
+                  className="form-control"
+                  value={bulkMaterialId}
+                  onChange={(e) => setBulkMaterialId(e.target.value)}
+                >
+                  {allMaterials.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.unit || m.unit_abbreviation || 'unit'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Action Buttons: Sample CSV & File Upload */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn--sm btn--secondary"
+                  id="bulk-load-sample-btn"
+                  onClick={handleLoadSampleCsv}
+                >
+                  <i className="fa-solid fa-file-lines" style={{ marginRight: '5px' }} />
+                  Load Sample CSV
+                </button>
+
+                <label className="btn btn--sm btn--ghost" style={{ cursor: 'pointer', margin: 0 }}>
+                  <i className="fa-solid fa-upload" style={{ marginRight: '5px' }} />
+                  Upload .CSV File
+                  <input
+                    type="file"
+                    accept=".csv,.txt,.tsv"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Paste Textarea */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" htmlFor="bulk-csv-textarea">
+              CSV or Tab-Delimited Data
+            </label>
+            <textarea
+              id="bulk-csv-textarea"
+              className="form-control font-mono"
+              rows={5}
+              placeholder={`Date, Price, Currency, Grade, Region\n2026-11-01, 112.50, INR, Grade A, Gujarat Domestic\n2026-11-02, 113.20, INR, Grade A, Gujarat Domestic`}
+              value={rawCsvText}
+              onChange={(e) => {
+                setRawCsvText(e.target.value);
+                setBulkResult(null);
+                setBulkError('');
+              }}
+            />
+          </div>
+
+          {/* Error Message */}
+          {bulkError && (
+            <div className="form-alert form-alert--error form-alert--visible" role="alert">
+              <span className="form-alert__message">{bulkError}</span>
+            </div>
+          )}
+
+          {/* Results Summary Card if submitted */}
+          {bulkResult && (
+            <div
+              className="bulk-summary-card"
+              style={{
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--color-border, #30363d)',
+                backgroundColor: 'var(--color-bg-secondary, #161b22)',
+              }}
+            >
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Upload Results Summary</h4>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <span className="badge badge--success">
+                  <i className="fa-solid fa-check" style={{ marginRight: '4px' }} />
+                  Inserted: {bulkResult.summary.inserted}
+                </span>
+                <span className="badge badge--warning">
+                  <i className="fa-solid fa-copy" style={{ marginRight: '4px' }} />
+                  Skipped (Duplicates): {bulkResult.summary.skipped}
+                </span>
+                {bulkResult.summary.failed > 0 && (
+                  <span className="badge badge--danger">
+                    <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }} />
+                    Failed: {bulkResult.summary.failed}
+                  </span>
+                )}
+              </div>
+
+              {/* Row Status Breakdown */}
+              <div style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '0.8125rem' }}>
+                <table className="table table--compact" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Material</th>
+                      <th>Status</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkResult.results.map((res, i) => (
+                      <tr key={i}>
+                        <td className="font-mono">{res.index + 1}</td>
+                        <td>{allMaterials.find((m) => m.id === res.trackedMaterialId)?.name || `ID ${res.trackedMaterialId}`}</td>
+                        <td>
+                          {res.status === 'inserted' && <span className="text-success font-semibold">Inserted</span>}
+                          {res.status === 'skipped' && <span className="text-warning font-semibold">Skipped</span>}
+                          {res.status === 'failed' && <span className="text-danger font-semibold">Failed</span>}
+                        </td>
+                        <td className="text-secondary">
+                          {res.status === 'inserted' && `Price ${res.price} ${res.currency || 'INR'}`}
+                          {res.status !== 'inserted' && (res.reason || '—')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pre-Flight Preview Table */}
+          {parsedRows.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span className="text-sm font-semibold">
+                  Pre-Flight Preview ({parsedRows.length} rows parsed &bull; {parsedRows.filter((r) => r.isValid).length} ready)
+                </span>
+                {parsedRows.length > 200 && (
+                  <span className="text-xs text-danger font-semibold">
+                    Warning: Exceeds 200 batch limit ({parsedRows.length}/200)
+                  </span>
+                )}
+              </div>
+
+              <div
+                style={{
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  border: '1px solid var(--color-border, #30363d)',
+                  borderRadius: '0.375rem',
+                }}
+              >
+                <table className="table table--compact" style={{ width: '100%', margin: 0 }}>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Material</th>
+                      <th>Date</th>
+                      <th>Price</th>
+                      <th>Currency</th>
+                      <th>Grade / Region</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedRows.map((row) => (
+                      <tr key={row.rowNumber} style={{ opacity: row.isValid ? 1 : 0.75 }}>
+                        <td className="font-mono">{row.rowNumber}</td>
+                        <td>{row.materialName}</td>
+                        <td className="font-mono">{row.date || '—'}</td>
+                        <td className="font-mono font-semibold">
+                          {row.price ? formatPriceDisplay(row.price, row.currency) : (row.rawPrice || '—')}
+                        </td>
+                        <td>{row.currency}</td>
+                        <td className="text-xs text-secondary">
+                          {[row.grade, row.region].filter(Boolean).join(' • ') || '—'}
+                        </td>
+                        <td>
+                          {row.isValid ? (
+                            <span className="badge badge--success" style={{ fontSize: '0.75rem' }}>Ready</span>
+                          ) : (
+                            <span className="badge badge--danger" style={{ fontSize: '0.75rem' }} title={row.error}>
+                              {row.error}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Footer / Actions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => {
+                setShowBulkModal(false);
+                setBulkResult(null);
+                setBulkError('');
+              }}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              id="bulk-submit-upload-btn"
+              className={`btn btn--primary${bulkSubmitting ? ' btn--loading' : ''}`}
+              disabled={bulkSubmitting || parsedRows.filter((r) => r.isValid).length === 0}
+              onClick={handleBulkSubmit}
+            >
+              Upload {parsedRows.filter((r) => r.isValid).length} Valid Row(s)
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

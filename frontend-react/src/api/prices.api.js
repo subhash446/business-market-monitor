@@ -64,3 +64,15 @@ export async function logPrice(materialId, priceData) {
   const { data } = await post(`/materials/${materialId}/prices`, priceData);
   return data;
 }
+
+/**
+ * Bulk upload price records for tracked materials.
+ * POST /api/v1/materials/prices/bulk
+ *
+ * @param {Array<object>} prices
+ * @returns {Promise<{ summary: { total: number, inserted: number, skipped: number, failed: number }, results: Array<object> }>}
+ */
+export async function bulkUploadPrices(prices) {
+  const { data } = await post('/materials/prices/bulk', { prices });
+  return data;
+}

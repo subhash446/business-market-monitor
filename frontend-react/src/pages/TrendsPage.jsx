@@ -356,8 +356,15 @@ export function TrendsPage() {
       const aligned = sortedDates.map(dt =>
         priceByDate.has(dt) ? priceByDate.get(dt) : null
       );
+      const firstPt = mat.series?.find(p => p.currency || p.unitLabel);
+      const curr = firstPt?.currency || 'INR';
+      const rawUnit = firstPt?.unitLabel || '';
+      const unitLabelStr = rawUnit.toUpperCase().includes(curr.toUpperCase())
+        ? ` (${rawUnit})`
+        : (rawUnit ? ` (${curr}/${rawUnit})` : ` (${curr})`);
+
       return {
-        label:           mat.name,
+        label:           `${mat.name}${unitLabelStr}`,
         data:            aligned,
         borderColor:     CHART_COLORS[idx % CHART_COLORS.length],
         backgroundColor: 'transparent',
@@ -416,6 +423,17 @@ export function TrendsPage() {
     () => comparison.reduce((s, m) => s + m.series.length, 0),
     [comparison],
   );
+
+  /* Distinct currencies across compared series — for multi-currency safeguards */
+  const uniqueCurrencies = useMemo(() => {
+    const set = new Set();
+    comparison.forEach(mat => {
+      mat.series?.forEach(pt => {
+        if (pt.currency) set.add(pt.currency.toUpperCase());
+      });
+    });
+    return Array.from(set);
+  }, [comparison]);
 
   /* â”€â”€ Cleanup charts on unmount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   useEffect(() => {
@@ -790,6 +808,32 @@ export function TrendsPage() {
 
           {cmpStatus === STATUS.SUCCESS && cmpTotalPoints > 0 && (
             <>
+              {uniqueCurrencies.length > 1 && (
+                <div
+                  className="alert alert--warning trends-currency-warning"
+                  role="alert"
+                  id="cmp-currency-warning"
+                  style={{
+                    marginBottom: 'var(--space-3)',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.75rem',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: '0.375rem',
+                    color: '#92400e',
+                    fontSize: '0.875rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <i className="fa-solid fa-triangle-exclamation" style={{ marginTop: '2px', color: '#d97706' }} aria-hidden="true" />
+                  <div>
+                    <strong>Multi-Currency Comparison Notice:</strong> Selected materials use different currencies ({uniqueCurrencies.join(' vs ')}). Chart values reflect nominal prices in each material's local unit and currency without FX conversion. Focus on relative trajectory and percentage trends rather than direct numeric comparison.
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>
                 <i className="fa-solid fa-circle-info" style={{ marginRight: '4px' }} />
                 Comparing multi-material trends. Series reflect respective benchmark units and currencies.
@@ -857,13 +901,18 @@ function CompareTable({ comparison }) {
           <tr>
             <th scope="col">Date</th>
             {comparison.map(mat => {
-              const unit = mat.series[0]?.unitLabel || mat.series[0]?.currency || null;
+              const pt = mat.series?.[0];
+              const curr = pt?.currency || 'INR';
+              const rawUnit = pt?.unitLabel || '';
+              const displayUnit = rawUnit.toUpperCase().includes(curr.toUpperCase())
+                ? rawUnit
+                : (rawUnit ? `${curr}/${rawUnit}` : curr);
               return (
                 <th key={mat.materialId} scope="col">
                   {mat.name}
-                  {unit && (
+                  {displayUnit && (
                     <span className="text-xs text-secondary" style={{ display: 'block', fontWeight: 'normal' }}>
-                      ({unit})
+                      ({displayUnit})
                     </span>
                   )}
                 </th>

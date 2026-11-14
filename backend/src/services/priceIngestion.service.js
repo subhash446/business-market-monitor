@@ -44,7 +44,14 @@ function resolveProviderSource(marketPrice, meta) {
   return PRICE_SOURCE.THIRD_PARTY_API;
 }
 
-const { normalizeCurrencyCode, isValidHttpUrl } = require('../utils/validationHelpers');
+const {
+  isStrictFiniteNumber,
+  isStrictPositiveInteger,
+  isValidCurrencyCode,
+  normalizeCurrencyCode,
+  isValidHttpUrl,
+} = require('../utils/validationHelpers');
+const logger = require('../utils/logger');
 
 async function addManualPrice(businessId, materialId, {
   price,
@@ -178,4 +185,314 @@ async function ingestFromProvider(trackedMaterial, marketPrice) {
   }
 }
 
-module.exports = { addManualPrice, ingestFromProvider };
+/**
+ * Bulk upload manual prices for tracked materials (V2 T-07).
+ *
+ * Scopes every material to businessId, enforces is_tracked = TRUE,
+ * performs per-row validation, guarantees idempotency against the
+ * unique constraint uq_price_points_material_date_source, and triggers
+ * alert evaluation once per affected material.
+ *
+ * Returns partial success breakdown:
+ *   { summary: { total, inserted, skipped, failed }, results: [...] }
+ *
+ * @param {number} businessId
+ * @param {Array<object>} prices
+ * @returns {Promise<{ summary: object, results: Array<object> }>}
+ */
+async function bulkAddPrices(businessId, prices) {
+  const summary = {
+    total: Array.isArray(prices) ? prices.length : 0,
+    inserted: 0,
+    skipped: 0,
+    failed: 0,
+  };
+  const results = [];
+  const affectedMaterialIds = new Set();
+  const materialCache = new Map();
+
+  const ALLOWED_DATA_CLASSES = ['OFFICIAL_BENCHMARK', 'MARKET_INDICATIVE', 'SUPPLIER_QUOTE'];
+
+  for (let index = 0; index < prices.length; index++) {
+    const item = prices[index];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      summary.failed++;
+      results.push({
+        index,
+        status: 'failed',
+        reason: 'Item must be an object',
+      });
+      continue;
+    }
+
+    const {
+      trackedMaterialId,
+      price,
+      recordedAt,
+      currency,
+      unitLabel,
+      region,
+      grade,
+      sourceUrl,
+      dataClass,
+    } = item;
+
+    // Validate trackedMaterialId
+    if (!isStrictPositiveInteger(trackedMaterialId)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: trackedMaterialId !== undefined ? trackedMaterialId : null,
+        status: 'failed',
+        reason: 'trackedMaterialId must be a positive integer',
+      });
+      continue;
+    }
+
+    const matId = Number(trackedMaterialId);
+
+    // Business ownership & tracking check
+    let material;
+    if (materialCache.has(matId)) {
+      material = materialCache.get(matId);
+    } else {
+      material = await materialRepository.findByIdForBusiness(matId, businessId);
+      materialCache.set(matId, material);
+    }
+
+    if (!material) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'Material not found or not tracked',
+      });
+      continue;
+    }
+
+    if (!material.is_tracked) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'Material is not currently tracked',
+      });
+      continue;
+    }
+
+    // Validate price
+    const numPrice = isStrictFiniteNumber(price) ? Number(price) : NaN;
+    if (Number.isNaN(numPrice) || numPrice <= 0) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'Price must be a number greater than 0',
+      });
+      continue;
+    }
+
+    // Validate recordedAt
+    if (!recordedAt) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'recordedAt is required',
+      });
+      continue;
+    }
+
+    const recordedDate = new Date(recordedAt);
+    if (Number.isNaN(recordedDate.getTime())) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'recordedAt must be a valid date',
+      });
+      continue;
+    }
+
+    if (recordedDate.getTime() > Date.now()) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'recordedAt cannot be in the future',
+      });
+      continue;
+    }
+
+    // Normalize recordedAt to YYYY-MM-DD 00:00:00 if date-only string
+    let normalizedRecordedAt = recordedAt;
+    if (typeof recordedAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recordedAt.trim())) {
+      normalizedRecordedAt = `${recordedAt.trim()} 00:00:00`;
+    }
+
+    // Validate currency
+    if (currency !== undefined && currency !== null && !isValidCurrencyCode(currency)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'currency must be a 3-letter alphabetic currency code (e.g. INR, USD)',
+      });
+      continue;
+    }
+    const resolvedCurrency = normalizeCurrencyCode(currency, 'INR');
+
+    // Validate unitLabel
+    if (unitLabel !== undefined && unitLabel !== null && (typeof unitLabel !== 'string' || unitLabel.length > 30)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'unitLabel must be a string up to 30 characters',
+      });
+      continue;
+    }
+    const resolvedUnitLabel = (typeof unitLabel === 'string' && unitLabel.trim())
+      ? unitLabel.trim()
+      : (material.unit_abbreviation || material.unit || null);
+
+    // Validate region
+    if (region !== undefined && region !== null && (typeof region !== 'string' || region.length > 100)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'region must be a string up to 100 characters',
+      });
+      continue;
+    }
+    const resolvedRegion = (typeof region === 'string' && region.trim()) ? region.trim() : 'Domestic (India)';
+
+    // Validate grade
+    if (grade !== undefined && grade !== null && (typeof grade !== 'string' || grade.length > 100)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'grade must be a string up to 100 characters',
+      });
+      continue;
+    }
+    const resolvedGrade = (typeof grade === 'string' && grade.trim()) ? grade.trim() : null;
+
+    // Validate sourceUrl
+    const trimmedSourceUrl = typeof sourceUrl === 'string' && sourceUrl.trim() ? sourceUrl.trim() : null;
+    if (trimmedSourceUrl && !isValidHttpUrl(trimmedSourceUrl, 500)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: 'sourceUrl must be a valid http or https URL string up to 500 characters',
+      });
+      continue;
+    }
+
+    // Validate dataClass
+    if (dataClass !== undefined && dataClass !== null && !ALLOWED_DATA_CLASSES.includes(dataClass)) {
+      summary.failed++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'failed',
+        reason: `dataClass must be one of: ${ALLOWED_DATA_CLASSES.join(', ')}`,
+      });
+      continue;
+    }
+    const resolvedDataClass = dataClass || 'SUPPLIER_QUOTE';
+
+    // Idempotent duplicate pre-check
+    try {
+      const alreadyExists = await priceRepository.existsByMaterialDateSource(
+        matId,
+        normalizedRecordedAt,
+        'MANUAL'
+      );
+
+      if (alreadyExists) {
+        summary.skipped++;
+        results.push({
+          index,
+          trackedMaterialId: matId,
+          status: 'skipped',
+          reason: 'Duplicate price entry for this material and date',
+        });
+        continue;
+      }
+
+      const created = await priceRepository.create({
+        trackedMaterialId: matId,
+        price: numPrice,
+        recordedAt: normalizedRecordedAt,
+        source: 'MANUAL',
+        currency: resolvedCurrency,
+        unitLabel: resolvedUnitLabel,
+        region: resolvedRegion,
+        grade: resolvedGrade,
+        providerName: 'Supplier Manual Entry (Bulk)',
+        sourceUrl: trimmedSourceUrl,
+        dataClass: resolvedDataClass,
+        isValid: true,
+        invalidReason: null,
+      });
+
+      summary.inserted++;
+      results.push({
+        index,
+        trackedMaterialId: matId,
+        status: 'inserted',
+        id: created.id,
+        price: created.price,
+        currency: created.currency,
+        recordedAt: created.recorded_at,
+      });
+      affectedMaterialIds.add(matId);
+    } catch (insertErr) {
+      if (insertErr?.code === 'ER_DUP_ENTRY' || insertErr?.errno === 1062) {
+        summary.skipped++;
+        results.push({
+          index,
+          trackedMaterialId: matId,
+          status: 'skipped',
+          reason: 'Duplicate price entry for this material and date',
+        });
+      } else {
+        summary.failed++;
+        results.push({
+          index,
+          trackedMaterialId: matId,
+          status: 'failed',
+          reason: insertErr?.message || 'Database error during insertion',
+        });
+      }
+    }
+  }
+
+  // Trigger alert evaluation once per distinct material affected
+  for (const matId of affectedMaterialIds) {
+    try {
+      await alertEvaluationService.evaluateMaterial(businessId, matId);
+    } catch (alertErr) {
+      logger.warn(`[bulkAddPrices] Alert evaluation failed for material ${matId}: ${alertErr?.message}`);
+    }
+  }
+
+  return { summary, results };
+}
+
+module.exports = { addManualPrice, ingestFromProvider, bulkAddPrices };

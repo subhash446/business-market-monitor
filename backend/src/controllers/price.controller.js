@@ -68,8 +68,20 @@ async function addPrice(req, res, next) {
   }
 }
 
+// POST /api/v1/materials/prices/bulk — V2 T-07 Bulk Price Ingestion
+async function bulkUploadPrices(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const result = await priceIngestionService.bulkAddPrices(businessId, req.body.prices);
+    sendSuccess(res, result, undefined, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getLatestPrice,
   getPriceSourceInfo,
   addPrice,
+  bulkUploadPrices,
 };

@@ -72,6 +72,40 @@ function validateAddPrice(body) {
   return errors;
 }
 
+function validateBulkPriceUpload(body) {
+  const errors = [];
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    errors.push({ field: 'body', issue: 'must be an object' });
+    return errors;
+  }
+
+  if (!Array.isArray(body.prices)) {
+    errors.push({ field: 'prices', issue: 'must be an array' });
+    return errors;
+  }
+
+  if (body.prices.length === 0) {
+    errors.push({ field: 'prices', issue: 'must contain at least 1 price item' });
+    return errors;
+  }
+
+  if (body.prices.length > 200) {
+    errors.push({ field: 'prices', issue: 'cannot exceed maximum batch size of 200 items' });
+    return errors;
+  }
+
+  for (let i = 0; i < body.prices.length; i++) {
+    const item = body.prices[i];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      errors.push({ field: `prices[${i}]`, issue: 'must be an object' });
+      break;
+    }
+  }
+
+  return errors;
+}
+
 function isValidDateString(value) {
   return !Number.isNaN(new Date(value).getTime());
 }
@@ -131,4 +165,9 @@ function validateCompareQuery(query) {
   return errors;
 }
 
-module.exports = { validateAddPrice, validatePriceHistoryQuery, validateCompareQuery };
+module.exports = {
+  validateAddPrice,
+  validateBulkPriceUpload,
+  validatePriceHistoryQuery,
+  validateCompareQuery,
+};
