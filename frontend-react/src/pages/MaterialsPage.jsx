@@ -51,6 +51,8 @@ import {
   setExternalSymbol,
   getUnitsOfMeasurement,
 } from '../api/materials.api.js';
+import { getBusiness } from '../api/business.api.js';
+import { useAuth }     from '../hooks/useAuth.js';
 import { Skeleton }   from '../components/ui/Skeleton.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
@@ -61,7 +63,7 @@ import '../styles/pages/materials.css';
 const STATUS = { LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
 
 /* ── Supported external symbols (matches backend SUPPORTED_SYMBOLS) ── */
-const SYMBOL_OPTIONS = [
+export const SYMBOL_OPTIONS = [
   { value: '',               label: 'None' },
   { value: 'WTI',            label: 'WTI (Crude Oil Proxy — USD/bbl)' },
   { value: 'BRENT',          label: 'Brent (Crude Oil Proxy — USD/bbl)' },
@@ -70,7 +72,94 @@ const SYMBOL_OPTIONS = [
   { value: 'EDIBLE_OIL_GOI', label: 'Mustard Oil (India Mandi — INR/quintal)' },
 ];
 
-function getSymbolDescription(symbol) {
+/**
+ * Filter supported market symbols based on the user's business industry.
+ *
+ * Rules:
+ *  - Plastics / Packaging / Water / Polymer:
+ *      Allowed: None + WTI, Brent (EIA petrochemical/energy proxies).
+ *      Excludes Indian agricultural mandi crops (Wheat, Sugar, Mustard Oil).
+ *  - Food & Beverage / Agriculture / Dairy:
+ *      Allowed: None + Wheat, Sugar, Mustard Oil (India Mandi) + WTI, Brent (feedstock/freight proxy).
+ *  - FMCG:
+ *      Allowed: All symbols.
+ *  - Unknown / Generic / Missing industry:
+ *      Fallback to all symbols safely.
+ *
+ * Backward-compatibility:
+ *  If currentSymbol is non-empty and excluded by the industry filter,
+ *  it is retained in the options list so the select never renders blank
+ *  or corrupts the existing assignment.
+ *
+ * @param {string|{ industrySlug?: string, industry_slug?: string, industryName?: string, industry_name?: string, industry?: string }} industryIdentifier
+ * @param {string} [currentSymbol='']
+ * @returns {Array<{ value: string, label: string }>}
+ */
+export function getFilteredSymbolOptions(industryIdentifier, currentSymbol = '') {
+  let rawStr = '';
+  if (typeof industryIdentifier === 'string') {
+    rawStr = industryIdentifier;
+  } else if (industryIdentifier && typeof industryIdentifier === 'object') {
+    rawStr =
+      industryIdentifier.industrySlug ||
+      industryIdentifier.industry_slug ||
+      industryIdentifier.slug ||
+      industryIdentifier.industryName ||
+      industryIdentifier.industry_name ||
+      industryIdentifier.industry ||
+      industryIdentifier.name ||
+      '';
+  }
+
+  const norm = (rawStr || '').toString().toLowerCase().trim();
+
+  let allowedValues = null;
+
+  if (!norm) {
+    allowedValues = null;
+  } else if (
+    norm.includes('plastic') ||
+    norm.includes('polymer') ||
+    norm.includes('water')
+  ) {
+    allowedValues = ['', 'WTI', 'BRENT'];
+  } else if (
+    norm.includes('food') ||
+    norm.includes('beverag') ||
+    norm.includes('agri') ||
+    norm.includes('dairy') ||
+    norm.includes('farm')
+  ) {
+    allowedValues = ['', 'WHEAT_GOI', 'SUGAR_GOI', 'EDIBLE_OIL_GOI', 'WTI', 'BRENT'];
+  } else if (norm.includes('packag')) {
+    allowedValues = ['', 'WTI', 'BRENT'];
+  } else if (norm.includes('fmcg')) {
+    allowedValues = null;
+  } else {
+    allowedValues = null;
+  }
+
+  let options = allowedValues
+    ? allowedValues
+        .map(val => SYMBOL_OPTIONS.find(opt => opt.value === val))
+        .filter(Boolean)
+    : [...SYMBOL_OPTIONS];
+
+  // Backward-compatibility: preserve existing symbol if already assigned
+  const activeSym = (currentSymbol || '').toString().trim();
+  if (activeSym && !options.some(opt => opt.value === activeSym)) {
+    const existing = SYMBOL_OPTIONS.find(opt => opt.value === activeSym);
+    if (existing) {
+      options = [...options, existing];
+    } else {
+      options = [...options, { value: activeSym, label: `${activeSym} (Saved Symbol)` }];
+    }
+  }
+
+  return options;
+}
+
+export function getSymbolDescription(symbol) {
   switch (symbol) {
     case 'WTI':
     case 'BRENT':
@@ -87,6 +176,7 @@ function getSymbolDescription(symbol) {
 }
 
 export function MaterialsPage() {
+  const { business, setBusiness } = useAuth();
   const { showToast } = useToast();
 
   /* ── Data state ─────────────────────────────────────────── */
@@ -125,7 +215,12 @@ export function MaterialsPage() {
     }
   }, []);
 
-  useEffect(() => { loadPage(); }, [loadPage]);
+  useEffect(() => {
+    loadPage();
+    if (!business && typeof setBusiness === 'function') {
+      getBusiness().then(setBusiness).catch(() => {});
+    }
+  }, [loadPage, business, setBusiness]);
 
   /* ── Derived: filtered list ─────────────────────────────── */
   const visible = filter === 'tracked'
@@ -367,6 +462,7 @@ export function MaterialsPage() {
             materials={materials}
             visible={visible}
             filter={filter}
+            business={business}
             trackingBusy={trackingBusy}
             symbolBusy={symbolBusy}
             onToggleTracking={handleToggleTracking}
@@ -384,7 +480,7 @@ export function MaterialsPage() {
  * MATERIALS LIST CONTENT
  * ================================================================ */
 function MaterialsListContent({
-  materials, visible, filter, trackingBusy, symbolBusy,
+  materials, visible, filter, business, trackingBusy, symbolBusy,
   onToggleTracking, onSetSymbol, onShowAll,
 }) {
   if (materials.length === 0) {
@@ -425,6 +521,7 @@ function MaterialsListContent({
               <MaterialTableRow
                 key={m.id}
                 material={m}
+                business={business}
                 busy={!!trackingBusy[m.id]}
                 symbolBusy={!!symbolBusy[m.id]}
                 onToggle={onToggleTracking}
@@ -441,6 +538,7 @@ function MaterialsListContent({
           <MaterialCard
             key={m.id}
             material={m}
+            business={business}
             busy={!!trackingBusy[m.id]}
             symbolBusy={!!symbolBusy[m.id]}
             onToggle={onToggleTracking}
@@ -455,7 +553,7 @@ function MaterialsListContent({
 /* ================================================================
  * TABLE ROW (tablet+)
  * ================================================================ */
-function MaterialTableRow({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
+function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSetSymbol }) {
   return (
     <tr>
       <td className="table__cell">{material.name}</td>
@@ -471,6 +569,7 @@ function MaterialTableRow({ material, busy, symbolBusy, onToggle, onSetSymbol })
           <div className="material-symbol-cell">
             <ExternalSymbolSelect
               material={material}
+              business={business}
               busy={symbolBusy}
               onSetSymbol={onSetSymbol}
             />
@@ -479,14 +578,15 @@ function MaterialTableRow({ material, busy, symbolBusy, onToggle, onSetSymbol })
                 {getSymbolDescription(material.externalSymbol) || 'Automatic market benchmark.'}
               </span>
             ) : (
-              <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px' }}>
-                No automatic source —{' '}
+              <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px', lineHeight: 1.3 }}>
+                No public market ticker — use{' '}
                 <Link
                   to={`/prices?materialId=${material.id}`}
                   className="text-accent"
                 >
-                  add supplier quote
-                </Link>
+                  Log Supplier Quote
+                </Link>{' '}
+                for custom or local grades.
               </span>
             )}
           </div>
@@ -502,7 +602,7 @@ function MaterialTableRow({ material, busy, symbolBusy, onToggle, onSetSymbol })
 /* ================================================================
  * MOBILE CARD
  * ================================================================ */
-function MaterialCard({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
+function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSymbol }) {
   return (
     <div className="card card--material material-card">
       <div className="material-card__header">
@@ -518,6 +618,7 @@ function MaterialCard({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
         <div className="material-card__symbol">
           <ExternalSymbolSelect
             material={material}
+            business={business}
             busy={symbolBusy}
             onSetSymbol={onSetSymbol}
           />
@@ -526,14 +627,15 @@ function MaterialCard({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
               {getSymbolDescription(material.externalSymbol) || 'Automatic market benchmark.'}
             </span>
           ) : (
-            <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px' }}>
-              No automatic source —{' '}
+            <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px', lineHeight: 1.3 }}>
+              No public market ticker — use{' '}
               <Link
                 to={`/prices?materialId=${material.id}`}
                 className="text-accent"
               >
-                add supplier quote
-              </Link>
+                Log Supplier Quote
+              </Link>{' '}
+              for custom or local grades.
             </span>
           )}
         </div>
@@ -543,17 +645,18 @@ function MaterialCard({ material, busy, symbolBusy, onToggle, onSetSymbol }) {
 }
 
 /* ── External symbol select ──────────────────────────────────
- * Renders a small <select> showing None / WTI / BRENT.
+ * Renders an industry-filtered <select> showing allowed symbols.
  * Only rendered when material.isTracked === true.
  * Sends null to the API when "None" is selected.
  * Disabled while the API call is in flight (symbolBusy).
  * ─────────────────────────────────────────────────────────── */
-function ExternalSymbolSelect({ material, busy, onSetSymbol }) {
+function ExternalSymbolSelect({ material, business, busy, onSetSymbol }) {
   // The select value is '' for null (select can't hold null natively)
   const currentValue = material.externalSymbol ?? '';
+  const options = getFilteredSymbolOptions(business, currentValue);
 
   function handleChange(e) {
-    const selected = e.target.value;  // '' | 'WTI' | 'BRENT'
+    const selected = e.target.value;  // '' | 'WTI' | 'BRENT' | ...
     if (selected === currentValue) return;  // no change
     onSetSymbol(material, selected);
   }
@@ -568,7 +671,7 @@ function ExternalSymbolSelect({ material, busy, onSetSymbol }) {
         aria-label={`External market symbol for ${material.name}`}
         aria-busy={busy}
       >
-        {SYMBOL_OPTIONS.map(opt => (
+        {options.map(opt => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>

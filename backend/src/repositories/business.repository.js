@@ -11,7 +11,7 @@ const { pool } = require('../database/connection');
 
 async function findByUserId(userId) {
   const [rows] = await pool.execute(
-    `SELECT b.*, i.name AS industry_name
+    `SELECT b.*, i.name AS industry_name, i.slug AS industry_slug
      FROM businesses b
      JOIN industries i ON i.id = b.industry_id
      WHERE b.user_id = ?
@@ -23,7 +23,7 @@ async function findByUserId(userId) {
 
 async function findById(id) {
   const [rows] = await pool.execute(
-    `SELECT b.*, i.name AS industry_name
+    `SELECT b.*, i.name AS industry_name, i.slug AS industry_slug
      FROM businesses b
      JOIN industries i ON i.id = b.industry_id
      WHERE b.id = ?
@@ -71,7 +71,7 @@ async function updateLastDigestSentAt(id, timestamp = new Date()) {
 
 async function listBusinessesDueForDigest(frequency = null) {
   let query = `
-    SELECT b.*, u.email AS user_email, i.name AS industry_name
+    SELECT b.*, u.email AS user_email, i.name AS industry_name, i.slug AS industry_slug
     FROM businesses b
     JOIN users u ON u.id = b.user_id
     JOIN industries i ON i.id = b.industry_id

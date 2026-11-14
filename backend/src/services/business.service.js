@@ -35,6 +35,7 @@ async function createBusiness({ userId, name, industryId, contactEmail, contactP
     id: business.id,
     name: business.name,
     industryId: business.industry_id,
+    industrySlug: business.industry_slug || null,
     materialsGenerated,
     materials: (trackedList || []).map((m) => ({
       id: m.id,
@@ -80,6 +81,7 @@ function toPublicBusiness(business) {
     name: business.name,
     industryId: business.industry_id,
     industryName: business.industry_name,
+    industrySlug: business.industry_slug || null,
     contactEmail: business.contact_email,
     contactPhone: business.contact_phone,
     address: business.address,
