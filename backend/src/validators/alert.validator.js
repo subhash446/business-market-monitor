@@ -9,6 +9,8 @@
  */
 const CONDITION_TYPES = ['PRICE_ABOVE', 'PRICE_BELOW'];
 const THRESHOLD_TYPES = ['ABSOLUTE', 'PERCENTAGE'];
+const NOTIFICATION_CHANNELS = ['EMAIL', 'WHATSAPP', 'BOTH'];
+const E164_PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 
 const {
   isStrictFiniteNumber,
@@ -66,10 +68,20 @@ function validateCreateRule(body) {
     errors.push({ field: 'cooldownHours', issue: 'must be an integer between 1 and 720 hours' });
   }
 
+  if (body.notificationChannel !== undefined && !NOTIFICATION_CHANNELS.includes(body.notificationChannel)) {
+    errors.push({ field: 'notificationChannel', issue: `must be one of ${NOTIFICATION_CHANNELS.join(', ')}` });
+  }
+
+  if (body.destinationPhone !== undefined && body.destinationPhone !== null && String(body.destinationPhone).trim() !== '') {
+    if (!E164_PHONE_REGEX.test(String(body.destinationPhone).trim())) {
+      errors.push({ field: 'destinationPhone', issue: 'must be a valid E.164 phone number (e.g. +919876543210)' });
+    }
+  }
+
   return errors;
 }
 
-const ALLOWED_UPDATE_FIELDS = ['conditionType', 'thresholdPrice', 'thresholdType', 'cooldownHours', 'isActive'];
+const ALLOWED_UPDATE_FIELDS = ['conditionType', 'thresholdPrice', 'thresholdType', 'cooldownHours', 'isActive', 'notificationChannel', 'destinationPhone'];
 
 function validateUpdateRule(body) {
   const errors = [];
@@ -110,7 +122,17 @@ function validateUpdateRule(body) {
     errors.push({ field: 'isActive', issue: 'must be a boolean' });
   }
 
+  if (body.notificationChannel !== undefined && !NOTIFICATION_CHANNELS.includes(body.notificationChannel)) {
+    errors.push({ field: 'notificationChannel', issue: `must be one of ${NOTIFICATION_CHANNELS.join(', ')}` });
+  }
+
+  if (body.destinationPhone !== undefined && body.destinationPhone !== null && String(body.destinationPhone).trim() !== '') {
+    if (!E164_PHONE_REGEX.test(String(body.destinationPhone).trim())) {
+      errors.push({ field: 'destinationPhone', issue: 'must be a valid E.164 phone number (e.g. +919876543210)' });
+    }
+  }
+
   return errors;
 }
 
-module.exports = { validateCreateRule, validateUpdateRule, CONDITION_TYPES, THRESHOLD_TYPES };
+module.exports = { validateCreateRule, validateUpdateRule, CONDITION_TYPES, THRESHOLD_TYPES, NOTIFICATION_CHANNELS, E164_PHONE_REGEX };

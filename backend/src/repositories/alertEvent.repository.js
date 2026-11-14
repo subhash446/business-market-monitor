@@ -17,7 +17,8 @@ async function listByBusinessId(businessId, { limit, offset }) {
     `SELECT id, alert_rule_id, business_id, tracked_material_id,
             triggered_price, threshold_price_snapshot, condition_type_snapshot,
             threshold_type_snapshot, triggered_change_percent,
-            notification_channel, delivery_status, delivery_attempted_at, triggered_at
+            notification_channel, recipient_phone_snapshot,
+            delivery_status, delivery_attempted_at, triggered_at
      FROM alert_events
      WHERE business_id = ?
      ORDER BY triggered_at DESC
@@ -37,6 +38,7 @@ async function create({
   thresholdTypeSnapshot = 'ABSOLUTE',
   triggeredChangePercent = null,
   notificationChannel = 'EMAIL',
+  recipientPhoneSnapshot = null,
   deliveryStatus = 'PENDING',
 }) {
   const [result] = await pool.execute(
@@ -50,9 +52,10 @@ async function create({
       threshold_type_snapshot,
       triggered_change_percent,
       notification_channel,
+      recipient_phone_snapshot,
       delivery_status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       alertRuleId,
       businessId,
@@ -63,6 +66,7 @@ async function create({
       thresholdTypeSnapshot,
       triggeredChangePercent,
       notificationChannel,
+      recipientPhoneSnapshot,
       deliveryStatus,
     ]
   );
@@ -79,6 +83,7 @@ async function create({
       threshold_type_snapshot,
       triggered_change_percent,
       notification_channel,
+      recipient_phone_snapshot,
       delivery_status,
       delivery_attempted_at,
       triggered_at
@@ -119,6 +124,7 @@ async function updateDeliveryStatus(eventId, deliveryStatus) {
       threshold_type_snapshot,
       triggered_change_percent,
       notification_channel,
+      recipient_phone_snapshot,
       delivery_status,
       delivery_attempted_at,
       triggered_at

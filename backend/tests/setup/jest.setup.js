@@ -108,6 +108,7 @@ process.env.NEWS_INGESTION_ENABLED = 'false';
 process.env.AI_INSIGHTS_ENABLED = 'false';
 process.env.ALERT_EVALUATION_ENABLED = 'false';
 process.env.INDIA_GOVT_DATA_ENABLED = 'false';
+process.env.WHATSAPP_ENABLED = 'false';
 
 // ---------------------------------------------------------------------------
 // 3. Dotenv Defusing

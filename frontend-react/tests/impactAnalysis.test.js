@@ -245,7 +245,8 @@ describe('T-05 Step 4: Impact Analysis API & Helpers', () => {
     assert.equal(getDependencyTypeMetadata(null), 'Structural link');
 
     assert.equal(getPriceDirectionMetadata('UP').label, 'Upward');
-    assert.equal(getPriceDirectionMetadata('UNKNOWN').label, 'Unknown');
+    assert.equal(getPriceDirectionMetadata('UNKNOWN').label, 'Insufficient history');
+    assert.equal(getPriceDirectionMetadata('UNKNOWN').symbol, '—');
 
     assert.equal(formatPercentChange(3.5), '+3.50%');
     assert.equal(formatPercentChange(null), '—');
@@ -398,6 +399,8 @@ describe('T-05 Step 4: JSX Component & Route Verification', () => {
       'must render kb_impact.warning banner'
     );
     assert.ok(html.includes('No price history'));
+    assert.ok(html.includes('— Insufficient history'), 'must display neutral insufficient history label when price direction is UNKNOWN');
+    assert.ok(!html.includes('? Unknown'), 'must not render legacy ? Unknown text');
     assert.ok(!html.includes('Recent (≤30 days)'), 'missing history must not display as recent');
     assert.ok(html.includes('No insight available yet'));
 

@@ -169,6 +169,17 @@ const env = {
     // Convenience alias used by gemini.provider.js to read one field, not two.
     get timeoutMs() { return env.aiInsights.timeoutMs; },
   },
+
+  // WhatsApp Cloud API provider (Phase 2 / T-06).
+  // Opt-in: disabled by default (WHATSAPP_ENABLED=true to activate).
+  // When enabled, requires WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID.
+  whatsapp: {
+    enabled: (process.env.WHATSAPP_ENABLED || 'false').toLowerCase() === 'true',
+    apiToken: process.env.WHATSAPP_API_TOKEN,
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+    baseUrl: process.env.WHATSAPP_BASE_URL || 'https://graph.facebook.com/v20.0',
+    timeoutMs: parseInt(process.env.WHATSAPP_TIMEOUT_MS, 10) || 15000,
+  },
 };
 
 module.exports = env;

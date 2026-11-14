@@ -61,6 +61,16 @@ function validateEnv() {
     missing.push('GOV_DATA_API_KEY (required when INDIA_GOVT_DATA_ENABLED=true)');
   }
 
+  // Phase 2 / T-06: WhatsApp credentials are only required when WHATSAPP_ENABLED is true.
+  if (env.whatsapp && env.whatsapp.enabled) {
+    if (isBlank(env.whatsapp.apiToken)) {
+      missing.push('WHATSAPP_API_TOKEN (required when WHATSAPP_ENABLED=true)');
+    }
+    if (isBlank(env.whatsapp.phoneNumberId)) {
+      missing.push('WHATSAPP_PHONE_NUMBER_ID (required when WHATSAPP_ENABLED=true)');
+    }
+  }
+
   if (missing.length > 0) {
     console.error('[boot] Refusing to start — required environment variable(s) missing:');
     missing.forEach((name) => console.error(`[boot]   - ${name}`));

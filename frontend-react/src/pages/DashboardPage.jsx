@@ -319,43 +319,45 @@ function MaterialsList({ items, onNavigate }) {
     <ul className="dashboard-panel__list" role="list">
       {items.map(material => (
         <li key={material.id} className="dashboard-panel__item">
-          <span className="dashboard-panel__item-name">{material.name}</span>
+          <div className="dashboard-panel__item-main">
+            <span className="dashboard-panel__item-name">{material.name}</span>
 
-          {/* latestPrice with currency, unit, and classification */}
-          {material.latestPrice === null || material.latestPrice === undefined ? (
-            <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
-              No price recorded
-            </span>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <span className="dashboard-panel__item-value font-mono">
-                {formatPriceDisplay({
-                  price: material.latestPrice,
-                  currency: material.currency,
-                  unitLabel: material.unitLabel,
-                  externalSymbol: material.externalSymbol,
-                }).text}
+            {/* latestPrice with currency, unit, and classification */}
+            {material.latestPrice === null || material.latestPrice === undefined ? (
+              <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
+                No price recorded
               </span>
-              {material.dataClass && (
-                <span
-                  className={`badge ${
-                    material.dataClass === 'OFFICIAL_BENCHMARK'
-                      ? 'badge--info'
-                      : material.dataClass === 'MARKET_INDICATIVE'
-                      ? 'badge--warning'
-                      : 'badge--neutral'
-                  }`}
-                  style={{ fontSize: '10px', padding: '1px 5px' }}
-                >
-                  {material.dataClass === 'OFFICIAL_BENCHMARK'
-                    ? 'Benchmark'
-                    : material.dataClass === 'MARKET_INDICATIVE'
-                    ? 'Proxy'
-                    : 'Quote'}
+            ) : (
+              <div className="dashboard-panel__item-meta">
+                <span className="dashboard-panel__item-value font-mono">
+                  {formatPriceDisplay({
+                    price: material.latestPrice,
+                    currency: material.currency,
+                    unitLabel: material.unitLabel,
+                    externalSymbol: material.externalSymbol,
+                  }).text}
                 </span>
-              )}
-            </div>
-          )}
+                {material.dataClass && (
+                  <span
+                    className={`badge ${
+                      material.dataClass === 'OFFICIAL_BENCHMARK'
+                        ? 'badge--info'
+                        : material.dataClass === 'MARKET_INDICATIVE'
+                        ? 'badge--warning'
+                        : 'badge--neutral'
+                    }`}
+                    style={{ fontSize: '10px', padding: '1px 5px' }}
+                  >
+                    {material.dataClass === 'OFFICIAL_BENCHMARK'
+                      ? 'Benchmark'
+                      : material.dataClass === 'MARKET_INDICATIVE'
+                      ? 'Proxy'
+                      : 'Quote'}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Quick-action links — id is tracked_materials.id (universal material ID) */}
           <div className="dashboard-panel__item-actions">

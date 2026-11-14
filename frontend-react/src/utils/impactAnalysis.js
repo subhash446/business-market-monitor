@@ -55,7 +55,7 @@ const PRICE_DIRECTION_MAP = {
   UP: { label: 'Upward', symbol: '▲', badgeClass: 'badge--danger' },
   DOWN: { label: 'Downward', symbol: '▼', badgeClass: 'badge--success' },
   FLAT: { label: 'Flat', symbol: '■', badgeClass: 'badge--neutral' },
-  UNKNOWN: { label: 'Unknown', symbol: '?', badgeClass: 'badge--neutral' },
+  UNKNOWN: { label: 'Insufficient history', symbol: '—', badgeClass: 'badge--neutral' },
 };
 
 /**

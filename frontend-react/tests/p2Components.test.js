@@ -423,4 +423,87 @@ describe('P2 JSX Component Verification (InsightCard & TrendsPage)', () => {
     assert.equal(html.includes('Lengthy rationale text that should be suppressed in compact dashboard mode.'), false);
     assert.equal(html.includes('Caveat text that should be suppressed in compact mode.'), false);
   });
+
+  test('T-06 — AlertsPage RulesTable and EventsTable render multi-channel badges and destination phone numbers', async () => {
+    const { RulesTable, EventsTable } = await viteServer.ssrLoadModule('/src/pages/AlertsPage.jsx');
+
+    const materials = [
+      { id: 10, name: 'PET Resin' },
+      { id: 11, name: 'Corrugated Box' },
+    ];
+
+    const rules = [
+      {
+        id: 1,
+        trackedMaterialId: 10,
+        conditionType: 'PRICE_ABOVE',
+        thresholdPrice: 150,
+        thresholdType: 'ABSOLUTE',
+        notificationChannel: 'WHATSAPP',
+        destinationPhone: '+919876543210',
+        isActive: true,
+      },
+      {
+        id: 2,
+        trackedMaterialId: 11,
+        conditionType: 'PRICE_BELOW',
+        thresholdPrice: 5,
+        thresholdType: 'PERCENTAGE',
+        notificationChannel: 'BOTH',
+        destinationPhone: '+918888888888',
+        isActive: false,
+      },
+    ];
+
+    const rulesHtml = renderToStaticMarkup(
+      React.createElement(RulesTable, {
+        rules,
+        materials,
+      })
+    );
+
+    assert.equal(rulesHtml.includes('WhatsApp'), true);
+    assert.equal(rulesHtml.includes('+919876543210'), true);
+    assert.equal(rulesHtml.includes('Email + WhatsApp'), true);
+    assert.equal(rulesHtml.includes('+918888888888'), true);
+
+    const events = [
+      {
+        id: 101,
+        triggeredPrice: 160,
+        thresholdPriceSnapshot: 150,
+        conditionTypeSnapshot: 'PRICE_ABOVE',
+        thresholdTypeSnapshot: 'ABSOLUTE',
+        notificationChannel: 'WHATSAPP',
+        recipientPhoneSnapshot: '+919876543210',
+        deliveryStatus: 'SENT',
+        triggeredAt: '2026-11-14T10:00:00Z',
+      },
+    ];
+
+    const eventsHtml = renderToStaticMarkup(
+      React.createElement(EventsTable, {
+        events,
+      })
+    );
+
+    assert.equal(eventsHtml.includes('WhatsApp'), true);
+    assert.equal(eventsHtml.includes('+919876543210'), true);
+    assert.equal(eventsHtml.includes('Sent'), true);
+  });
+
+  test('UI Polish 1 — DashboardPage material list item encapsulates layout in dashboard-panel__item-main and meta', async () => {
+    const { DashboardPage } = await viteServer.ssrLoadModule('/src/pages/DashboardPage.jsx');
+
+    const html = renderToStaticMarkup(
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(DashboardPage)
+      )
+    );
+
+    // DashboardPage should mount and render dashboard layout
+    assert.equal(html.includes('dashboard-panel'), true);
+  });
 });

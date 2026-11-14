@@ -27,8 +27,8 @@ function assertBusinessId(businessId, operation) {
 async function listActiveByBusinessId(businessId) {
   const [rows] = await pool.execute(
     `SELECT id, business_id, tracked_material_id, condition_type, threshold_price,
-            threshold_type, cooldown_hours, last_triggered_at, is_active,
-            created_at, updated_at
+            threshold_type, cooldown_hours, notification_channel, destination_phone,
+            last_triggered_at, is_active, created_at, updated_at
      FROM alert_rules
      WHERE business_id = ? AND deleted_at IS NULL
      ORDER BY created_at DESC, id DESC`,
@@ -41,8 +41,8 @@ async function listActiveByBusinessId(businessId) {
 async function findByIdForBusiness(ruleId, businessId) {
   const [rows] = await pool.execute(
     `SELECT id, business_id, tracked_material_id, condition_type, threshold_price,
-            threshold_type, cooldown_hours, last_triggered_at, is_active,
-            created_at, updated_at
+            threshold_type, cooldown_hours, notification_channel, destination_phone,
+            last_triggered_at, is_active, created_at, updated_at
      FROM alert_rules
      WHERE id = ? AND business_id = ? AND deleted_at IS NULL
      LIMIT 1`,
@@ -54,8 +54,8 @@ async function findByIdForBusiness(ruleId, businessId) {
 async function findById(ruleId) {
   const [rows] = await pool.execute(
     `SELECT id, business_id, tracked_material_id, condition_type, threshold_price,
-            threshold_type, cooldown_hours, last_triggered_at, is_active,
-            created_at, updated_at
+            threshold_type, cooldown_hours, notification_channel, destination_phone,
+            last_triggered_at, is_active, created_at, updated_at
      FROM alert_rules
      WHERE id = ? LIMIT 1`,
     [ruleId]
@@ -70,14 +70,25 @@ async function create({
   thresholdPrice,
   thresholdType = 'ABSOLUTE',
   cooldownHours = 24,
+  notificationChannel = 'EMAIL',
+  destinationPhone = null,
 }) {
   const [result] = await pool.execute(
     `INSERT INTO alert_rules (
        business_id, tracked_material_id, condition_type, threshold_price,
-       threshold_type, cooldown_hours
+       threshold_type, cooldown_hours, notification_channel, destination_phone
      )
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [businessId, trackedMaterialId, conditionType, thresholdPrice, thresholdType, cooldownHours]
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      businessId,
+      trackedMaterialId,
+      conditionType,
+      thresholdPrice,
+      thresholdType,
+      cooldownHours,
+      notificationChannel,
+      destinationPhone,
+    ]
   );
   return findById(result.insertId);
 }
@@ -88,14 +99,26 @@ async function update(ruleId, {
   thresholdType = 'ABSOLUTE',
   cooldownHours = 24,
   isActive,
+  notificationChannel = 'EMAIL',
+  destinationPhone = null,
 }, businessId) {
   assertBusinessId(businessId, 'update');
   const [result] = await pool.execute(
     `UPDATE alert_rules
      SET condition_type = ?, threshold_price = ?, threshold_type = ?,
-         cooldown_hours = ?, is_active = ?
+         cooldown_hours = ?, is_active = ?, notification_channel = ?, destination_phone = ?
      WHERE id = ? AND business_id = ? AND deleted_at IS NULL`,
-    [conditionType, thresholdPrice, thresholdType, cooldownHours, isActive, ruleId, businessId]
+    [
+      conditionType,
+      thresholdPrice,
+      thresholdType,
+      cooldownHours,
+      isActive,
+      notificationChannel,
+      destinationPhone,
+      ruleId,
+      businessId,
+    ]
   );
   if (result && result.affectedRows === 0) {
     return null;
@@ -172,6 +195,7 @@ async function listAllActive() {
   const [rows] = await pool.execute(
     `SELECT ar.id, ar.business_id, ar.tracked_material_id, ar.condition_type,
             ar.threshold_price, ar.threshold_type, ar.cooldown_hours,
+            ar.notification_channel, ar.destination_phone,
             ar.last_triggered_at, ar.is_active,
             tm.external_symbol
      FROM alert_rules ar

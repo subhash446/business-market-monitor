@@ -62,6 +62,12 @@ export const CONDITION_TYPES = {
   PRICE_BELOW: 'PRICE_BELOW',
 };
 
+export const NOTIFICATION_CHANNELS = {
+  EMAIL: 'EMAIL',
+  WHATSAPP: 'WHATSAPP',
+  BOTH: 'BOTH',
+};
+
 export const EVENTS_LIMIT = 20;
 
 /* ── Alert Rules ────────────────────────────────────────────────── */
@@ -78,7 +84,7 @@ export async function getAlertRules() {
 /**
  * Create a new alert rule.
  * POST /api/v1/alerts/rules
- * @param {{ trackedMaterialId: number, conditionType: string, thresholdPrice: number }} body
+ * @param {{ trackedMaterialId: number, conditionType: string, thresholdPrice: number, thresholdType?: string, cooldownHours?: number, notificationChannel?: string, destinationPhone?: string|null }} body
  * @returns {Promise<{id,trackedMaterialId,conditionType,thresholdPrice,isActive}>}
  * @throws 400 VALIDATION_ERROR, 404 NOT_FOUND, 409 CONFLICT
  */
@@ -88,6 +94,8 @@ export async function createAlertRule({
   thresholdPrice,
   thresholdType = 'ABSOLUTE',
   cooldownHours = 24,
+  notificationChannel = 'EMAIL',
+  destinationPhone = null,
 }) {
   const { data } = await post('/alerts/rules', {
     trackedMaterialId,
@@ -95,6 +103,8 @@ export async function createAlertRule({
     thresholdPrice,
     thresholdType,
     cooldownHours,
+    notificationChannel,
+    destinationPhone,
   });
   return data;
 }

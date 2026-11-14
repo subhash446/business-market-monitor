@@ -67,17 +67,15 @@ async function evaluateMaterial(businessId, trackedMaterialId) {
     return [];
   }
 
-  // Get business -> user -> recipient email.
+  // Get business -> user -> recipient email and fallback phone.
   const business = await businessRepository.findById(businessId);
   let user = null;
   if (business?.user_id) {
     user = await userRepository.findById(business.user_id);
   }
 
-  const recipientEmail = user?.email || business?.contact_email;
-  if (!recipientEmail) {
-    throw new Error('No email address found for alert notification');
-  }
+  const recipientEmail = user?.email || business?.contact_email || null;
+  const businessPhone = business?.contact_phone || null;
 
   const materialName = material?.name || 'Tracked Material';
   const triggeredEvents = [];
@@ -154,51 +152,132 @@ async function evaluateMaterial(businessId, trackedMaterialId) {
       continue;
     }
 
-    // 4. Record immutable alert event with PENDING status
-    const event = await alertEventRepository.create({
-      alertRuleId: rule.id,
-      businessId,
-      trackedMaterialId: rule.tracked_material_id,
-      triggeredPrice: currentPrice,
-      thresholdPriceSnapshot: thresholdVal,
-      conditionTypeSnapshot: rule.condition_type,
-      thresholdTypeSnapshot: thresholdType,
-      triggeredChangePercent: percentChange,
-      notificationChannel: 'EMAIL',
-      deliveryStatus: 'PENDING',
-    });
+    // 4. Determine channels to dispatch: EMAIL, WHATSAPP, or BOTH
+    const ruleChannel = rule.notification_channel || 'EMAIL';
+    const channels = ruleChannel === 'BOTH'
+      ? ['EMAIL', 'WHATSAPP']
+      : ruleChannel === 'WHATSAPP'
+        ? ['WHATSAPP']
+        : ['EMAIL'];
 
-    if (!event) {
-      continue;
-    }
+    const targetPhone = rule.destination_phone || businessPhone;
 
-    // 5. Dispatch Email Notification
-    try {
-      await notificationService.sendAlertNotification({
-        to: recipientEmail,
-        materialName,
-        conditionType: rule.condition_type,
-        thresholdType,
-        thresholdPrice: thresholdVal,
-        triggeredPrice: currentPrice,
-        triggeredChangePercent: percentChange,
-        currency: latestPrice.currency || 'INR',
-        unitLabel: latestPrice.unit_label || material?.unit_abbreviation || material?.unit || 'unit',
-        triggeredAt: event.triggered_at,
-      });
+    // 5. Dispatch per channel independently
+    for (const channel of channels) {
+      if (channel === 'EMAIL') {
+        const emailEvent = await alertEventRepository.create({
+          alertRuleId: rule.id,
+          businessId,
+          trackedMaterialId: rule.tracked_material_id,
+          triggeredPrice: currentPrice,
+          thresholdPriceSnapshot: thresholdVal,
+          conditionTypeSnapshot: rule.condition_type,
+          thresholdTypeSnapshot: thresholdType,
+          triggeredChangePercent: percentChange,
+          notificationChannel: 'EMAIL',
+          recipientPhoneSnapshot: null,
+          deliveryStatus: 'PENDING',
+        });
 
-      await alertEventRepository.updateDeliveryStatus(event.id, 'SENT');
-      triggeredEvents.push({
-        ...event,
-        delivery_status: 'SENT',
-      });
-    } catch (error) {
-      await alertEventRepository.updateDeliveryStatus(event.id, 'FAILED');
-      logger.error(`[Alert Email] Failed to send alert event ${event.id}:`, error.message);
-      triggeredEvents.push({
-        ...event,
-        delivery_status: 'FAILED',
-      });
+        if (!emailEvent) continue;
+
+        if (!recipientEmail) {
+          await alertEventRepository.updateDeliveryStatus(emailEvent.id, 'FAILED');
+          logger.warn(`[Alert Email] No recipient email found for business ${businessId}, event ${emailEvent.id} failed`);
+          triggeredEvents.push({ ...emailEvent, delivery_status: 'FAILED' });
+          continue;
+        }
+
+        try {
+          await notificationService.sendAlertNotification({
+            channel: 'EMAIL',
+            to: recipientEmail,
+            materialName,
+            conditionType: rule.condition_type,
+            thresholdType,
+            thresholdPrice: thresholdVal,
+            triggeredPrice: currentPrice,
+            triggeredChangePercent: percentChange,
+            currency: latestPrice.currency || 'INR',
+            unitLabel: latestPrice.unit_label || material?.unit_abbreviation || material?.unit || 'unit',
+            triggeredAt: emailEvent.triggered_at,
+          });
+
+          await alertEventRepository.updateDeliveryStatus(emailEvent.id, 'SENT');
+          triggeredEvents.push({
+            ...emailEvent,
+            delivery_status: 'SENT',
+          });
+        } catch (error) {
+          await alertEventRepository.updateDeliveryStatus(emailEvent.id, 'FAILED');
+          logger.error(`[Alert Email] Failed to send alert event ${emailEvent.id}:`, error.message);
+          triggeredEvents.push({
+            ...emailEvent,
+            delivery_status: 'FAILED',
+          });
+        }
+      } else if (channel === 'WHATSAPP') {
+        const waEvent = await alertEventRepository.create({
+          alertRuleId: rule.id,
+          businessId,
+          trackedMaterialId: rule.tracked_material_id,
+          triggeredPrice: currentPrice,
+          thresholdPriceSnapshot: thresholdVal,
+          conditionTypeSnapshot: rule.condition_type,
+          thresholdTypeSnapshot: thresholdType,
+          triggeredChangePercent: percentChange,
+          notificationChannel: 'WHATSAPP',
+          recipientPhoneSnapshot: targetPhone,
+          deliveryStatus: 'PENDING',
+        });
+
+        if (!waEvent) continue;
+
+        if (!targetPhone) {
+          await alertEventRepository.updateDeliveryStatus(waEvent.id, 'FAILED');
+          logger.warn(`[Alert WhatsApp] No destination phone found for rule ${rule.id}, event ${waEvent.id} failed`);
+          triggeredEvents.push({ ...waEvent, delivery_status: 'FAILED' });
+          continue;
+        }
+
+        try {
+          const result = await notificationService.sendAlertNotification({
+            channel: 'WHATSAPP',
+            to: targetPhone,
+            materialName,
+            conditionType: rule.condition_type,
+            thresholdType,
+            thresholdPrice: thresholdVal,
+            triggeredPrice: currentPrice,
+            triggeredChangePercent: percentChange,
+            currency: latestPrice.currency || 'INR',
+            unitLabel: latestPrice.unit_label || material?.unit_abbreviation || material?.unit || 'unit',
+            triggeredAt: waEvent.triggered_at,
+          });
+
+          if (result && result.success) {
+            await alertEventRepository.updateDeliveryStatus(waEvent.id, 'SENT');
+            triggeredEvents.push({
+              ...waEvent,
+              delivery_status: 'SENT',
+            });
+          } else {
+            await alertEventRepository.updateDeliveryStatus(waEvent.id, 'FAILED');
+            logger.warn(`[Alert WhatsApp] WhatsApp dispatch failed for event ${waEvent.id}: ${result?.error || 'Unknown error'}`);
+            triggeredEvents.push({
+              ...waEvent,
+              delivery_status: 'FAILED',
+            });
+          }
+        } catch (error) {
+          await alertEventRepository.updateDeliveryStatus(waEvent.id, 'FAILED');
+          logger.error(`[Alert WhatsApp] Failed to send alert event ${waEvent.id}:`, error.message);
+          triggeredEvents.push({
+            ...waEvent,
+            delivery_status: 'FAILED',
+          });
+        }
+      }
     }
   }
 

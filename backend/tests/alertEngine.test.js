@@ -131,6 +131,45 @@ describe('Phase 2 — Alert Rule Engine & Notification Pipeline', () => {
       });
       expect(errors).toHaveLength(0);
     });
+
+    test('accepts valid notificationChannel and destinationPhone', () => {
+      const errors = validateCreateRule({
+        trackedMaterialId: 1,
+        conditionType: 'PRICE_ABOVE',
+        thresholdPrice: 100,
+        notificationChannel: 'WHATSAPP',
+        destinationPhone: '+919876543210',
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    test('rejects invalid notificationChannel', () => {
+      const errors = validateCreateRule({
+        trackedMaterialId: 1,
+        conditionType: 'PRICE_ABOVE',
+        thresholdPrice: 100,
+        notificationChannel: 'SMS',
+      });
+      expect(errors.some((e) => e.field === 'notificationChannel')).toBe(true);
+    });
+
+    test('rejects invalid destinationPhone format', () => {
+      const errors = validateCreateRule({
+        trackedMaterialId: 1,
+        conditionType: 'PRICE_ABOVE',
+        thresholdPrice: 100,
+        destinationPhone: '9876543210',
+      });
+      expect(errors.some((e) => e.field === 'destinationPhone')).toBe(true);
+    });
+
+    test('validateUpdateRule accepts notificationChannel and destinationPhone', () => {
+      const errors = validateUpdateRule({
+        notificationChannel: 'BOTH',
+        destinationPhone: '+919876543210',
+      });
+      expect(errors).toHaveLength(0);
+    });
   });
 
   /* =========================================================================
@@ -525,6 +564,139 @@ describe('Phase 2 — Alert Rule Engine & Notification Pipeline', () => {
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('ALERT_EVALUATION')
       );
+    });
+  });
+
+  /* =========================================================================
+   * Multi-Channel Alert Dispatch (FR-ALERT-07: WhatsApp & Both)
+   * ========================================================================= */
+  describe('Multi-Channel Alert Dispatch (WhatsApp & Both)', () => {
+    test('dispatches WHATSAPP alert event when rule channel is WHATSAPP', async () => {
+      jest.spyOn(priceRepository, 'findLatestByMaterialId').mockResolvedValue({
+        id: 1,
+        price: '115.00',
+        currency: 'INR',
+        is_valid: 1,
+        recorded_at: '2026-11-14 10:00:00',
+      });
+      jest.spyOn(alertRuleRepository, 'listActiveByBusinessId').mockResolvedValue([
+        {
+          id: 401,
+          tracked_material_id: 1,
+          condition_type: 'PRICE_ABOVE',
+          threshold_type: 'ABSOLUTE',
+          threshold_price: '100.00',
+          cooldown_hours: 24,
+          notification_channel: 'WHATSAPP',
+          destination_phone: '+919876543210',
+          last_triggered_at: null,
+          is_active: 1,
+        },
+      ]);
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({ id: 1, name: 'PET Resin' });
+      jest.spyOn(businessRepository, 'findById').mockResolvedValue({ id: 10, user_id: 5, contact_phone: '+919999999999' });
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({ email: 'sme@example.com' });
+      jest.spyOn(alertRuleRepository, 'claimTriggerCooldown').mockResolvedValue(true);
+      jest.spyOn(alertEventRepository, 'create').mockImplementation(async (params) => ({
+        id: 2001,
+        ...params,
+        triggered_at: new Date(),
+      }));
+      jest.spyOn(notificationService, 'sendAlertNotification').mockResolvedValue({ success: true, messageId: 'wa-1' });
+      jest.spyOn(alertEventRepository, 'updateDeliveryStatus').mockResolvedValue(true);
+
+      const events = await alertEvaluationService.evaluateMaterial(10, 1);
+      expect(events).toHaveLength(1);
+      expect(events[0].notificationChannel).toBe('WHATSAPP');
+      expect(events[0].recipientPhoneSnapshot).toBe('+919876543210');
+      expect(events[0].delivery_status).toBe('SENT');
+      expect(notificationService.sendAlertNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'WHATSAPP',
+          to: '+919876543210',
+          materialName: 'PET Resin',
+        })
+      );
+    });
+
+    test('dispatches both EMAIL and WHATSAPP when rule channel is BOTH', async () => {
+      jest.spyOn(priceRepository, 'findLatestByMaterialId').mockResolvedValue({
+        id: 1,
+        price: '125.00',
+        currency: 'INR',
+        is_valid: 1,
+        recorded_at: '2026-11-14 10:00:00',
+      });
+      jest.spyOn(alertRuleRepository, 'listActiveByBusinessId').mockResolvedValue([
+        {
+          id: 402,
+          tracked_material_id: 1,
+          condition_type: 'PRICE_ABOVE',
+          threshold_type: 'ABSOLUTE',
+          threshold_price: '100.00',
+          cooldown_hours: 24,
+          notification_channel: 'BOTH',
+          destination_phone: '+919876543210',
+          last_triggered_at: null,
+          is_active: 1,
+        },
+      ]);
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({ id: 1, name: 'PET Resin' });
+      jest.spyOn(businessRepository, 'findById').mockResolvedValue({ id: 10, user_id: 5 });
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({ email: 'sme@example.com' });
+      jest.spyOn(alertRuleRepository, 'claimTriggerCooldown').mockResolvedValue(true);
+      let eventIdCounter = 3000;
+      jest.spyOn(alertEventRepository, 'create').mockImplementation(async (params) => ({
+        id: ++eventIdCounter,
+        ...params,
+        triggered_at: new Date(),
+      }));
+      jest.spyOn(notificationService, 'sendAlertNotification').mockResolvedValue({ success: true, id: 'multi-dispatch' });
+      jest.spyOn(alertEventRepository, 'updateDeliveryStatus').mockResolvedValue(true);
+
+      const events = await alertEvaluationService.evaluateMaterial(10, 1);
+      expect(events).toHaveLength(2);
+      expect(events.map((e) => e.notificationChannel).sort()).toEqual(['EMAIL', 'WHATSAPP']);
+      expect(events.every((e) => e.delivery_status === 'SENT')).toBe(true);
+    });
+
+    test('marks WHATSAPP event FAILED gracefully when no destination phone is configured', async () => {
+      jest.spyOn(priceRepository, 'findLatestByMaterialId').mockResolvedValue({
+        id: 1,
+        price: '125.00',
+        currency: 'INR',
+        is_valid: 1,
+        recorded_at: '2026-11-14 10:00:00',
+      });
+      jest.spyOn(alertRuleRepository, 'listActiveByBusinessId').mockResolvedValue([
+        {
+          id: 403,
+          tracked_material_id: 1,
+          condition_type: 'PRICE_ABOVE',
+          threshold_type: 'ABSOLUTE',
+          threshold_price: '100.00',
+          cooldown_hours: 24,
+          notification_channel: 'WHATSAPP',
+          destination_phone: null,
+          last_triggered_at: null,
+          is_active: 1,
+        },
+      ]);
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({ id: 1, name: 'PET Resin' });
+      jest.spyOn(businessRepository, 'findById').mockResolvedValue({ id: 10, user_id: 5, contact_phone: null });
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({ email: 'sme@example.com' });
+      jest.spyOn(alertRuleRepository, 'claimTriggerCooldown').mockResolvedValue(true);
+      jest.spyOn(alertEventRepository, 'create').mockImplementation(async (params) => ({
+        id: 4001,
+        ...params,
+        triggered_at: new Date(),
+      }));
+      jest.spyOn(alertEventRepository, 'updateDeliveryStatus').mockResolvedValue(true);
+
+      const events = await alertEvaluationService.evaluateMaterial(10, 1);
+      expect(events).toHaveLength(1);
+      expect(events[0].notificationChannel).toBe('WHATSAPP');
+      expect(events[0].delivery_status).toBe('FAILED');
     });
   });
 

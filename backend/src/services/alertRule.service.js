@@ -47,6 +47,8 @@ async function createRule(businessId, {
   thresholdPrice,
   thresholdType = 'ABSOLUTE',
   cooldownHours = 24,
+  notificationChannel,
+  destinationPhone,
 }) {
   assertValidRuleConfig({ thresholdPrice, thresholdType, cooldownHours });
   const material = await materialRepository.findByIdForBusiness(trackedMaterialId, businessId);
@@ -54,14 +56,22 @@ async function createRule(businessId, {
     throw new AppError(404, 'NOT_FOUND', 'Material not found');
   }
 
-  const rule = await alertRuleRepository.create({
+  const createPayload = {
     businessId,
     trackedMaterialId,
     conditionType,
     thresholdPrice,
     thresholdType,
     cooldownHours,
-  });
+  };
+  if (notificationChannel !== undefined) {
+    createPayload.notificationChannel = notificationChannel;
+  }
+  if (destinationPhone !== undefined) {
+    createPayload.destinationPhone = destinationPhone ? String(destinationPhone).trim() : null;
+  }
+
+  const rule = await alertRuleRepository.create(createPayload);
   return toPublicRule(rule);
 }
 
@@ -77,6 +87,10 @@ async function updateRule(businessId, ruleId, updates) {
     thresholdType: updates.thresholdType !== undefined ? updates.thresholdType : (existing.threshold_type || 'ABSOLUTE'),
     cooldownHours: updates.cooldownHours !== undefined ? updates.cooldownHours : (existing.cooldown_hours || 24),
     isActive: updates.isActive !== undefined ? updates.isActive : !!existing.is_active,
+    notificationChannel: updates.notificationChannel !== undefined ? updates.notificationChannel : (existing.notification_channel || 'EMAIL'),
+    destinationPhone: updates.destinationPhone !== undefined
+      ? (updates.destinationPhone ? String(updates.destinationPhone).trim() : null)
+      : (existing.destination_phone || null),
   };
   assertValidRuleConfig(merged);
 
@@ -125,6 +139,8 @@ function toPublicRule(rule) {
     thresholdPrice: rule.threshold_price,
     thresholdType: rule.threshold_type || 'ABSOLUTE',
     cooldownHours: rule.cooldown_hours !== undefined ? rule.cooldown_hours : 24,
+    notificationChannel: rule.notification_channel || 'EMAIL',
+    destinationPhone: rule.destination_phone || null,
     lastTriggeredAt: lastTriggeredAt || null,
     isActive: !!rule.is_active,
   };
@@ -147,6 +163,7 @@ function toPublicEvent(event) {
       ? Number(event.triggered_change_percent)
       : null,
     notificationChannel: event.notification_channel,
+    recipientPhoneSnapshot: event.recipient_phone_snapshot || null,
     deliveryStatus: event.delivery_status,
     triggeredAt,
   };

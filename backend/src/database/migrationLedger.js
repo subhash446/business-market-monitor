@@ -561,6 +561,35 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
     },
     verifyCustom: verifyMigration027BaselineData,
   },
+  '028_add_procurement_recommendations_to_ai_insights.js': {
+    tables: {
+      ai_insights: {
+        columns: {
+          action_recommendation: { dataType: 'enum', columnTypeIncludes: ['ACCELERATE_PURCHASE', 'DELAY_PURCHASE', 'MAINTAIN_BUFFER', 'MONITOR_ONLY'], isNullable: 'YES' },
+          recommendation_rationale: { dataType: 'text', isNullable: 'YES' },
+          recommendation_horizon: { dataType: 'enum', columnTypeIncludes: ['IMMEDIATE', 'SHORT_TERM', 'MEDIUM_TERM'], isNullable: 'YES' },
+          is_downgraded: { dataType: 'tinyint', isNullable: 'NO' },
+          downgrade_reason: { dataType: 'varchar', isNullable: 'YES' },
+        },
+      },
+    },
+  },
+  '029_add_whatsapp_alert_channel.js': {
+    tables: {
+      alert_rules: {
+        columns: {
+          notification_channel: { dataType: 'enum', columnTypeIncludes: ['EMAIL', 'WHATSAPP', 'BOTH'], isNullable: 'NO' },
+          destination_phone: { dataType: 'varchar', isNullable: 'YES' },
+        },
+      },
+      alert_events: {
+        columns: {
+          notification_channel: { dataType: 'enum', columnTypeIncludes: ['EMAIL', 'WHATSAPP'], isNullable: 'NO' },
+          recipient_phone_snapshot: { dataType: 'varchar', isNullable: 'YES' },
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

@@ -358,7 +358,7 @@ export function MaterialImpactPanel({
               <div className="impact-kpi">
                 <span className="impact-kpi__label">Observed Price Direction</span>
                 <span className="impact-kpi__value">
-                  {directionMeta ? `${directionMeta.symbol} ${directionMeta.label}` : 'Unknown'}
+                  {directionMeta ? `${directionMeta.symbol} ${directionMeta.label}` : '— Insufficient history'}
                 </span>
               </div>
               <div className="impact-kpi">

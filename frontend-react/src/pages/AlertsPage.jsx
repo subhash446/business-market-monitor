@@ -324,9 +324,9 @@ export function AlertsPage() {
 
 /* ================================================================
  * RULES TABLE
- * Columns: Material | Condition | Threshold | Status | Actions
+ * Columns: Material | Condition | Threshold | Channel | Cooldown | Status | Actions
  * ================================================================ */
-function RulesTable({ rules, materials, toggleBusy, onToggle, onDelete, onCreateRule }) {
+export function RulesTable({ rules, materials, toggleBusy = {}, onToggle = () => {}, onDelete = () => {}, onCreateRule = () => {} }) {
   if (rules.length === 0) {
     return (
       <EmptyState
@@ -344,7 +344,7 @@ function RulesTable({ rules, materials, toggleBusy, onToggle, onDelete, onCreate
         <caption className="sr-only">Alert rules</caption>
         <thead>
           <tr className="table__header-row">
-            {['Material', 'Condition', 'Threshold', 'Cooldown', 'Status', 'Actions'].map(col => (
+            {['Material', 'Condition', 'Threshold', 'Channel', 'Cooldown', 'Status', 'Actions'].map(col => (
               <th key={col} className="table__cell table__cell--header" scope="col">
                 {col}
               </th>
@@ -383,6 +383,29 @@ function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
       </td>
       <td className="table__cell font-mono">
         {isPct ? `${formatNumber(rule.thresholdPrice, 1)}%` : formatNumber(rule.thresholdPrice, 2)}
+      </td>
+      <td className="table__cell">
+        <span
+          className={`badge ${
+            rule.notificationChannel === 'WHATSAPP'
+              ? 'badge--success'
+              : rule.notificationChannel === 'BOTH'
+              ? 'badge--info'
+              : 'badge--neutral'
+          }`}
+          style={{ fontSize: '10px' }}
+        >
+          {rule.notificationChannel === 'WHATSAPP'
+            ? 'WhatsApp'
+            : rule.notificationChannel === 'BOTH'
+            ? 'Email + WhatsApp'
+            : 'Email'}
+        </span>
+        {rule.destinationPhone && (
+          <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+            {rule.destinationPhone}
+          </span>
+        )}
       </td>
       <td className="table__cell text-xs text-secondary">
         {rule.cooldownHours || 24}h
@@ -431,7 +454,7 @@ function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
  * EVENTS TABLE
  * Columns: Triggered At | Condition | Triggered Price | Delivery Status
  * ================================================================ */
-function EventsTable({ events }) {
+export function EventsTable({ events }) {
   if (!events || events.length === 0) {
     return (
       <EmptyState
@@ -448,7 +471,7 @@ function EventsTable({ events }) {
         <caption className="sr-only">Alert event history</caption>
         <thead>
           <tr className="table__header-row">
-            {['Triggered At', 'Condition', 'Threshold', 'Observed Change', 'Triggered Price', 'Delivery Status'].map(col => (
+            {['Triggered At', 'Condition', 'Threshold', 'Observed Change', 'Triggered Price', 'Channel', 'Delivery Status'].map(col => (
               <th key={col} className="table__cell table__cell--header" scope="col">
                 {col}
               </th>
@@ -482,6 +505,19 @@ function EventsTable({ events }) {
                 </td>
                 <td className="table__cell font-mono">{formatNumber(evt.triggeredPrice, 2)}</td>
                 <td className="table__cell">
+                  <span
+                    className={`badge ${evt.notificationChannel === 'WHATSAPP' ? 'badge--success' : 'badge--neutral'}`}
+                    style={{ fontSize: '10px' }}
+                  >
+                    {evt.notificationChannel === 'WHATSAPP' ? 'WhatsApp' : 'Email'}
+                  </span>
+                  {evt.recipientPhoneSnapshot && (
+                    <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                      {evt.recipientPhoneSnapshot}
+                    </span>
+                  )}
+                </td>
+                <td className="table__cell">
                   <span className={`badge ${cls}`}>{label}</span>
                 </td>
               </tr>
@@ -499,17 +535,20 @@ function EventsTable({ events }) {
  * POST /api/v1/alerts/rules { trackedMaterialId, conditionType, thresholdPrice }
  * ================================================================ */
 function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
-  const [matId,          setMatId]          = useState('');
-  const [matErr,         setMatErr]         = useState('');
-  const [thresholdType,  setThresholdType]  = useState('ABSOLUTE'); // 'ABSOLUTE' | 'PERCENTAGE'
-  const [condition,      setCondition]      = useState('');
-  const [condErr,        setCondErr]        = useState('');
-  const [threshold,      setThreshold]      = useState('');
-  const [threshErr,      setThreshErr]      = useState('');
-  const [cooldownHours,  setCooldownHours]  = useState('24');
-  const [cooldownErr,    setCooldownErr]    = useState('');
-  const [formErr,        setFormErr]        = useState('');
-  const [saving,         setSaving]         = useState(false);
+  const [matId,                setMatId]                = useState('');
+  const [matErr,               setMatErr]               = useState('');
+  const [thresholdType,        setThresholdType]        = useState('ABSOLUTE'); // 'ABSOLUTE' | 'PERCENTAGE'
+  const [condition,            setCondition]            = useState('');
+  const [condErr,              setCondErr]              = useState('');
+  const [threshold,            setThreshold]            = useState('');
+  const [threshErr,            setThreshErr]            = useState('');
+  const [cooldownHours,        setCooldownHours]        = useState('24');
+  const [cooldownErr,          setCooldownErr]          = useState('');
+  const [notificationChannel,  setNotificationChannel]  = useState('EMAIL'); // 'EMAIL' | 'WHATSAPP' | 'BOTH'
+  const [destinationPhone,     setDestinationPhone]     = useState('');
+  const [phoneErr,             setPhoneErr]             = useState('');
+  const [formErr,              setFormErr]              = useState('');
+  const [saving,               setSaving]               = useState(false);
 
   // Reset on open/close
   useEffect(() => {
@@ -519,6 +558,8 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
       setCondition(''); setCondErr('');
       setThreshold(''); setThreshErr('');
       setCooldownHours('24'); setCooldownErr('');
+      setNotificationChannel('EMAIL');
+      setDestinationPhone(''); setPhoneErr('');
       setFormErr(''); setSaving(false);
     }
   }, [isOpen]);
@@ -528,7 +569,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMatErr(''); setCondErr(''); setThreshErr(''); setCooldownErr(''); setFormErr('');
+    setMatErr(''); setCondErr(''); setThreshErr(''); setCooldownErr(''); setPhoneErr(''); setFormErr('');
 
     let valid = true;
 
@@ -558,16 +599,26 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
       valid = false;
     }
 
+    if (destinationPhone.trim()) {
+      const e164Regex = /^\+[1-9]\d{6,14}$/;
+      if (!e164Regex.test(destinationPhone.trim())) {
+        setPhoneErr('Phone must be a valid E.164 number (e.g. +919876543210).');
+        valid = false;
+      }
+    }
+
     if (!valid) return;
 
     setSaving(true);
     try {
       const created = await createAlertRule({
         trackedMaterialId,
-        conditionType:  condition,
-        thresholdPrice: rawThresh,
+        conditionType:       condition,
+        thresholdPrice:      rawThresh,
         thresholdType,
-        cooldownHours:  cd,
+        cooldownHours:       cd,
+        notificationChannel,
+        destinationPhone:    destinationPhone.trim() || null,
       });
       onClose();
       onCreated(created);
@@ -578,6 +629,10 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
       if (mapped.threshErr) setThreshErr(mapped.threshErr);
       if (mapped.cooldownErr) setCooldownErr(mapped.cooldownErr);
       if (mapped.formErr) setFormErr(mapped.formErr);
+
+      const rawErrors = err?.details ?? err?.errors ?? [];
+      const phoneIssue = Array.isArray(rawErrors) && rawErrors.find(e => e?.field === 'destinationPhone');
+      if (phoneIssue) setPhoneErr(phoneIssue.issue);
     } finally {
       setSaving(false);
     }
@@ -760,6 +815,64 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
             </p>
           )}
         </div>
+
+        {/* Notification Channel selector: Email, WhatsApp, Both */}
+        <div className="form-group">
+          <label className="form-label form-label--required">Notification Channel</label>
+          <div className="filter-group" style={{ display: 'inline-flex', width: '100%' }}>
+            <button
+              type="button"
+              className={`filter-btn ${notificationChannel === 'EMAIL' ? 'filter-btn--active' : ''}`}
+              style={{ flex: 1, textAlign: 'center' }}
+              onClick={() => { setNotificationChannel('EMAIL'); setPhoneErr(''); }}
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              className={`filter-btn ${notificationChannel === 'WHATSAPP' ? 'filter-btn--active' : ''}`}
+              style={{ flex: 1, textAlign: 'center' }}
+              onClick={() => setNotificationChannel('WHATSAPP')}
+            >
+              WhatsApp
+            </button>
+            <button
+              type="button"
+              className={`filter-btn ${notificationChannel === 'BOTH' ? 'filter-btn--active' : ''}`}
+              style={{ flex: 1, textAlign: 'center' }}
+              onClick={() => setNotificationChannel('BOTH')}
+            >
+              Both
+            </button>
+          </div>
+        </div>
+
+        {/* WhatsApp destination phone (shown when WHATSAPP or BOTH is selected) */}
+        {(notificationChannel === 'WHATSAPP' || notificationChannel === 'BOTH') && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="ar-phone">
+              WhatsApp Destination Phone (optional)
+            </label>
+            <input
+              type="tel"
+              id="ar-phone"
+              name="destinationPhone"
+              className={`form-control font-mono${phoneErr ? ' form-control--error' : ''}`}
+              placeholder="+919876543210"
+              value={destinationPhone}
+              onChange={e => { setDestinationPhone(e.target.value); setPhoneErr(''); }}
+              aria-describedby="ar-phone-desc"
+            />
+            <small id="ar-phone-desc" className="text-xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
+              E.164 format with country code. If left blank, your business contact phone will be used.
+            </small>
+            {phoneErr && (
+              <p className="form-error form-error--visible" id="ar-phone-error" role="alert">
+                {phoneErr}
+              </p>
+            )}
+          </div>
+        )}
 
       </form>
     </Modal>
