@@ -26,7 +26,7 @@ import { ToastProvider }  from './components/ui/Toast.jsx';
 import { AppLayout }      from './components/layout/AppLayout.jsx';
 
 /* ── Phase D: Public landing page ─────────────────────────────── */
-import { LandingPage } from './pages/public/LandingPage.jsx';
+import { LandingPage } from './pages/LandingPage.jsx';
 
 /* ── Auth page components ──────────────────────────────────────── */
 import { LoginPage }          from './pages/auth/LoginPage.jsx';
