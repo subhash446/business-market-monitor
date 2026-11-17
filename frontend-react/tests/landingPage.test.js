@@ -200,6 +200,14 @@ describe('Landing Page — Geometry, Sample Data & SSR Verification', () => {
       assert.ok(html.includes('23% in 34 days'));
       assert.ok(html.includes('Self-Serve SME Access'));
       assert.ok(html.includes('Multi-Plant &amp; ERP Sync') || html.includes('Multi-Plant & ERP Sync'));
+      assert.ok(
+        html.includes('mailto:subhashyadav25177@gmail.com'),
+        'Enterprise CTA must point to subhashyadav25177@gmail.com'
+      );
+      assert.ok(
+        html.includes('subhashyadav25177@gmail.com'),
+        'Enterprise card must display copyable email address helper'
+      );
       assert.ok(html.includes('Business Market Monitor'));
       assert.ok(
         html.includes('© 2026 Business Market Monitor · Automated 7:00 AM Briefings') ||

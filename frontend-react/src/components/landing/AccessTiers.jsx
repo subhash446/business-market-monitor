@@ -1,14 +1,48 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+
+const ENTERPRISE_EMAIL = 'subhashyadav25177@gmail.com';
+const MAILTO_SUBJECT = 'Business Market Monitor — Multi-Plant & ERP Inquiry';
+const MAILTO_BODY = `Hi Subhash,
+
+We are interested in Multi-Plant & ERP Sync for Business Market Monitor.
+
+- Company Name:
+- Number of Plants / Locations:
+- Key Raw Materials Tracked:
+- Current ERP / Accounting Tool (e.g., Tally, SAP, Zoho):
+
+Thanks,`;
+
+const MAILTO_URL = `mailto:${ENTERPRISE_EMAIL}?subject=${encodeURIComponent(
+  MAILTO_SUBJECT
+)}&body=${encodeURIComponent(MAILTO_BODY)}`;
 
 /**
  * AccessTiers — Transparent, Honest Tier Comparison
  *
  * Rules:
  * - Free tier for Indian SME manufacturers (unlimited materials, alerts, WhatsApp)
- * - Custom tier for multi-plant ERP operations
+ * - Custom tier for multi-plant ERP operations with grounded direct email CTA
  * - Zero invented enterprise pricing
  */
 export function AccessTiers() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyEmail = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(ENTERPRISE_EMAIL)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => {
+          // Safe fallback if clipboard access is denied
+        });
+    }
+  };
+
   return (
     <section id="access" className="lp-section" aria-label="Transparent Access Options">
       <div className="lp-container">
@@ -113,11 +147,40 @@ export function AccessTiers() {
 
             <div className="lp-tier-action">
               <a
-                href="mailto:engineering@businessmarketmonitor.com?subject=Multi-Plant%20ERP%20Inquiry"
+                href={MAILTO_URL}
                 className="lp-btn lp-btn--secondary lp-btn--full"
               >
                 Contact Engineering
               </a>
+
+              <div className="lp-copy-email-row">
+                <span className="lp-copy-email-text font-mono">
+                  {ENTERPRISE_EMAIL}
+                </span>
+                <button
+                  type="button"
+                  className={`lp-copy-email-btn ${
+                    copied ? 'lp-copy-email-btn--copied' : ''
+                  }`}
+                  onClick={handleCopyEmail}
+                  aria-label={copied ? 'Email address copied' : 'Copy email address'}
+                >
+                  {copied ? (
+                    <>
+                      <i
+                        className="fa-solid fa-check text-emerald-400 mr-1"
+                        aria-hidden="true"
+                      />
+                      Copied ✓
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-regular fa-copy mr-1" aria-hidden="true" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
