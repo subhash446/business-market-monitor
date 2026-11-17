@@ -22,7 +22,7 @@ export function LandingNav() {
   return (
     <header className={`lp-nav ${isScrolled ? 'lp-nav--scrolled' : ''}`}>
       <div className="lp-container lp-nav__inner">
-        {/* Brand logo & wordmark */}
+        {/* Brand logo & unified executive wordmark */}
         <Link to="/" className="lp-nav__brand" aria-label="Business Market Monitor Home">
           <svg
             className="lp-nav__logo"
@@ -40,7 +40,7 @@ export function LandingNav() {
             />
           </svg>
           <span className="lp-nav__title">
-            Business Market <span className="lp-nav__title-accent">Monitor</span>
+            Business Market Monitor
           </span>
         </Link>
 

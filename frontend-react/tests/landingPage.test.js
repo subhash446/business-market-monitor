@@ -200,10 +200,17 @@ describe('Landing Page — Geometry, Sample Data & SSR Verification', () => {
       assert.ok(html.includes('23% in 34 days'));
       assert.ok(html.includes('Self-Serve SME Access'));
       assert.ok(html.includes('Multi-Plant &amp; ERP Sync') || html.includes('Multi-Plant & ERP Sync'));
+      assert.ok(html.includes('Business Market Monitor'));
+      assert.ok(
+        html.includes('© 2026 Business Market Monitor · Automated 7:00 AM Briefings') ||
+        html.includes('&copy; 2026 Business Market Monitor · Automated 7:00 AM Briefings')
+      );
 
       // Honesty boundaries
       assert.ok(!html.includes('View Live Demo'), 'Must NOT invent a live demo account button');
       assert.ok(!html.includes('Hindi'), 'Must NOT claim Hindi alerts when alerts are English');
+      assert.ok(!html.includes('lp-nav__title-accent'), 'Must NOT use split accent styling on Monitor');
+      assert.ok(!html.includes('Deterministic Invariants'), 'Must NOT use developer jargon in footer legal bar');
     });
   });
 });
