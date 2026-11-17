@@ -556,8 +556,10 @@ function MaterialsListContent({
 function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSetSymbol }) {
   return (
     <tr>
-      <td className="table__cell">{material.name}</td>
-      <td className="table__cell">{material.unit}</td>
+      <td className="table__cell font-medium">{material.name}</td>
+      <td className="table__cell">
+        <span className="material-unit-pill">{material.unit}</span>
+      </td>
       <td className="table__cell">
         <SourceBadge isCustom={material.isCustom} />
       </td>
@@ -609,7 +611,9 @@ function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSym
         <span className="material-card__name">{material.name}</span>
         <SourceBadge isCustom={material.isCustom} />
       </div>
-      <p className="material-card__unit">{material.unit}</p>
+      <p className="material-card__unit">
+        <span className="material-unit-pill">{material.unit}</span>
+      </p>
       <div className="material-card__footer">
         <TrackButton material={material} busy={busy} onToggle={onToggle} />
         {material.isTracked && <ActionLinks material={material} />}

@@ -457,7 +457,8 @@ select.form-control option {
   background-color: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
+  border-top: 1px solid rgba(255,255,255,0.05);
   overflow: hidden;
 }
 
@@ -571,7 +572,7 @@ select.form-control option {
 }
 
 .table th {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   text-align: left;
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
@@ -595,7 +596,7 @@ select.form-control option {
 }
 
 .table td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   color: var(--color-text-primary);
   vertical-align: middle;
 }
@@ -655,7 +656,7 @@ select.form-control option {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.65);
+  background-color: rgba(0, 0, 0, 0.72);
   z-index: var(--z-modal);
   display: flex;
   align-items: center;

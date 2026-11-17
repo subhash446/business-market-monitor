@@ -4,6 +4,9 @@
  *
  * Applies design tokens from variables.css to actual HTML elements.
  * Dark-mode only (v1). Doc 3 §15.
+ *
+ * Stage 2A: heading letter-spacing, tabular-nums default on .font-mono,
+ *           crisp focus rings, improved scrollbar styling.
  */
 
 /* ================================================================
@@ -40,6 +43,10 @@ body {
   background-color: var(--color-bg-base);
   color: var(--color-text-primary);
   min-height: 100vh;
+  /* Render Inter at its best on all platforms */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ================================================================
@@ -66,13 +73,14 @@ body {
 }
 
 /* ================================================================
- * HEADINGS
+ * HEADINGS — tighter tracking for premium B2B look
  * ================================================================ */
 
 h1 {
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
   color: var(--color-text-primary);
 }
 
@@ -80,6 +88,7 @@ h2 {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
   color: var(--color-text-primary);
 }
 
@@ -87,6 +96,7 @@ h3 {
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
   color: var(--color-text-primary);
 }
 
@@ -94,6 +104,7 @@ h4, h5, h6 {
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-normal);
   color: var(--color-text-primary);
 }
 
@@ -142,12 +153,13 @@ a:focus-visible {
 
 /* ================================================================
  * CODE / MONOSPACE
+ * tabular-nums: aligns price digits vertically in tables
  * ================================================================ */
 
 code {
   font-family: var(--font-mono);
   font-size: 0.875em;
-  color: var(--color-primary);
+  color: var(--color-primary-light);
   background-color: var(--color-primary-subtle);
   padding: 0.125em 0.375em;
   border-radius: var(--radius-sm);
@@ -170,10 +182,11 @@ pre code {
   color: var(--color-text-primary);
 }
 
-/* Numeric / price display — monospace (Doc 3 §15.3) */
+/* Numeric / price display — monospace with tabular-nums (Doc 3 §15.3) */
 .font-mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
 }
 
 /* ================================================================
@@ -196,7 +209,7 @@ hr {
 }
 
 /* ================================================================
- * SCROLLBAR (webkit — optional visual polish)
+ * SCROLLBAR (webkit — refined for Zinc dark palette)
  * ================================================================ */
 
 ::-webkit-scrollbar {
@@ -205,7 +218,7 @@ hr {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-base);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -214,7 +227,13 @@ hr {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-disabled);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
 }
 
 /* ================================================================

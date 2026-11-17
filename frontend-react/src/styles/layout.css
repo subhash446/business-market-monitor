@@ -165,6 +165,7 @@
 .sidebar__app-name {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -207,7 +208,7 @@
 
 .sidebar__business-name {
   font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -265,6 +266,8 @@
 .nav-link[aria-current="page"] {
   background-color: var(--color-primary-subtle);
   color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 .nav-link--active:hover,
@@ -507,6 +510,7 @@
 .page-header__title {
   font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
   color: var(--color-text-primary);
 }
 

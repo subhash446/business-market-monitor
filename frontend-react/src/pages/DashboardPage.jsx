@@ -96,6 +96,12 @@ export function DashboardPage() {
   const isLoading = status === STATUS.LOADING;
   const isError   = status === STATUS.ERROR;
 
+  const trackedCount = data?.trackedMaterials?.length ?? 0;
+  const withPricesCount = data?.trackedMaterials?.filter(m => m.latestPrice != null)?.length ?? 0;
+  const activeRulesCount = data?.activeAlertRules?.length ?? 0;
+  const recentAlertsCount = data?.recentAlertEvents?.length ?? 0;
+  const aiInsightsCount = aiInsights?.length ?? 0;
+
   return (
     <div className="page-container">
 
@@ -106,6 +112,65 @@ export function DashboardPage() {
           message={errMsg}
           retry={loadDashboard}
         />
+      )}
+
+      {/* ── Top KPI Stat Cards ─────────────────────────────────── */}
+      {!isError && (
+        <div className="dashboard-kpi-grid" aria-label="Key Performance Indicators">
+          <div className="card dashboard-stat">
+            <div className="dashboard-stat__header">
+              <span className="dashboard-stat__label">Tracked Materials</span>
+              <i className="fa-solid fa-boxes-stacked dashboard-stat__icon" aria-hidden="true" />
+            </div>
+            <div className="dashboard-stat__value font-mono">
+              {isLoading ? '—' : trackedCount}
+            </div>
+            <div className="dashboard-stat__footer">
+              <span className="dashboard-stat__subtext">
+                <strong>{isLoading ? '—' : withPricesCount}</strong> with recorded prices
+              </span>
+            </div>
+          </div>
+
+          <div className="card dashboard-stat">
+            <div className="dashboard-stat__header">
+              <span className="dashboard-stat__label">Active Alert Rules</span>
+              <i className="fa-solid fa-bell dashboard-stat__icon" aria-hidden="true" />
+            </div>
+            <div className="dashboard-stat__value font-mono">
+              {isLoading ? '—' : activeRulesCount}
+            </div>
+            <div className="dashboard-stat__footer">
+              <span className="dashboard-stat__subtext">Price threshold monitors</span>
+            </div>
+          </div>
+
+          <div className="card dashboard-stat">
+            <div className="dashboard-stat__header">
+              <span className="dashboard-stat__label">Triggered Events</span>
+              <i className="fa-solid fa-triangle-exclamation dashboard-stat__icon" aria-hidden="true" />
+            </div>
+            <div className="dashboard-stat__value font-mono">
+              {isLoading ? '—' : recentAlertsCount}
+            </div>
+            <div className="dashboard-stat__footer">
+              <span className="dashboard-stat__subtext">Recent threshold crossings</span>
+            </div>
+          </div>
+
+          <div className="card dashboard-stat">
+            <div className="dashboard-stat__header">
+              <span className="dashboard-stat__label">AI Insights</span>
+              <i className="fa-solid fa-robot dashboard-stat__icon text-accent" aria-hidden="true" />
+            </div>
+            <div className="dashboard-stat__value font-mono">
+              {aiInsightsLoading ? '—' : aiInsightsCount}
+            </div>
+            <div className="dashboard-stat__footer">
+              <span className="dashboard-stat__subtext">Active market briefings</span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Dashboard grid — 5 panels */}
@@ -212,7 +277,10 @@ export function DashboardPage() {
               <div className="sync-bar">
                 {/* Price sync */}
                 <div className="sync-bar__item">
-                  <span className="sync-bar__dot" aria-hidden="true" />
+                  <span
+                    className={`sync-bar__dot${!data?.sync?.lastPriceSyncAt ? ' sync-bar__dot--inactive' : ''}`}
+                    aria-hidden="true"
+                  />
                   <span>Last price update:</span>
                   <strong id="sync-price-time" className="sync-bar__value">
                     {isLoading
@@ -224,7 +292,10 @@ export function DashboardPage() {
                 </div>
                 {/* News sync */}
                 <div className="sync-bar__item">
-                  <span className="sync-bar__dot" aria-hidden="true" />
+                  <span
+                    className={`sync-bar__dot${!data?.sync?.lastNewsSyncAt ? ' sync-bar__dot--inactive' : ''}`}
+                    aria-hidden="true"
+                  />
                   <span>Last news update:</span>
                   <strong id="sync-news-time" className="sync-bar__value">
                     {isLoading
@@ -339,14 +410,13 @@ function MaterialsList({ items, onNavigate }) {
                 </span>
                 {material.dataClass && (
                   <span
-                    className={`badge ${
+                    className={`badge dashboard-badge ${
                       material.dataClass === 'OFFICIAL_BENCHMARK'
-                        ? 'badge--info'
+                        ? 'dashboard-badge--benchmark badge--info'
                         : material.dataClass === 'MARKET_INDICATIVE'
-                        ? 'badge--warning'
-                        : 'badge--neutral'
+                        ? 'dashboard-badge--proxy badge--warning'
+                        : 'dashboard-badge--quote badge--neutral'
                     }`}
-                    style={{ fontSize: '10px', padding: '1px 5px' }}
                   >
                     {material.dataClass === 'OFFICIAL_BENCHMARK'
                       ? 'Benchmark'
@@ -459,7 +529,7 @@ function AlertEventsList({ items }) {
       {items.map(event => (
         <li key={event.id} className="dashboard-panel__item">
           {/* formatDateTime returns e.g. "Aug 10, 2026, 02:30 PM" or "—" for null */}
-          <span className="dashboard-panel__item-name">
+          <span className="dashboard-panel__item-name font-mono">
             {formatDateTime(event.triggeredAt)}
           </span>
         </li>

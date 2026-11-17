@@ -5,61 +5,74 @@
  * Source of truth: Document 3 (Frontend) §15
  * ALL visual values in this project derive from these tokens.
  * Do NOT use hard-coded values in other CSS files.
+ *
+ * Stage 2A: Zinc dark palette, adaptive rgba borders, Inter/JetBrains Mono,
+ *           letter-spacing tokens, extended type scale, semantic status bg tokens.
  */
 
 :root {
 
   /* ================================================================
-   * BACKGROUND SCALE
+   * BACKGROUND SCALE — Zinc dark (neutral-dark, not blue-tinted)
    * ================================================================ */
-  --color-bg-base:     #0d1117;   /* Page background */
-  --color-bg-surface:  #161b22;   /* Cards, panels, sidebar */
-  --color-bg-elevated: #1f2937;   /* Modals, dropdowns */
-  --color-bg-hover:    #242d3a;   /* Row / nav hover */
+  --color-bg-base:     #09090b;   /* Zinc-950 — true near-black page bg   */
+  --color-bg-surface:  #18181b;   /* Zinc-900 — cards, panels, sidebar    */
+  --color-bg-elevated: #27272a;   /* Zinc-800 — modals, dropdowns, insets */
+  --color-bg-hover:    #3f3f46;   /* Zinc-700 — hover / active rows       */
+  --color-bg-subtle:   #141414;   /* Between base+surface for inset areas */
 
   /* ================================================================
-   * BORDERS
+   * BORDERS — adaptive rgba for depth perception across surfaces
    * ================================================================ */
-  --color-border:        #30363d;  /* Default borders, dividers */
-  --color-border-strong: #484f58;  /* Active / focused borders */
+  --color-border:        rgba(255, 255, 255, 0.08);  /* Hairline default   */
+  --color-border-strong: rgba(255, 255, 255, 0.15);  /* Active / focused   */
+  --color-border-muted:  rgba(255, 255, 255, 0.04);  /* Inset / recessed   */
 
   /* ================================================================
    * TEXT SCALE
    * ================================================================ */
-  --color-text-primary:   #e6edf3;  /* Main content text */
-  --color-text-secondary: #8b949e;  /* Labels, captions, hints */
-  --color-text-disabled:  #484f58;  /* Disabled elements */
-  --color-text-inverse:   #0d1117;  /* Text on primary buttons */
+  --color-text-primary:   #f4f4f5;  /* Zinc-100 — main content text        */
+  --color-text-secondary: #a1a1aa;  /* Zinc-400 — labels, captions, hints  */
+  --color-text-disabled:  #52525b;  /* Zinc-600 — disabled elements        */
+  --color-text-inverse:   #09090b;  /* Text on primary buttons             */
 
   /* ================================================================
    * BRAND / ACCENT
    * ================================================================ */
-  --color-primary:            #3b82f6;                 /* Primary actions, links, focus rings */
-  --color-primary-hover:      #2563eb;                 /* Primary button hover */
-  --color-primary-subtle:     rgba(59, 130, 246, 0.12);/* Active nav bg, selected items */
-  --color-primary-foreground: #ffffff;                 /* Text on primary buttons */
+  --color-primary:            #3b82f6;                 /* Blue-500 — primary actions, links  */
+  --color-primary-hover:      #2563eb;                 /* Blue-600 — hover                   */
+  --color-primary-light:      #60a5fa;                 /* Blue-400 — icons on dark surfaces  */
+  --color-primary-subtle:     rgba(59, 130, 246, 0.12);/* Active nav bg, selected items      */
+  --color-primary-foreground: #ffffff;                 /* Text on primary buttons            */
 
   /* ================================================================
-   * STATUS COLOURS
+   * STATUS COLOURS — foreground + badge (12%) + banner (8%) variants
    * ================================================================ */
   --color-success:        #22c55e;
-  --color-success-subtle: rgba(34, 197, 94, 0.12);
+  --color-success-subtle: rgba(34, 197, 94, 0.12);   /* badges, status dots  */
+  --color-success-bg:     rgba(34, 197, 94, 0.08);   /* callout / banner bg  */
 
   --color-warning:        #f59e0b;
   --color-warning-subtle: rgba(245, 158, 11, 0.12);
+  --color-warning-bg:     rgba(245, 158, 11, 0.08);
 
   --color-danger:         #ef4444;
   --color-danger-subtle:  rgba(239, 68, 68, 0.12);
+  --color-danger-bg:      rgba(239, 68, 68, 0.08);
 
   --color-info:           #6366f1;
   --color-info-subtle:    rgba(99, 102, 241, 0.12);
+  --color-info-bg:        rgba(99, 102, 241, 0.08);
 
   /* ================================================================
    * TYPOGRAPHY
+   * Inter loaded via Google Fonts in index.html (preconnect + link).
+   * JetBrains Mono replaces Fira Code as primary mono — better
+   * legibility for price/numeric data at small sizes.
    * ================================================================ */
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
                'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'Fira Code', 'Cascadia Code', 'Courier New', Courier, monospace;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
   /* Type scale */
   --text-xs:   0.75rem;    /* 12px */
@@ -69,6 +82,8 @@
   --text-xl:   1.25rem;    /* 20px */
   --text-2xl:  1.5rem;     /* 24px */
   --text-3xl:  1.875rem;   /* 30px */
+  --text-4xl:  2.25rem;    /* 36px — KPI stat display */
+  --text-5xl:  3rem;       /* 48px — hero display */
 
   /* Font weights */
   --weight-normal:   400;
@@ -77,9 +92,17 @@
   --weight-bold:     700;
 
   /* Line heights */
-  --leading-tight:  1.25;
-  --leading-normal: 1.5;
+  --leading-tight:   1.25;
+  --leading-normal:  1.5;
   --leading-relaxed: 1.625;
+
+  /* Letter spacing — tighter headings feel more professional */
+  --tracking-tightest: -0.04em;
+  --tracking-tight:    -0.025em;
+  --tracking-normal:    0;
+  --tracking-wide:      0.025em;
+  --tracking-wider:     0.05em;
+  --tracking-widest:    0.1em;
 
   /* ================================================================
    * SPACING SCALE (4 px base unit)
@@ -110,13 +133,16 @@
   --radius-full: 9999px;
 
   /* ================================================================
-   * SHADOWS (dark-mode tuned)
+   * SHADOWS — slightly stronger for the darker Zinc base
    * ================================================================ */
-  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.40);
-  --shadow-md:    0 4px 6px  rgba(0, 0, 0, 0.50);
-  --shadow-lg:    0 10px 15px rgba(0, 0, 0, 0.60);
-  --shadow-xl:    0 20px 25px rgba(0, 0, 0, 0.70);
-  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.50);
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.50);
+  --shadow-md:    0 4px 8px  rgba(0, 0, 0, 0.60);
+  --shadow-lg:    0 10px 20px rgba(0, 0, 0, 0.70);
+  --shadow-xl:    0 20px 30px rgba(0, 0, 0, 0.80);
+  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.45);
+
+  /* Card depth: directional drop shadow */
+  --shadow-card:  0 1px 3px rgba(0, 0, 0, 0.60), 0 1px 2px rgba(0, 0, 0, 0.40);
 
   /* ================================================================
    * TRANSITIONS

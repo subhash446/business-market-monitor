@@ -2,69 +2,70 @@
  * Materials page styles
  * Business Market Monitor — Frontend v1.0
  *
- * Doc 3 §5.5, Doc 4 §4.1 — css/pages/materials.css
- *
- * All component base styles (card, table, badge, btn, form-*)
- * come from components.css. Only materials-page-specific
- * layout rules are defined here.
+ * Modern Linear / Tremor caliber styling for material tracking & symbols.
+ * Solid Zinc cards, adaptive hairline borders, refined segmented controls.
  */
 
 /* ── Toolbar ─────────────────────────────────────────────────────── */
-
 .materials-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
-/* ── Filter button group ─────────────────────────────────────────── */
-
+/* ── Segmented filter bar ────────────────────────────────────────── */
+.filter-bar,
 .filter-group {
-  display: flex;
-  gap: 0;
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  padding: 3px;
+  gap: 2px;
 }
 
 .filter-btn {
-  background: none;
-  border: none;
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--text-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 5px 14px;
+  font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color var(--transition-fast),
-              color var(--transition-fast);
-}
-
-.filter-btn + .filter-btn {
-  border-left: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+  line-height: 1.4;
 }
 
 .filter-btn:hover {
-  background-color: var(--color-bg-elevated);
+  background-color: rgba(255, 255, 255, 0.04);
   color: var(--color-text-primary);
 }
 
 .filter-btn--active {
-  background-color: var(--color-primary);
-  color: var(--color-white, #fff);
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--weight-semibold);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .filter-btn--active:hover {
-  background-color: var(--color-primary);
-  color: var(--color-white, #fff);
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-primary);
 }
 
 /* ── Add Custom Material collapsible panel ───────────────────────── */
-
 .add-panel {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-6);
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   transition: max-height 0.25s ease, opacity 0.2s ease;
   max-height: 600px;
@@ -96,10 +97,10 @@
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
+  margin-top: var(--space-4);
 }
 
 /* ── Materials list container ────────────────────────────────────── */
-
 #materials-list-container {
   min-height: 120px;
 }
@@ -122,8 +123,10 @@
   .materials-table-wrap {
     display: block;
     overflow-x: auto;
+    background-color: var(--color-bg-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
   }
 
   .materials-cards {
@@ -131,10 +134,68 @@
   }
 }
 
-/* ── Material card (mobile) ──────────────────────────────────────── */
+/* ── Table structure & styling ───────────────────────────────────── */
+.materials-table-wrap .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
 
+.materials-table-wrap .table th {
+  padding: var(--space-3) var(--space-5);
+  text-align: left;
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  white-space: nowrap;
+  background-color: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.materials-table-wrap .table td {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  vertical-align: middle;
+}
+
+.materials-table-wrap .table tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+.materials-table-wrap .table tbody tr:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.materials-table-wrap .table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Material unit badge */
+.material-unit-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Material card (mobile) ──────────────────────────────────────── */
 .material-card {
-  padding: var(--space-4);
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .material-card__header {
@@ -142,7 +203,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .material-card__name {
@@ -159,7 +220,7 @@
 .material-card__unit {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
   font-family: var(--font-mono);
 }
 
@@ -168,46 +229,76 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  padding-top: var(--space-2);
 }
 
 /* ── Action links in row/card ────────────────────────────────────── */
-
 .materials-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+}
+
+.materials-actions .btn {
+  height: 28px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background-color: transparent;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.materials-actions .btn:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-elevated);
+  border-color: var(--color-border);
 }
 
 /* ── External symbol select ──────────────────────────────────────── */
-
-/* Wrapper provides relative positioning for the spinner overlay */
 .symbol-select-wrap {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
+  max-width: 320px;
 }
 
-/* Compact select — narrower than the default form-control */
 .symbol-select {
-  min-width: 9rem;
-  padding-top: var(--space-1);
-  padding-bottom: var(--space-1);
+  width: 100%;
+  min-width: 13rem;
+  height: 32px;
+  padding: 4px var(--space-3);
   font-size: var(--text-xs);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-/* Dim the select while the API call is in flight */
+.symbol-select:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+.symbol-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
+}
+
 .symbol-select--loading {
   opacity: 0.6;
   pointer-events: none;
 }
 
-/* Inline spinner: a small rotating ring next to the select */
 .symbol-select__spinner {
   display: inline-block;
-  width: 0.875rem;
-  height: 0.875rem;
-  border: 2px solid var(--color-border);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border-strong);
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: symbol-spin 0.7s linear infinite;
@@ -218,6 +309,12 @@
   to { transform: rotate(360deg); }
 }
 
+.material-symbol-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* Mobile card: symbol row below the footer buttons */
 .material-card__symbol {
   margin-top: var(--space-3);
@@ -226,12 +323,19 @@
 }
 
 /* ── Responsive overrides ────────────────────────────────────────── */
-
 @media (max-width: 639px) {
-  /* Stack toolbar filters and add-button vertically */
   .materials-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .filter-bar {
+    width: 100%;
+  }
+
+  .filter-btn {
+    flex: 1;
+    text-align: center;
   }
 
   #add-material-toggle-btn {
@@ -239,9 +343,9 @@
     justify-content: center;
   }
 
-  /* Symbol select expands to fill card width on mobile */
   .material-card__symbol .symbol-select-wrap {
     width: 100%;
+    max-width: 100%;
   }
 
   .material-card__symbol .symbol-select {

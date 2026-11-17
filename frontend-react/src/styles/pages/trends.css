@@ -1,43 +1,57 @@
 /**
  * Trends page styles
- * Business Market Monitor — Frontend v1.0
+ * Business Market Monitor — High-Caliber SaaS Redesign
  *
- * Doc 3 §5.10, §15.9, Doc 4 §9.1 — css/pages/trends.css
- *
- * Component base styles (table, btn, form-*)
- * come from components.css. Only trends-page-specific layout
- * and chart rules are defined here.
+ * Linear / Tremor dark theme aesthetics:
+ * - Segmented tab bar with subtle surface elevation
+ * - Inset Zinc chart viewport with subtle depth
+ * - Tabular numbers and JetBrains Mono metrics
+ * - Hairline 1px borders (rgba(255, 255, 255, 0.08))
+ * - Grounded supplier sourcing & inventory guidance card
  */
 
 /* ── Tab bar ─────────────────────────────────────────────────────── */
 
 .tab-bar {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 3px;
+  gap: 4px;
   margin-bottom: var(--space-6);
 }
 
 .tab-btn {
-  background: none;
+  background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--color-text-secondary);
   cursor: pointer;
-  margin-bottom: -2px;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition: all var(--transition-fast);
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
   color: var(--color-text-primary);
+  background-color: var(--color-bg-elevated);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 .tab-btn--active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  font-weight: var(--weight-semibold);
 }
 
 /* ── Tab panels ──────────────────────────────────────────────────── */
@@ -50,57 +64,74 @@
   display: none;
 }
 
-/* ── Controls row ────────────────────────────────────────────────── */
+/* ── Filter bar ──────────────────────────────────────────────────── */
 
-.trends-controls {
+.trends-filter-bar {
+  margin-bottom: var(--space-5);
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.trends-filter-bar__body {
   display: flex;
   align-items: flex-end;
   gap: var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5);
 }
 
-.trends-controls .form-group {
-  flex: 0 0 auto;
-  min-width: 140px;
+.trends-filter-bar__body--compare {
+  align-items: flex-start;
+}
+
+.trends-filter-bar__item {
+  flex: 1 1 180px;
+  min-width: 150px;
   margin-bottom: 0;
 }
 
-.trends-controls__material {
-  flex: 1 1 200px;
-  min-width: 180px;
-}
-
-.trends-controls__action {
+.trends-filter-bar__actions {
   flex: 0 0 auto;
+  margin-bottom: 0;
+  align-self: flex-end;
 }
 
 /* ── Compare: material checkbox list ────────────────────────────── */
 
-.cmp-material-section {
-  flex: 1 1 200px;
-  min-width: 200px;
+.trends-compare-list-wrap {
+  flex: 2 1 280px;
+  min-width: 240px;
+  margin-bottom: 0;
 }
 
 .cmp-material-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-3);
-  background: var(--color-bg-elevated);
+  padding: var(--space-2);
+  background-color: var(--color-bg-base);
 }
 
 .cmp-material-label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--color-text-primary);
   cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.cmp-material-label:hover {
+  background-color: var(--color-bg-elevated);
 }
 
 .cmp-material-label input[type="checkbox"] {
@@ -114,22 +145,62 @@
 .cmp-counter {
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
+  font-family: var(--font-mono);
   margin-top: var(--space-2);
   margin-bottom: 0;
   min-height: 1.2em;
 }
 
-/* ── Chart container ─────────────────────────────────────────────── */
+/* ── Benchmark / Proxy notices ───────────────────────────────────── */
+
+.trends-notice {
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.trends-notice--info {
+  background-color: var(--color-info-subtle);
+  border: 1px solid var(--color-info);
+  border-left: 3px solid var(--color-info);
+}
+
+.trends-notice--warning {
+  background-color: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+  border-left: 3px solid var(--color-warning);
+}
+
+/* ── Multi-Currency comparison warning ───────────────────────────── */
+
+.trends-currency-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  margin-bottom: var(--space-3);
+}
+
+/* ── Chart container (Inset Zinc Depth) ──────────────────────────── */
 
 .chart-container {
   position: relative;
-  height: 320px;
+  height: 340px;
   width: 100%;
-  background: var(--color-bg-elevated);
+  background-color: var(--color-bg-base);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .chart-container canvas {
@@ -138,21 +209,34 @@
   height: 100% !important;
 }
 
-/* ── Data table toggle ───────────────────────────────────────────── */
+/* ── Accessible data table toggle & table ────────────────────────── */
 
-.chart-data-table-toggle {
-  display: flex;
-  justify-content: flex-end;
+.trends-show-table-btn {
   margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
 }
 
-/* ── Accessible data table container ────────────────────────────── */
+.trends-show-table-btn:hover {
+  color: var(--color-text-primary);
+}
 
-.chart-data-table {
+.trends-data-table {
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   margin-bottom: var(--space-4);
+  background-color: var(--color-bg-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.trends-data-table table {
+  margin-bottom: 0;
+}
+
+.trends-data-table td.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Pagination ──────────────────────────────────────────────────── */
@@ -161,18 +245,179 @@
   margin-top: var(--space-4);
 }
 
+/* ── AI Insight section wrapper ──────────────────────────────────── */
+
+.trends-insight-section {
+  margin-top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Supplier Sourcing Guidance Card (T-08 / FR-ALERT-06) ────────── */
+
+.supplier-guidance-card {
+  margin-top: var(--space-4);
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.supplier-guidance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.supplier-guidance-header__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.supplier-action-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.supplier-action-pill--accelerate {
+  background-color: var(--color-danger-subtle);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.supplier-action-pill--delay {
+  background-color: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.supplier-action-pill--maintain {
+  background-color: var(--color-info-subtle);
+  border-color: var(--color-info);
+  color: var(--color-info);
+}
+
+.supplier-action-pill--monitor {
+  background-color: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.supplier-guidance-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.supplier-subpanel {
+  background-color: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.supplier-subpanel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.supplier-subpanel__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.supplier-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.supplier-metric-card {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.supplier-metric-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  font-weight: var(--weight-medium);
+}
+
+.supplier-metric-value {
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+}
+
+.supplier-checklist {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.supplier-checklist li {
+  margin-bottom: var(--space-1);
+}
+
 /* ── Responsive ──────────────────────────────────────────────────── */
 
 @media (max-width: 639px) {
-  .trends-controls {
+  .trends-filter-bar__body {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .trends-controls .form-group,
-  .trends-controls__material,
-  .cmp-material-section {
+  .trends-filter-bar__item,
+  .trends-compare-list-wrap {
     min-width: unset;
+    width: 100%;
+  }
+
+  .trends-filter-bar__actions {
+    align-self: stretch;
+  }
+
+  .trends-filter-bar__actions .btn {
     width: 100%;
   }
 
