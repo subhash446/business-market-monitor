@@ -16,8 +16,10 @@
 
 const { pool } = require('../database/connection');
 const materialRepository = require('../repositories/material.repository');
+const newsRepository = require('../repositories/news.repository');
 const aiInsightQueryService = require('./aiInsightQuery.service');
 const inventoryDecisionService = require('./inventoryDecision.service');
+const priceOutlookService = require('./priceOutlook.service');
 const { ACTION_RECOMMENDATION } = require('../constants/enums');
 const AppError = require('../utils/AppError');
 
@@ -309,9 +311,12 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
     throw new AppError(404, 'NOT_FOUND', 'Tracked material not found');
   }
 
-  const [prices, latestInsight] = await Promise.all([
+  const [prices, latestInsight, candidateNews] = await Promise.all([
     getRecentPrices(materialId),
     aiInsightQueryService.getLatestInsight(businessId, materialId).catch(() => null),
+    material.industry_id
+      ? newsRepository.listRecentByIndustry(material.industry_id, 10).catch(() => [])
+      : Promise.resolve([]),
   ]);
 
   const quoteAnalysis = analyzeQuoteVsBenchmark(prices);
@@ -331,6 +336,14 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
     materialUnit: material.unit_abbreviation,
     actionRecommendation: recommendation.action,
     prices,
+  });
+
+  // V3-M2: Evaluate directional price outlook and bands
+  const priceOutlook = priceOutlookService.evaluatePriceOutlook({
+    prices,
+    newsHeadlines: candidateNews || [],
+    materialUnit: material.unit_abbreviation,
+    materialName: material.name,
   });
 
   const effectiveAction = (inventoryDecision.hasInventoryProfile && inventoryDecision.isBridgeOverride)
@@ -371,9 +384,34 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
       crossCurrencyNote: quoteAnalysis.crossCurrencyNote,
     },
     inventoryDecision,
+    priceOutlook,
     diversification,
     evaluatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Get directional price outlook for a single tracked material (V3-M2).
+ */
+async function getMaterialPriceOutlook(businessId, materialId) {
+  const material = await materialRepository.findByIdForBusiness(materialId, businessId);
+  if (!material) {
+    throw new AppError(404, 'NOT_FOUND', 'Tracked material not found');
+  }
+
+  const [prices, candidateNews] = await Promise.all([
+    getRecentPrices(materialId),
+    material.industry_id
+      ? newsRepository.listRecentByIndustry(material.industry_id, 10).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+
+  return priceOutlookService.evaluatePriceOutlook({
+    prices,
+    newsHeadlines: candidateNews || [],
+    materialUnit: material.unit_abbreviation,
+    materialName: material.name,
+  });
 }
 
 /**
@@ -448,4 +486,5 @@ module.exports = {
   resolveActionRecommendation,
   getMaterialSupplierRecommendations,
   getBusinessSupplierRecommendations,
+  getMaterialPriceOutlook,
 };

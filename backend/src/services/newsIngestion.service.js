@@ -27,6 +27,7 @@
  */
 
 const newsRepository = require('../repositories/news.repository');
+const newsImpactScorer = require('./newsImpactScorer.service');
 
 /**
  * Ingest a single article. Handles dedup, insert, and tagging.
@@ -48,14 +49,26 @@ async function ingestArticle(article, keywords) {
       return { status: 'skipped', reason: 'duplicate' };
     }
 
-    // === Step 2: Insert the article ===
-    const normalizedArticle = {
-  ...article,
-  publishedAt: normalizePublishedAt(article.publishedAt),
-};
+    // === Step 2: Score and insert the article (V3-M2) ===
+    let impactScores = null;
+    try {
+      impactScores = await newsImpactScorer.scoreArticle(article);
+    } catch {
+      impactScores = newsImpactScorer.scoreArticleDeterministic(article);
+    }
 
-const { insertId: newsItemId } =
- await newsRepository.create(normalizedArticle);
+    const normalizedArticle = {
+      ...article,
+      publishedAt: normalizePublishedAt(article.publishedAt),
+      impactDirection: impactScores?.impactDirection || null,
+      severityScore: impactScores?.severityScore || null,
+      expectedLagDays: impactScores?.expectedLagDays || null,
+      impactRationale: impactScores?.impactRationale || null,
+      scoringMethod: impactScores?.scoringMethod || null,
+      impactScoredAt: impactScores?.impactScoredAt || null,
+    };
+
+    const { insertId: newsItemId } = await newsRepository.create(normalizedArticle);
 
     // === Step 3: Tag the article to matching industries ===
     await tagArticle(newsItemId, article, keywords);

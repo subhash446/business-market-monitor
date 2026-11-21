@@ -117,17 +117,77 @@ async function existsByUrlHash(url) {
  * Insert one article into news_items.
  * The url_hash is computed here — callers only pass the raw URL.
  *
- * @param {{ title, url, sourceName, publishedAt, summary }} article
+ * @param {{
+ *   title: string,
+ *   url: string,
+ *   sourceName?: string|null,
+ *   publishedAt?: string|null,
+ *   summary?: string|null,
+ *   impactDirection?: string|null,
+ *   severityScore?: number|null,
+ *   expectedLagDays?: number|null,
+ *   impactRationale?: string|null,
+ *   scoringMethod?: string|null,
+ *   impactScoredAt?: string|null,
+ * }} article
  * @returns {Promise<{ insertId: number }>}  — the new row's id
  */
-async function create({ title, url, sourceName, publishedAt, summary }) {
+async function create({
+  title, url, sourceName, publishedAt, summary,
+  impactDirection = null, severityScore = null, expectedLagDays = null,
+  impactRationale = null, scoringMethod = null, impactScoredAt = null,
+}) {
   const urlHash = hashUrl(url);
   const [result] = await pool.execute(
-    `INSERT INTO news_items (title, url, url_hash, summary, source_name, published_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [title, url, urlHash, summary || null, sourceName || null, publishedAt || null]
+    `INSERT INTO news_items (
+       title, url, url_hash, summary, source_name, published_at,
+       impact_direction, severity_score, expected_lag_days,
+       impact_rationale, scoring_method, impact_scored_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      title,
+      url,
+      urlHash,
+      summary || null,
+      sourceName || null,
+      publishedAt || null,
+      impactDirection || null,
+      severityScore || null,
+      expectedLagDays || null,
+      impactRationale || null,
+      scoringMethod || null,
+      impactScoredAt ? new Date(impactScoredAt) : null,
+    ]
   );
   return { insertId: result.insertId };
+}
+
+/**
+ * Update impact scoring columns for an existing news item.
+ */
+async function updateImpactScores(newsItemId, {
+  impactDirection, severityScore, expectedLagDays, impactRationale, scoringMethod, impactScoredAt,
+}) {
+  await pool.execute(
+    `UPDATE news_items
+     SET impact_direction = ?,
+         severity_score = ?,
+         expected_lag_days = ?,
+         impact_rationale = ?,
+         scoring_method = ?,
+         impact_scored_at = ?
+     WHERE id = ?`,
+    [
+      impactDirection || null,
+      severityScore || null,
+      expectedLagDays || null,
+      impactRationale || null,
+      scoringMethod || null,
+      impactScoredAt ? new Date(impactScoredAt) : new Date(),
+      newsItemId,
+    ]
+  );
 }
 
 /**
@@ -172,7 +232,13 @@ async function listRecentByIndustry(industryId, limit = 10) {
        ni.url,
        ni.summary,
        ni.source_name,
-       ni.published_at
+       ni.published_at,
+       ni.impact_direction,
+       ni.severity_score,
+       ni.expected_lag_days,
+       ni.impact_rationale,
+       ni.scoring_method,
+       ni.impact_scored_at
      FROM news_items ni
      JOIN news_item_tags nit
        ON nit.news_item_id = ni.id
@@ -190,6 +256,7 @@ module.exports = {
   countByIndustry,
   existsByUrlHash,
   create,
+  updateImpactScores,
   createTag,
   listKeywordsWithIndustry,
   hashUrl,

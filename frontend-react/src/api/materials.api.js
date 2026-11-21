@@ -127,3 +127,15 @@ export async function updateMaterialInventory(materialId, inventoryData) {
   const { data } = await patch(`/materials/${materialId}/inventory`, inventoryData);
   return data;
 }
+
+/**
+ * Fetch directional price outlook and 14d/30d statistical bands for a tracked material (V3-M2).
+ * GET /api/v1/materials/:materialId/price-outlook
+ *
+ * @param {number|string} materialId
+ * @returns {Promise<Object>}
+ */
+export async function getMaterialPriceOutlook(materialId) {
+  const { data } = await get(`/materials/${materialId}/price-outlook`);
+  return data;
+}

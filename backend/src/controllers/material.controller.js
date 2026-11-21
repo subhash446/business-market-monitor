@@ -99,6 +99,20 @@ async function getSupplierRecommendations(req, res, next) {
   }
 }
 
+// GET /api/v1/materials/:materialId/price-outlook — V3-M2
+async function getPriceOutlook(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const outlook = await supplierRecommendationService.getMaterialPriceOutlook(
+      businessId,
+      req.params.materialId
+    );
+    sendSuccess(res, outlook);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listMaterials,
   updateMaterial,
@@ -106,4 +120,5 @@ module.exports = {
   setExternalSymbol,
   updateInventoryProfile,
   getSupplierRecommendations,
+  getPriceOutlook,
 };

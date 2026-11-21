@@ -618,6 +618,23 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '032_add_news_impact_scoring_to_news_items.js': {
+    tables: {
+      news_items: {
+        columns: {
+          impact_direction: { dataType: 'enum', columnTypeIncludes: ['COST_UP', 'COST_DOWN', 'NEUTRAL'], isNullable: 'YES' },
+          severity_score: { dataType: ['tinyint', 'int'], isNullable: 'YES' },
+          expected_lag_days: { dataType: ['smallint', 'int'], isNullable: 'YES' },
+          impact_rationale: { dataType: 'varchar', isNullable: 'YES' },
+          scoring_method: { dataType: 'enum', columnTypeIncludes: ['DETERMINISTIC_HEURISTIC', 'AI_ASSISTED'], isNullable: 'YES' },
+          impact_scored_at: { dataType: ['datetime', 'timestamp'], isNullable: 'YES' },
+        },
+        indexes: {
+          idx_news_items_impact: {},
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

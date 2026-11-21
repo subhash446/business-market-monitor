@@ -245,6 +245,8 @@ describe('Supplier Recommendations Service (T-08 / FR-ALERT-06)', () => {
       expect(res.diversification.category).toBe('Petrochemicals & Polymers');
       expect(res.inventoryDecision).toBeDefined();
       expect(res.inventoryDecision.hasInventoryProfile).toBe(false);
+      expect(res.priceOutlook).toBeDefined();
+      expect(res.priceOutlook.evaluatedAt).toBeDefined();
     });
 
     test('getMaterialSupplierRecommendations triggers BUY_MINIMUM_BRIDGE override when inventory is CRITICAL during DELAY_PURCHASE', async () => {

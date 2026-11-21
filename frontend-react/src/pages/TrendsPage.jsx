@@ -725,6 +725,12 @@ export function TrendsPage() {
               error={insightError}
               title={`AI Insight -- ${selectedHistMaterial?.name ?? 'Selected Material'}`}
             />
+            <PriceOutlookCard
+              outlook={supplierRec?.priceOutlook}
+              loading={supplierRecLoading}
+              error={supplierRecError}
+              materialName={selectedHistMaterial?.name}
+            />
             <SupplierGuidanceCard
               rec={supplierRec}
               loading={supplierRecLoading}
@@ -956,6 +962,269 @@ function CompareTable({ comparison }) {
         </tbody>
       </table>
     </>
+  );
+}
+
+/* ================================================================
+ * DIRECTIONAL PRICE OUTLOOK & BANDS CARD (V3-M2)
+ * ================================================================ */
+
+export function formatRelativeDays(publishedAt, evaluatedAt) {
+  if (!publishedAt || !evaluatedAt) return 'Recent';
+  const tPub = new Date(publishedAt).getTime();
+  const tEval = new Date(evaluatedAt).getTime();
+  if (isNaN(tPub) || isNaN(tEval)) return 'Recent';
+  const diffHours = Math.max(0, Math.round((tEval - tPub) / (1000 * 60 * 60)));
+  if (diffHours < 24) {
+    return `${Math.max(1, diffHours)}h ago`;
+  }
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+export function PriceOutlookCard({ outlook, loading, error, materialName }) {
+  if (loading) {
+    return (
+      <div className="card price-outlook-card" id="price-outlook-card">
+        <div className="card__body">
+          <Skeleton type="card" rows={3} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card price-outlook-card" id="price-outlook-card">
+        <div className="card__body">
+          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+            <i className="fa-solid fa-circle-exclamation mr-1" /> {error}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!outlook) return null;
+
+  if (outlook.insufficientData) {
+    return (
+      <div className="card price-outlook-card" id="price-outlook-card">
+        <div className="price-outlook-header">
+          <h3 className="price-outlook-header__title">
+            <i className="fa-solid fa-chart-line mr-2" style={{ color: 'var(--color-primary)' }} />
+            14d &amp; 30d Directional Price Outlook — {materialName || 'Tracked Material'}
+          </h3>
+          <span className="badge badge--neutral">INSUFFICIENT DATA</span>
+        </div>
+        <div className="card__body" style={{ padding: 'var(--space-4)' }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+            {outlook.reason || 'At least 5 historical price points are required to compute statistical volatility and directional bands.'}
+          </p>
+          <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+            Current points logged: <strong className="font-mono">{outlook.dataPointCount || 0}</strong> / {outlook.minimumRequired || 5}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const direction = outlook.expectedDirection || 'RANGE_BOUND';
+  const dirClass =
+    direction === 'UPWARD_PRESSURE'   ? 'outlook-dir-pill--up' :
+    direction === 'DOWNWARD_PRESSURE' ? 'outlook-dir-pill--down' :
+    'outlook-dir-pill--range';
+
+  const dirLabel =
+    direction === 'UPWARD_PRESSURE'   ? 'Upward Cost Pressure' :
+    direction === 'DOWNWARD_PRESSURE' ? 'Downward Softening' :
+    'Range-Bound / Neutral';
+
+  const tierClass =
+    outlook.confidenceTier === 'HIGH'     ? 'badge--success' :
+    outlook.confidenceTier === 'MODERATE' ? 'badge--warning' : 'badge--neutral';
+
+  return (
+    <div className="card price-outlook-card" id="price-outlook-card">
+      <div className="price-outlook-header">
+        <div className="price-outlook-header__left">
+          <h3 className="price-outlook-header__title">
+            <i className="fa-solid fa-chart-line mr-2" style={{ color: 'var(--color-primary)' }} />
+            14d &amp; 30d Directional Price Outlook — {materialName || 'Tracked Material'}
+          </h3>
+          <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px' }}>
+            Series: {outlook.seriesSource === 'SUPPLIER_QUOTE' ? 'Domestic Supplier Quotes' : 'Market Benchmark'} ({outlook.currency}/{outlook.unit})
+          </span>
+        </div>
+        <div className="price-outlook-header__badges">
+          <span className={`outlook-dir-pill ${dirClass}`}>
+            <i className={`fa-solid ${direction === 'UPWARD_PRESSURE' ? 'fa-arrow-trend-up' : direction === 'DOWNWARD_PRESSURE' ? 'fa-arrow-trend-down' : 'fa-arrows-left-right'} mr-1`} />
+            {dirLabel}
+          </span>
+          <span className={`badge ${tierClass}`} style={{ fontSize: '11px', padding: '3px 8px' }}>
+            {outlook.confidenceTier} ({outlook.confidenceScore}%)
+          </span>
+        </div>
+      </div>
+
+      <div className="price-outlook-body">
+        {outlook.isDataStale && (
+          <div className="alert alert--warning" style={{ fontSize: 'var(--text-xs)', marginBottom: 'var(--space-3)' }}>
+            <i className="fa-solid fa-clock-rotate-left mr-1" />
+            Latest price was recorded {outlook.daysSinceLatest} days ago. Statistical confidence is downgraded until fresh prices are logged.
+          </div>
+        )}
+
+        {/* 14d & 30d Directional Bands Grid */}
+        <div className="outlook-bands-grid">
+          {/* 14-Day Horizon */}
+          <div className="outlook-band-card">
+            <div className="outlook-band-card__header">
+              <span className="outlook-band-label">14-Day Price Band</span>
+              <span className="outlook-band-vol font-mono">±{outlook.volatility14dPct}% vol</span>
+            </div>
+            <div className="outlook-band-values">
+              <div className="outlook-band-col">
+                <span className="outlook-sublabel">Low Target</span>
+                <span className="outlook-value font-mono">
+                  {outlook.currency} {Number(outlook.band14d?.low || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="outlook-band-col outlook-band-col--mid">
+                <span className="outlook-sublabel">Expected Mid</span>
+                <span className="outlook-value font-mono" style={{ color: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'inherit' }}>
+                  {outlook.currency} {Number(outlook.band14d?.mid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="outlook-band-col">
+                <span className="outlook-sublabel">High Target</span>
+                <span className="outlook-value font-mono">
+                  {outlook.currency} {Number(outlook.band14d?.high || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+            <div className="outlook-progress-bar">
+              <div
+                className="outlook-progress-fill"
+                style={{
+                  width: `${Math.max(5, Math.min(95, (((outlook.currentPrice - outlook.band14d?.low) / Math.max(0.01, (outlook.band14d?.high || 1) - (outlook.band14d?.low || 0))) * 100)))}%`,
+                  backgroundColor: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'var(--color-primary)',
+                }}
+              />
+            </div>
+            <span className="outlook-curr-hint font-mono">Current: {outlook.currency} {Number(outlook.currentPrice || 0).toFixed(2)}</span>
+          </div>
+
+          {/* 30-Day Horizon */}
+          <div className="outlook-band-card">
+            <div className="outlook-band-card__header">
+              <span className="outlook-band-label">30-Day Price Band</span>
+              <span className="outlook-band-vol font-mono">±{outlook.volatility30dPct}% vol</span>
+            </div>
+            <div className="outlook-band-values">
+              <div className="outlook-band-col">
+                <span className="outlook-sublabel">Low Target</span>
+                <span className="outlook-value font-mono">
+                  {outlook.currency} {Number(outlook.band30d?.low || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="outlook-band-col outlook-band-col--mid">
+                <span className="outlook-sublabel">Expected Mid</span>
+                <span className="outlook-value font-mono" style={{ color: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'inherit' }}>
+                  {outlook.currency} {Number(outlook.band30d?.mid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="outlook-band-col">
+                <span className="outlook-sublabel">High Target</span>
+                <span className="outlook-value font-mono">
+                  {outlook.currency} {Number(outlook.band30d?.high || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+            <div className="outlook-progress-bar">
+              <div
+                className="outlook-progress-fill"
+                style={{
+                  width: `${Math.max(5, Math.min(95, (((outlook.currentPrice - outlook.band30d?.low) / Math.max(0.01, (outlook.band30d?.high || 1) - (outlook.band30d?.low || 0))) * 100)))}%`,
+                  backgroundColor: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'var(--color-primary)',
+                }}
+              />
+            </div>
+            <span className="outlook-curr-hint font-mono">Current: {outlook.currency} {Number(outlook.currentPrice || 0).toFixed(2)}</span>
+          </div>
+        </div>
+
+        {/* Confidence Drivers & Key Signals */}
+        {outlook.confidenceDrivers && outlook.confidenceDrivers.length > 0 && (
+          <div className="outlook-subpanel">
+            <h4 className="outlook-subpanel__title">
+              <i className="fa-solid fa-satellite-dish mr-2" style={{ color: 'var(--color-primary)' }} />
+              Signal Alignment &amp; Drivers
+            </h4>
+            <ul className="outlook-drivers-list">
+              {outlook.confidenceDrivers.map((driver, idx) => (
+                <li key={idx} className="outlook-driver-item">
+                  <i className="fa-solid fa-check mr-2 text-muted" style={{ fontSize: '10px' }} />
+                  <span>{driver}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Top Scored News Impact Drivers */}
+        {outlook.newsDrivers && outlook.newsDrivers.length > 0 && (
+          <div className="outlook-subpanel">
+            <h4 className="outlook-subpanel__title">
+              <i className="fa-solid fa-newspaper mr-2" style={{ color: '#a855f7' }} />
+              Recent News Impact Drivers
+            </h4>
+            <div className="outlook-news-list">
+              {outlook.newsDrivers.map((driver, idx) => (
+                <div key={driver.id || idx} className="outlook-news-item">
+                  <div className="outlook-news-item__top">
+                    <span
+                      className={`badge ${
+                        driver.impactDirection === 'COST_UP'   ? 'badge--danger' :
+                        driver.impactDirection === 'COST_DOWN' ? 'badge--success' : 'badge--neutral'
+                      }`}
+                      style={{ fontSize: '10px', padding: '1px 6px' }}
+                    >
+                      {driver.impactDirection === 'COST_UP' ? 'COST UP' : driver.impactDirection === 'COST_DOWN' ? 'COST DOWN' : 'NEUTRAL'}
+                    </span>
+                    <span className="badge badge--neutral font-mono" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                      SEV {driver.severityScore}/5
+                    </span>
+                    <span className="outlook-news-time text-muted font-mono" style={{ fontSize: '11px', marginLeft: 'auto' }}>
+                      {formatRelativeDays(driver.publishedAt, outlook.evaluatedAt)}
+                    </span>
+                  </div>
+                  <div className="outlook-news-title">
+                    {driver.url ? (
+                      <a href={driver.url} target="_blank" rel="noopener noreferrer" className="text-secondary hover:text-primary">
+                        {driver.title}
+                      </a>
+                    ) : (
+                      <span>{driver.title}</span>
+                    )}
+                  </div>
+                  {driver.impactRationale && (
+                    <div className="outlook-news-rationale text-muted">
+                      {driver.impactRationale}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Transparency Disclaimer */}
+        <div className="outlook-disclaimer text-muted font-mono">
+          <i className="fa-solid fa-shield-halved mr-1" /> {outlook.disclaimer}
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -24,4 +24,7 @@ router.patch('/:materialId/inventory', authMiddleware, validate(validateUpdateIn
 // T-08: Supplier recommendations for a tracked material
 router.get('/:materialId/supplier-recommendations', authMiddleware, materialController.getSupplierRecommendations);
 
+// V3-M2: Directional price outlook and bands for a tracked material
+router.get('/:materialId/price-outlook', authMiddleware, materialController.getPriceOutlook);
+
 module.exports = router;

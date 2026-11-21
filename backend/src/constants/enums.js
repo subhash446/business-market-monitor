@@ -109,4 +109,28 @@ module.exports = {
     SHORT_TERM:  'SHORT_TERM',
     MEDIUM_TERM: 'MEDIUM_TERM',
   },
+
+  // V3-M2 — News Impact Scoring & Directional Price Bands (migration 032)
+  IMPACT_DIRECTION: {
+    COST_UP:   'COST_UP',
+    COST_DOWN: 'COST_DOWN',
+    NEUTRAL:   'NEUTRAL',
+  },
+
+  SCORING_METHOD: {
+    DETERMINISTIC_HEURISTIC: 'DETERMINISTIC_HEURISTIC',
+    AI_ASSISTED:             'AI_ASSISTED',
+  },
+
+  EXPECTED_DIRECTION: {
+    UPWARD_PRESSURE:   'UPWARD_PRESSURE',
+    DOWNWARD_PRESSURE: 'DOWNWARD_PRESSURE',
+    RANGE_BOUND:       'RANGE_BOUND',
+  },
+
+  CONFIDENCE_TIER: {
+    HIGH:     'HIGH',
+    MODERATE: 'MODERATE',
+    LOW:      'LOW',
+  },
 };
