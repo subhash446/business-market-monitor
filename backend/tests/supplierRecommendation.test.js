@@ -243,9 +243,66 @@ describe('Supplier Recommendations Service (T-08 / FR-ALERT-06)', () => {
       expect(res.quoteComparison.variancePercent).toBe(7.14); // (112.5 - 105) / 105 * 100
       expect(res.quoteComparison.crossCurrencyNote).toBeNull();
       expect(res.diversification.category).toBe('Petrochemicals & Polymers');
+      expect(res.inventoryDecision).toBeDefined();
+      expect(res.inventoryDecision.hasInventoryProfile).toBe(false);
     });
 
-    test('getBusinessSupplierRecommendations aggregates across tracked materials', async () => {
+    test('getMaterialSupplierRecommendations triggers BUY_MINIMUM_BRIDGE override when inventory is CRITICAL during DELAY_PURCHASE', async () => {
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({
+        id: 36,
+        business_id: 1,
+        name: 'PET Resin',
+        unit_abbreviation: 'kg',
+        is_tracked: 1,
+        current_stock_qty: '20.0000',
+        daily_consumption_rate: '10.0000', // 2 days cover
+        supplier_lead_time_days: 7,        // 7 days lead time -> CRITICAL
+        max_storage_days: 30,
+        inventory_updated_at: '2026-11-20T10:00:00Z',
+      });
+
+      jest.spyOn(pool, 'execute').mockImplementation(async (sql) => {
+        if (sql.includes('price_points')) {
+          return [[
+            {
+              id: 101,
+              price: 100.00,
+              currency: 'INR',
+              unit_label: 'kg',
+              source: 'MANUAL',
+              data_class: 'SUPPLIER_QUOTE',
+              recorded_at: '2026-11-20T10:00:00Z',
+              is_valid: 1,
+            },
+          ]];
+        }
+        return [[]];
+      });
+
+      jest.spyOn(aiInsightQueryService, 'getLatestInsight').mockResolvedValue({
+        action_recommendation: ACTION_RECOMMENDATION.DELAY_PURCHASE,
+        recommendation_rationale: 'Prices softening upstream.',
+        recommendation_horizon: 'SHORT_TERM',
+        confidence: 'HIGH',
+      });
+
+      const res = await supplierRecommendationService.getMaterialSupplierRecommendations(1, 36);
+
+      expect(res.actionRecommendation).toBe('BUY_MINIMUM_BRIDGE');
+      expect(res.originalAiRecommendation).toBe(ACTION_RECOMMENDATION.DELAY_PURCHASE);
+      expect(res.recommendationSource).toBe('OPERATIONAL_OVERRIDE');
+      expect(res.inventoryDecision.hasInventoryProfile).toBe(true);
+      expect(res.inventoryDecision.isBridgeOverride).toBe(true);
+      expect(res.inventoryDecision.stockoutRisk).toBe('CRITICAL');
+      expect(res.inventoryDecision.daysOfCover).toBe(2);
+      expect(res.inventoryDecision.recommendedOrderQty).toBe(120); // (7 + 7) * 10 - 20
+      expect(res.inventoryDecision.estimatedOrderValue).toBe(12000);
+      expect(res.inventoryDecision.currency).toBe('INR');
+      expect(res.bufferStrategy.action).toBe('BUY_MINIMUM_BRIDGE');
+      expect(res.bufferStrategy.priority).toBe('CRITICAL');
+    });
+
+    test('getBusinessSupplierRecommendations aggregates across tracked materials including bridgeCount', async () => {
       jest.spyOn(materialRepository, 'listByBusinessId').mockResolvedValue([
         { id: 36, name: 'PET Resin', unit_abbreviation: 'INR/kg', is_tracked: 1 },
       ]);
@@ -265,6 +322,7 @@ describe('Supplier Recommendations Service (T-08 / FR-ALERT-06)', () => {
 
       expect(aggregated.summary).toBeDefined();
       expect(aggregated.summary.totalTracked).toBe(1);
+      expect(aggregated.summary.bridgeCount).toBe(0);
       expect(aggregated.recommendations.length).toBe(1);
     });
   });

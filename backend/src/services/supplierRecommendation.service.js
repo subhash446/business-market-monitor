@@ -17,6 +17,7 @@
 const { pool } = require('../database/connection');
 const materialRepository = require('../repositories/material.repository');
 const aiInsightQueryService = require('./aiInsightQuery.service');
+const inventoryDecisionService = require('./inventoryDecision.service');
 const { ACTION_RECOMMENDATION } = require('../constants/enums');
 const AppError = require('../utils/AppError');
 
@@ -48,6 +49,16 @@ const BUFFER_STRATEGIES = {
     targetBufferDays: 15,
     priority: 'LOW',
     badgeVariant: 'neutral',
+  },
+};
+
+const OPERATIONAL_BUFFER_STRATEGIES = {
+  BUY_MINIMUM_BRIDGE: {
+    summary: 'Operational Bridge: Procure minimum volume to prevent imminent stockout.',
+    guidance: 'Critical stockout risk identified within supplier lead time. Even though market prices are softening, operational continuity requires placing a minimum bridge order before negotiating bulk volumes.',
+    targetBufferDays: 14,
+    priority: 'CRITICAL',
+    badgeVariant: 'danger',
   },
 };
 
@@ -305,7 +316,28 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
 
   const quoteAnalysis = analyzeQuoteVsBenchmark(prices);
   const recommendation = resolveActionRecommendation(latestInsight, prices);
-  const bufferPlan = BUFFER_STRATEGIES[recommendation.action] || BUFFER_STRATEGIES[ACTION_RECOMMENDATION.MONITOR_ONLY];
+
+  // V3-M1: Evaluate deterministic inventory reorder decision
+  const inventoryProfile = {
+    currentStockQty: material.current_stock_qty != null ? Number(material.current_stock_qty) : null,
+    dailyConsumptionRate: material.daily_consumption_rate != null ? Number(material.daily_consumption_rate) : null,
+    supplierLeadTimeDays: material.supplier_lead_time_days != null ? Number(material.supplier_lead_time_days) : null,
+    maxStorageDays: material.max_storage_days != null ? Number(material.max_storage_days) : null,
+    inventoryUpdatedAt: material.inventory_updated_at,
+  };
+
+  const inventoryDecision = inventoryDecisionService.evaluateInventoryDecision({
+    inventoryProfile,
+    materialUnit: material.unit_abbreviation,
+    actionRecommendation: recommendation.action,
+    prices,
+  });
+
+  const effectiveAction = (inventoryDecision.hasInventoryProfile && inventoryDecision.isBridgeOverride)
+    ? 'BUY_MINIMUM_BRIDGE'
+    : recommendation.action;
+
+  const bufferPlan = OPERATIONAL_BUFFER_STRATEGIES[effectiveAction] || BUFFER_STRATEGIES[effectiveAction] || BUFFER_STRATEGIES[ACTION_RECOMMENDATION.MONITOR_ONLY];
   const diversification = getDiversificationGuidance(material.name);
 
   return {
@@ -313,13 +345,18 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
     materialName: material.name,
     unit: material.unit_abbreviation,
     isTracked: Boolean(material.is_tracked),
-    actionRecommendation: recommendation.action,
-    rationale: recommendation.rationale,
+    actionRecommendation: effectiveAction,
+    originalAiRecommendation: recommendation.action,
+    rationale: (inventoryDecision.hasInventoryProfile && inventoryDecision.isBridgeOverride)
+      ? inventoryDecision.decisionSummary
+      : recommendation.rationale,
     horizon: recommendation.horizon,
     confidence: recommendation.confidence,
-    recommendationSource: recommendation.source,
+    recommendationSource: (inventoryDecision.hasInventoryProfile && inventoryDecision.isBridgeOverride)
+      ? 'OPERATIONAL_OVERRIDE'
+      : recommendation.source,
     bufferStrategy: {
-      action: recommendation.action,
+      action: effectiveAction,
       summary: bufferPlan.summary,
       detailedGuidance: bufferPlan.guidance,
       targetBufferDays: bufferPlan.targetBufferDays,
@@ -333,6 +370,7 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
       variancePercent: quoteAnalysis.variancePercent,
       crossCurrencyNote: quoteAnalysis.crossCurrencyNote,
     },
+    inventoryDecision,
     diversification,
     evaluatedAt: new Date().toISOString(),
   };
@@ -351,6 +389,7 @@ async function getBusinessSupplierRecommendations(businessId) {
         delayCount: 0,
         maintainCount: 0,
         monitorCount: 0,
+        bridgeCount: 0,
       },
       recommendations: [],
     };
@@ -370,6 +409,7 @@ async function getBusinessSupplierRecommendations(businessId) {
     delayCount: 0,
     maintainCount: 0,
     monitorCount: 0,
+    bridgeCount: 0,
   };
 
   for (const rec of recommendations) {
@@ -386,6 +426,9 @@ async function getBusinessSupplierRecommendations(businessId) {
         break;
       case ACTION_RECOMMENDATION.MONITOR_ONLY:
         summary.monitorCount += 1;
+        break;
+      case ACTION_RECOMMENDATION.BUY_MINIMUM_BRIDGE:
+        summary.bridgeCount += 1;
         break;
       default:
         break;

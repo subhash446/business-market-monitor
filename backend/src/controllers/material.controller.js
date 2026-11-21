@@ -69,6 +69,22 @@ async function setExternalSymbol(req, res, next) {
   }
 }
 
+// PATCH /api/v1/materials/:materialId/inventory — V3-M1
+async function updateInventoryProfile(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const { currentStockQty, dailyConsumptionRate, supplierLeadTimeDays, maxStorageDays } = req.body;
+    const material = await materialTrackingService.updateInventoryProfile(
+      businessId,
+      req.params.materialId,
+      { currentStockQty, dailyConsumptionRate, supplierLeadTimeDays, maxStorageDays }
+    );
+    sendSuccess(res, material);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // GET /api/v1/materials/:materialId/supplier-recommendations — T-08
 async function getSupplierRecommendations(req, res, next) {
   try {
@@ -83,4 +99,11 @@ async function getSupplierRecommendations(req, res, next) {
   }
 }
 
-module.exports = { listMaterials, updateMaterial, addMaterial, setExternalSymbol, getSupplierRecommendations };
+module.exports = {
+  listMaterials,
+  updateMaterial,
+  addMaterial,
+  setExternalSymbol,
+  updateInventoryProfile,
+  getSupplierRecommendations,
+};

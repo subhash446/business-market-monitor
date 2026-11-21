@@ -7,6 +7,7 @@ const {
   validateUpdateMaterial,
   validateCreateMaterial,
   validateSetExternalSymbol,
+  validateUpdateInventoryProfile,
 } = require('../validators/material.validator');
 
 router.get('/', authMiddleware, materialController.listMaterials);
@@ -16,6 +17,9 @@ router.patch('/:materialId', authMiddleware, validate(validateUpdateMaterial), m
 // Phase B: set or clear the external commodity symbol for a tracked material.
 // PATCH before /:materialId/... to avoid shadowing the general /:materialId route.
 router.patch('/:materialId/external-symbol', authMiddleware, validate(validateSetExternalSymbol), materialController.setExternalSymbol);
+
+// V3-M1: update inventory profile for a tracked material
+router.patch('/:materialId/inventory', authMiddleware, validate(validateUpdateInventoryProfile), materialController.updateInventoryProfile);
 
 // T-08: Supplier recommendations for a tracked material
 router.get('/:materialId/supplier-recommendations', authMiddleware, materialController.getSupplierRecommendations);

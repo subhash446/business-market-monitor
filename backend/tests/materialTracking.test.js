@@ -742,4 +742,117 @@ describe('Phase 6 — Material Tracking & Custom Materials', () => {
 
   });
 
+  // =========================================================================
+  // 7. V3-M1: Inventory Profile Validation & Tenant Scoped Updates
+  // =========================================================================
+  describe('7. V3-M1: Inventory Profile Management', () => {
+    const { validateUpdateInventoryProfile } = require('../src/validators/material.validator');
+
+    test('7.1 validateUpdateInventoryProfile accepts valid numbers and null values', () => {
+      const errors = validateUpdateInventoryProfile({
+        currentStockQty: 1500.5,
+        dailyConsumptionRate: 100.25,
+        supplierLeadTimeDays: 7,
+        maxStorageDays: 45,
+      });
+      expect(errors).toHaveLength(0);
+
+      const nullErrors = validateUpdateInventoryProfile({
+        currentStockQty: null,
+        dailyConsumptionRate: null,
+      });
+      expect(nullErrors).toHaveLength(0);
+    });
+
+    test('7.2 validateUpdateInventoryProfile accepts zero stock (currentStockQty === 0)', () => {
+      const errors = validateUpdateInventoryProfile({
+        currentStockQty: 0,
+        dailyConsumptionRate: 50,
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    test('7.3 validateUpdateInventoryProfile rejects negative stock, <= 0 burn rate, and unknown fields', () => {
+      expect(validateUpdateInventoryProfile({})).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'body' })])
+      );
+      expect(validateUpdateInventoryProfile({ currentStockQty: -5 })).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'currentStockQty' })])
+      );
+      expect(validateUpdateInventoryProfile({ dailyConsumptionRate: 0 })).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'dailyConsumptionRate' })])
+      );
+      expect(validateUpdateInventoryProfile({ supplierLeadTimeDays: -1 })).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'supplierLeadTimeDays' })])
+      );
+      expect(validateUpdateInventoryProfile({ maxStorageDays: 0 })).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'maxStorageDays' })])
+      );
+      expect(validateUpdateInventoryProfile({ currentStockQty: 10, evilField: 'hack' })).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'evilField' })])
+      );
+    });
+
+    test('7.4 materialTrackingService.updateInventoryProfile updates profile and maps public output', async () => {
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({
+        id: 42,
+        business_id: 10,
+        raw_material_id: 3,
+        name: 'PET Resin',
+        unit_abbreviation: 'kg',
+        is_tracked: 1,
+        external_symbol: 'BRENT',
+        current_stock_qty: '500.0000',
+        daily_consumption_rate: '25.0000',
+        supplier_lead_time_days: 10,
+        max_storage_days: 60,
+        inventory_updated_at: new Date('2026-11-20T10:00:00Z'),
+        created_at: new Date('2026-11-01T10:00:00Z'),
+      });
+
+      jest.spyOn(materialRepository, 'updateInventoryProfile').mockResolvedValue({
+        id: 42,
+        business_id: 10,
+        raw_material_id: 3,
+        name: 'PET Resin',
+        unit_abbreviation: 'kg',
+        is_tracked: 1,
+        external_symbol: 'BRENT',
+        current_stock_qty: '750.0000',
+        daily_consumption_rate: '25.0000',
+        supplier_lead_time_days: 10,
+        max_storage_days: 60,
+        inventory_updated_at: new Date('2026-11-21T10:00:00Z'),
+        created_at: new Date('2026-11-01T10:00:00Z'),
+      });
+
+      const updated = await materialTrackingService.updateInventoryProfile(10, 42, {
+        currentStockQty: 750,
+      });
+
+      expect(updated.id).toBe(42);
+      expect(updated.currentStockQty).toBe(750);
+      expect(updated.inventory.currentStockQty).toBe(750);
+      expect(updated.inventory.dailyConsumptionRate).toBe(25);
+    });
+
+    test('7.5 materialRepository.updateInventoryProfile rejects missing businessId and sets inventory_updated_at', async () => {
+      materialRepository.updateInventoryProfile.mockRestore();
+
+      await expect(
+        materialRepository.updateInventoryProfile(42, { currentStockQty: 100 }, null)
+      ).rejects.toThrow(/businessId must be a positive integer/);
+
+      const executeSpy = jest.spyOn(pool, 'execute').mockResolvedValue([{ affectedRows: 1 }]);
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({ id: 42 });
+
+      await materialRepository.updateInventoryProfile(42, { currentStockQty: 100 }, 10);
+      expect(executeSpy).toHaveBeenCalledTimes(2);
+      const [sql] = executeSpy.mock.calls[0];
+      expect(sql).toContain('current_stock_qty = ?');
+      expect(sql).toContain('inventory_updated_at = NOW()');
+      expect(sql).toContain('AND business_id = ?');
+    });
+  });
+
 });

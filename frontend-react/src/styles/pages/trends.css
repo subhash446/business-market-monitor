@@ -297,6 +297,13 @@
   border: 1px solid transparent;
 }
 
+.supplier-action-pill--bridge {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #f87171;
+  font-weight: 700;
+}
+
 .supplier-action-pill--accelerate {
   background-color: var(--color-danger-subtle);
   border-color: var(--color-danger);
@@ -369,6 +376,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.bridge-override-callout {
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: #f87171;
+}
+
+.stock-stale-warning {
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
 }
 
 .supplier-metric-label {

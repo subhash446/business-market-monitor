@@ -605,6 +605,19 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '031_add_inventory_profile_to_tracked_materials.js': {
+    tables: {
+      tracked_materials: {
+        columns: {
+          current_stock_qty: { dataType: 'decimal', isNullable: 'YES' },
+          daily_consumption_rate: { dataType: 'decimal', isNullable: 'YES' },
+          supplier_lead_time_days: { dataType: ['int', 'smallint', 'tinyint', 'mediumint'], isNullable: 'YES' },
+          max_storage_days: { dataType: ['int', 'smallint', 'tinyint', 'mediumint'], isNullable: 'YES' },
+          inventory_updated_at: { dataType: ['datetime', 'timestamp'], isNullable: 'YES' },
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

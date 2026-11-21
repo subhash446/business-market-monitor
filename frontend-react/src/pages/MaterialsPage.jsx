@@ -42,7 +42,7 @@
  *   No userId in requests. No innerHTML. No eval().
  */
 
-import { useCallback, useState, useEffect } from 'react';
+import { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   getMaterials,
@@ -57,6 +57,7 @@ import { Skeleton }   from '../components/ui/Skeleton.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { useToast }   from '../components/ui/Toast.jsx';
+import { StockProfileModal } from '../components/materials/StockProfileModal.jsx';
 import '../styles/pages/materials.css';
 
 /* ── Load state ────────────────────────────────────────────── */
@@ -175,6 +176,8 @@ export function getSymbolDescription(symbol) {
   }
 }
 
+const StockModalContext = createContext(null);
+
 export function MaterialsPage() {
   const { business, setBusiness } = useAuth();
   const { showToast } = useToast();
@@ -201,6 +204,14 @@ export function MaterialsPage() {
 
   /* ── External symbol loading map: { [id]: boolean } ────── */
   const [symbolBusy, setSymbolBusy] = useState({});
+
+  /* ── Stock profile modal target material (V3-M1) ────────── */
+  const [stockModalMaterial, setStockModalMaterial] = useState(null);
+
+  const handleStockSaved = (updatedMaterial) => {
+    setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
+    showToast(`Stock profile updated for ${updatedMaterial.name}`, 'success');
+  };
 
   /* ── Load data ──────────────────────────────────────────── */
   const loadPage = useCallback(async () => {
@@ -333,9 +344,10 @@ export function MaterialsPage() {
 
   /* ── Render ───────────────────────────────────────────────── */
   return (
-    <div className="page-container">
+    <StockModalContext.Provider value={setStockModalMaterial}>
+      <div className="page-container">
 
-      {/* ── Page toolbar: filter + add button ─────────────────── */}
+        {/* ── Page toolbar: filter + add button ─────────────────── */}
       <div className="materials-toolbar">
         <div className="filter-bar" role="group" aria-label="Filter materials">
           <button
@@ -467,12 +479,20 @@ export function MaterialsPage() {
             symbolBusy={symbolBusy}
             onToggleTracking={handleToggleTracking}
             onSetSymbol={handleSetSymbol}
+            onOpenStock={setStockModalMaterial}
             onShowAll={() => setFilter('all')}
           />
         )}
       </div>
 
+      <StockProfileModal
+        material={stockModalMaterial}
+        isOpen={Boolean(stockModalMaterial)}
+        onClose={() => setStockModalMaterial(null)}
+        onSaveSuccess={handleStockSaved}
+      />
     </div>
+    </StockModalContext.Provider>
   );
 }
 
@@ -481,7 +501,7 @@ export function MaterialsPage() {
  * ================================================================ */
 function MaterialsListContent({
   materials, visible, filter, business, trackingBusy, symbolBusy,
-  onToggleTracking, onSetSymbol, onShowAll,
+  onToggleTracking, onSetSymbol, onOpenStock, onShowAll,
 }) {
   if (materials.length === 0) {
     return (
@@ -511,7 +531,7 @@ function MaterialsListContent({
         <table className="table">
           <thead>
             <tr>
-              {['Name', 'Unit', 'Source', 'Tracking', 'Market Symbol', 'Actions'].map(col => (
+              {['Name', 'Unit', 'Source', 'Tracking', 'Stock Cover', 'Market Symbol', 'Actions'].map(col => (
                 <th key={col} className="table__header">{col}</th>
               ))}
             </tr>
@@ -526,6 +546,7 @@ function MaterialsListContent({
                 symbolBusy={!!symbolBusy[m.id]}
                 onToggle={onToggleTracking}
                 onSetSymbol={onSetSymbol}
+                onOpenStock={onOpenStock}
               />
             ))}
           </tbody>
@@ -543,6 +564,7 @@ function MaterialsListContent({
             symbolBusy={!!symbolBusy[m.id]}
             onToggle={onToggleTracking}
             onSetSymbol={onSetSymbol}
+            onOpenStock={onOpenStock}
           />
         ))}
       </div>
@@ -553,7 +575,7 @@ function MaterialsListContent({
 /* ================================================================
  * TABLE ROW (tablet+)
  * ================================================================ */
-function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSetSymbol }) {
+function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSetSymbol, onOpenStock }) {
   return (
     <tr>
       <td className="table__cell font-medium">{material.name}</td>
@@ -565,6 +587,9 @@ function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSe
       </td>
       <td className="table__cell">
         <TrackButton material={material} busy={busy} onToggle={onToggle} />
+      </td>
+      <td className="table__cell">
+        <StockCoverBadge material={material} onOpenStock={onOpenStock} />
       </td>
       <td className="table__cell">
         {material.isTracked && (
@@ -604,7 +629,7 @@ function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSe
 /* ================================================================
  * MOBILE CARD
  * ================================================================ */
-function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSymbol }) {
+function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSymbol, onOpenStock }) {
   return (
     <div className="card card--material material-card">
       <div className="material-card__header">
@@ -614,6 +639,11 @@ function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSym
       <p className="material-card__unit">
         <span className="material-unit-pill">{material.unit}</span>
       </p>
+      {material.isTracked && (
+        <div className="material-card__stock" style={{ margin: '8px 0' }}>
+          <StockCoverBadge material={material} onOpenStock={onOpenStock} />
+        </div>
+      )}
       <div className="material-card__footer">
         <TrackButton material={material} busy={busy} onToggle={onToggle} />
         {material.isTracked && <ActionLinks material={material} />}
@@ -717,7 +747,9 @@ function TrackButton({ material, busy, onToggle }) {
 /* ── Action links — shown only when isTracked === true ─────────
  * Links use material.id = tracked_materials.id (universal ID)
  * ──────────────────────────────────────────────────────────── */
-function ActionLinks({ material }) {
+function ActionLinks({ material, onOpenStock: propOpenStock }) {
+  const contextOpenStock = useContext(StockModalContext);
+  const onOpenStock = propOpenStock || contextOpenStock;
   const logLabel = material.externalSymbol ? 'Log Price' : 'Log Supplier Quote';
 
   return (
@@ -740,6 +772,73 @@ function ActionLinks({ material }) {
       >
         Impact
       </Link>
+      {onOpenStock && (
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost"
+          onClick={() => onOpenStock(material)}
+        >
+          Stock Profile
+        </button>
+      )}
     </div>
+  );
+}
+
+/* ── Stock Cover Badge (V3-M1) ──────────────────────────────── */
+function StockCoverBadge({ material, onOpenStock: propOpenStock }) {
+  const contextOpenStock = useContext(StockModalContext);
+  const onOpenStock = propOpenStock || contextOpenStock;
+
+  if (!material.isTracked) return <span className="text-xs text-muted">—</span>;
+
+  const hasProfile = material.currentStockQty != null &&
+    material.dailyConsumptionRate != null &&
+    Number(material.dailyConsumptionRate) > 0;
+
+  if (!hasProfile) {
+    return onOpenStock ? (
+      <button
+        type="button"
+        className="btn btn--xs btn--ghost text-muted"
+        onClick={() => onOpenStock(material)}
+        title="Configure stock quantity and daily consumption rate"
+      >
+        + Stock Profile
+      </button>
+    ) : (
+      <span className="text-xs text-muted">Unconfigured</span>
+    );
+  }
+
+  const cover = Number((Number(material.currentStockQty) / Number(material.dailyConsumptionRate)).toFixed(1));
+  const lead = (material.supplierLeadTimeDays != null && Number(material.supplierLeadTimeDays) >= 0)
+    ? Number(material.supplierLeadTimeDays)
+    : 7;
+
+  let badgeClass = 'badge--success';
+  let label = `${cover}d cover`;
+
+  if (cover <= lead) {
+    badgeClass = 'badge--danger';
+    label = `CRITICAL: ${cover}d`;
+  } else if (cover <= Math.max(lead * 1.5, lead + 5)) {
+    badgeClass = 'badge--warning';
+    label = `LOW: ${cover}d`;
+  }
+
+  return onOpenStock ? (
+    <button
+      type="button"
+      className={`badge font-mono stock-cover-btn ${badgeClass}`}
+      onClick={() => onOpenStock(material)}
+      title={`Current stock: ${material.currentStockQty} ${material.unit} (${cover} days cover vs ${lead}d lead time). Click to edit.`}
+    >
+      {label}
+    </button>
+  ) : (
+    <span className={`badge font-mono ${badgeClass}`}>
+      {label}
+    </span>
   );
 }

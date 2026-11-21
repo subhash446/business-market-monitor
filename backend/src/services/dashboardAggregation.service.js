@@ -66,7 +66,28 @@ async function getDashboard(businessId) {
     if (recordedAt instanceof Date) {
       recordedAt = recordedAt.toISOString();
     }
-    return {
+
+    let daysOfCover = null;
+    let stockoutRisk = null;
+
+    if (m.current_stock_qty != null && m.daily_consumption_rate != null && Number(m.daily_consumption_rate) > 0) {
+      const stock = Number(m.current_stock_qty);
+      const burn = Number(m.daily_consumption_rate);
+      daysOfCover = Number((stock / burn).toFixed(1));
+      const leadTime = (m.supplier_lead_time_days != null && Number(m.supplier_lead_time_days) >= 0)
+        ? Number(m.supplier_lead_time_days)
+        : 7;
+
+      if (daysOfCover <= leadTime) {
+        stockoutRisk = 'CRITICAL';
+      } else if (daysOfCover <= Math.max(leadTime * 1.5, leadTime + 5)) {
+        stockoutRisk = 'LOW';
+      } else {
+        stockoutRisk = 'HEALTHY';
+      }
+    }
+
+    const item = {
       id: m.id,
       name: m.name,
       latestPrice: latest ? latest.price : null,
@@ -78,6 +99,13 @@ async function getDashboard(businessId) {
       recordedAt,
       externalSymbol: m.external_symbol || null,
     };
+
+    if (daysOfCover !== null) {
+      item.daysOfCover = daysOfCover;
+      item.stockoutRisk = stockoutRisk;
+    }
+
+    return item;
   });
 
   const recentNews = (recentNewsRows || []).map((n) => ({ id: n.id, title: n.title }));

@@ -114,3 +114,16 @@ export async function getMaterialSupplierRecommendations(materialId) {
   const { data } = await get(`/materials/${materialId}/supplier-recommendations`);
   return data;
 }
+
+/**
+ * Update inventory profile for a tracked material (V3-M1).
+ * PATCH /api/v1/materials/:materialId/inventory
+ *
+ * @param {number|string} materialId
+ * @param {{ currentStockQty?: number|null, dailyConsumptionRate?: number|null, supplierLeadTimeDays?: number|null, maxStorageDays?: number|null }} inventoryData
+ * @returns {Promise<Object>}
+ */
+export async function updateMaterialInventory(materialId, inventoryData) {
+  const { data } = await patch(`/materials/${materialId}/inventory`, inventoryData);
+  return data;
+}

@@ -991,6 +991,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName }) {
   const actionLabel = action.replace(/_/g, ' ');
 
   const pillClass =
+    action === 'BUY_MINIMUM_BRIDGE'  ? 'supplier-action-pill--bridge' :
     action === 'ACCELERATE_PURCHASE' ? 'supplier-action-pill--accelerate' :
     action === 'DELAY_PURCHASE'      ? 'supplier-action-pill--delay' :
     action === 'MAINTAIN_BUFFER'     ? 'supplier-action-pill--maintain' :
@@ -1009,6 +1010,103 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName }) {
       </div>
 
       <div className="supplier-guidance-body">
+        {/* Smart Reorder Decision (V3-M1) */}
+        <div className="supplier-subpanel" id="reorder-decision-panel">
+          <div className="supplier-subpanel__header">
+            <h4 className="supplier-subpanel__title">
+              <i className="fa-solid fa-calculator mr-2" style={{ color: 'var(--color-primary)' }} />
+              Smart Reorder &amp; Inventory Decision
+            </h4>
+            {rec.inventoryDecision?.hasInventoryProfile && (
+              <span
+                className={`badge ${
+                  rec.inventoryDecision.stockoutRisk === 'CRITICAL'
+                    ? 'badge--danger'
+                    : rec.inventoryDecision.stockoutRisk === 'LOW'
+                    ? 'badge--warning'
+                    : 'badge--success'
+                }`}
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+              >
+                {rec.inventoryDecision.stockoutRisk === 'CRITICAL'
+                  ? 'CRITICAL STOCKOUT RISK'
+                  : rec.inventoryDecision.stockoutRisk === 'LOW'
+                  ? 'LOW COVERAGE'
+                  : 'HEALTHY BUFFER'}
+              </span>
+            )}
+          </div>
+
+          {rec.inventoryDecision?.hasInventoryProfile ? (
+            <>
+              {rec.inventoryDecision.isBridgeOverride && (
+                <div className="bridge-override-callout">
+                  <i className="fa-solid fa-triangle-exclamation mr-2" />
+                  <strong>Critical Stockout Override:</strong> Market price trend suggests delaying purchase, but current stock is below supplier lead time. Minimum bridge order recommended immediately to prevent stockout.
+                </div>
+              )}
+
+              {rec.inventoryDecision.isStockStale && (
+                <div className="alert alert--warning stock-stale-warning">
+                  <i className="fa-solid fa-clock-rotate-left mr-1" />
+                  Stock updated {rec.inventoryDecision.daysSinceUpdate} days ago. Review and update current stock in Materials to keep reorder calculations accurate.
+                </div>
+              )}
+
+              <div className="supplier-metric-grid">
+                <div className="supplier-metric-card">
+                  <span className="supplier-metric-label">Days of Cover</span>
+                  <span className="supplier-metric-value">
+                    {rec.inventoryDecision.daysOfCover != null ? `${rec.inventoryDecision.daysOfCover}d` : '—'}
+                  </span>
+                </div>
+
+                <div className="supplier-metric-card">
+                  <span className="supplier-metric-label">Recommended Order</span>
+                  <span className="supplier-metric-value">
+                    {rec.inventoryDecision.recommendedOrderQty != null
+                      ? `${Number(rec.inventoryDecision.recommendedOrderQty).toLocaleString()} ${rec.unit || ''}`.trim()
+                      : '0'}
+                  </span>
+                  {rec.inventoryDecision.isStorageCapped && (
+                    <span style={{ fontSize: '10px', color: 'var(--color-warning)' }}>
+                      Capped by max storage limit
+                    </span>
+                  )}
+                </div>
+
+                <div className="supplier-metric-card">
+                  <span className="supplier-metric-label">Estimated Order Value</span>
+                  {rec.inventoryDecision.estimatedOrderValue != null ? (
+                    <span className="supplier-metric-value">
+                      {rec.inventoryDecision.currency || ''} {Number(rec.inventoryDecision.estimatedOrderValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                      {rec.inventoryDecision.valuationNote || 'Quote needed for valuation'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {rec.inventoryDecision.decisionSummary && (
+                <p style={{ margin: 'var(--space-3) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                  {rec.inventoryDecision.decisionSummary}
+                </p>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', padding: 'var(--space-2) 0' }}>
+              <p style={{ margin: '0 0 var(--space-2) 0' }}>
+                Inventory parameters (current stock, consumption rate, lead time) are not configured for this material.
+              </p>
+              <Link to="/materials" className="btn btn--secondary btn--sm">
+                <i className="fa-solid fa-boxes-stacked mr-1" /> Configure Stock Profile in Materials
+              </Link>
+            </div>
+          )}
+        </div>
+
         {/* Buffer strategy overview */}
         <div className="supplier-subpanel">
           <div className="supplier-subpanel__header">

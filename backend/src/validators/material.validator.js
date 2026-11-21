@@ -123,8 +123,60 @@ function validateSetExternalSymbol(body) {
   return errors;
 }
 
+// Added in V3-M1 (Inventory Profile Management) — purely additive.
+const ALLOWED_INVENTORY_FIELDS = [
+  'currentStockQty',
+  'dailyConsumptionRate',
+  'supplierLeadTimeDays',
+  'maxStorageDays',
+];
+
+function validateUpdateInventoryProfile(body) {
+  const errors = [];
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    errors.push({ field: 'body', issue: 'must be an object' });
+    return errors;
+  }
+
+  const providedFields = Object.keys(body);
+  const disallowed = providedFields.filter((f) => !ALLOWED_INVENTORY_FIELDS.includes(f));
+  disallowed.forEach((f) => errors.push({ field: f, issue: 'cannot be updated' }));
+
+  if (providedFields.length === 0) {
+    errors.push({ field: 'body', issue: 'must provide at least one inventory field to update' });
+    return errors;
+  }
+
+  if (body.currentStockQty !== undefined && body.currentStockQty !== null) {
+    if (typeof body.currentStockQty !== 'number' || isNaN(body.currentStockQty) || body.currentStockQty < 0) {
+      errors.push({ field: 'currentStockQty', issue: 'must be a non-negative number or null' });
+    }
+  }
+
+  if (body.dailyConsumptionRate !== undefined && body.dailyConsumptionRate !== null) {
+    if (typeof body.dailyConsumptionRate !== 'number' || isNaN(body.dailyConsumptionRate) || body.dailyConsumptionRate <= 0) {
+      errors.push({ field: 'dailyConsumptionRate', issue: 'must be a positive number or null' });
+    }
+  }
+
+  if (body.supplierLeadTimeDays !== undefined && body.supplierLeadTimeDays !== null) {
+    if (!Number.isInteger(body.supplierLeadTimeDays) || body.supplierLeadTimeDays < 0) {
+      errors.push({ field: 'supplierLeadTimeDays', issue: 'must be a non-negative integer or null' });
+    }
+  }
+
+  if (body.maxStorageDays !== undefined && body.maxStorageDays !== null) {
+    if (!Number.isInteger(body.maxStorageDays) || body.maxStorageDays <= 0) {
+      errors.push({ field: 'maxStorageDays', issue: 'must be a positive integer or null' });
+    }
+  }
+
+  return errors;
+}
+
 module.exports = {
   validateUpdateMaterial,
   validateCreateMaterial,
   validateSetExternalSymbol,
+  validateUpdateInventoryProfile,
 };

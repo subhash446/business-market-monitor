@@ -21,6 +21,8 @@ function assertBusinessId(businessId, operation) {
 const BASE_SELECT = `
   SELECT tm.id, tm.raw_material_id, tm.unit_id, COALESCE(rm.name, tm.custom_name) AS name,
          u.abbreviation AS unit_abbreviation, tm.is_tracked, tm.external_symbol,
+         tm.current_stock_qty, tm.daily_consumption_rate, tm.supplier_lead_time_days,
+         tm.max_storage_days, tm.inventory_updated_at,
          tm.created_at
   FROM tracked_materials tm
   LEFT JOIN raw_materials rm ON rm.id = tm.raw_material_id
@@ -251,6 +253,53 @@ async function findAllTracked() {
   return rows;
 }
 
+// Added in V3-M1 (Inventory Profile Management) — purely additive.
+async function updateInventoryProfile(materialId, inventoryData, businessId) {
+  assertBusinessId(businessId, 'updateInventoryProfile');
+  const updates = [];
+  const params = [];
+
+  if (inventoryData.currentStockQty !== undefined) {
+    updates.push('current_stock_qty = ?');
+    params.push(inventoryData.currentStockQty);
+  }
+  if (inventoryData.dailyConsumptionRate !== undefined) {
+    updates.push('daily_consumption_rate = ?');
+    params.push(inventoryData.dailyConsumptionRate);
+  }
+  if (inventoryData.supplierLeadTimeDays !== undefined) {
+    updates.push('supplier_lead_time_days = ?');
+    params.push(inventoryData.supplierLeadTimeDays);
+  }
+  if (inventoryData.maxStorageDays !== undefined) {
+    updates.push('max_storage_days = ?');
+    params.push(inventoryData.maxStorageDays);
+  }
+
+  // Refinement 2: Set inventory_updated_at = NOW() when inventory values are saved with non-null currentStockQty,
+  // and reset to NULL if currentStockQty is explicitly cleared to null.
+  if (inventoryData.currentStockQty !== undefined) {
+    if (inventoryData.currentStockQty !== null) {
+      updates.push('inventory_updated_at = NOW()');
+    } else {
+      updates.push('inventory_updated_at = NULL');
+    }
+  }
+
+  if (updates.length > 0) {
+    params.push(materialId, businessId);
+    const [result] = await pool.execute(
+      `UPDATE tracked_materials SET ${updates.join(', ')} WHERE id = ? AND business_id = ?`,
+      params
+    );
+    if (result && result.affectedRows === 0) {
+      return null;
+    }
+  }
+
+  return findByIdForBusiness(materialId, businessId);
+}
+
 module.exports = {
   listByBusinessId,
   findByIdForBusiness,
@@ -263,5 +312,6 @@ module.exports = {
   bulkCreateFromTemplate,
   findTrackedByExternalSymbol,
   updateExternalSymbol,
+  updateInventoryProfile,
   findAllTracked,
 };

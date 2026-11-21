@@ -394,39 +394,59 @@ function MaterialsList({ items, onNavigate }) {
             <span className="dashboard-panel__item-name">{material.name}</span>
 
             {/* latestPrice with currency, unit, and classification */}
-            {material.latestPrice === null || material.latestPrice === undefined ? (
-              <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
-                No price recorded
-              </span>
-            ) : (
-              <div className="dashboard-panel__item-meta">
-                <span className="dashboard-panel__item-value font-mono">
-                  {formatPriceDisplay({
-                    price: material.latestPrice,
-                    currency: material.currency,
-                    unitLabel: material.unitLabel,
-                    externalSymbol: material.externalSymbol,
-                  }).text}
+            <div className="dashboard-panel__item-meta">
+              {material.latestPrice === null || material.latestPrice === undefined ? (
+                <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
+                  No price recorded
                 </span>
-                {material.dataClass && (
-                  <span
-                    className={`badge dashboard-badge ${
-                      material.dataClass === 'OFFICIAL_BENCHMARK'
-                        ? 'dashboard-badge--benchmark badge--info'
-                        : material.dataClass === 'MARKET_INDICATIVE'
-                        ? 'dashboard-badge--proxy badge--warning'
-                        : 'dashboard-badge--quote badge--neutral'
-                    }`}
-                  >
-                    {material.dataClass === 'OFFICIAL_BENCHMARK'
-                      ? 'Benchmark'
-                      : material.dataClass === 'MARKET_INDICATIVE'
-                      ? 'Proxy'
-                      : 'Quote'}
+              ) : (
+                <>
+                  <span className="dashboard-panel__item-value font-mono">
+                    {formatPriceDisplay({
+                      price: material.latestPrice,
+                      currency: material.currency,
+                      unitLabel: material.unitLabel,
+                      externalSymbol: material.externalSymbol,
+                    }).text}
                   </span>
-                )}
-              </div>
-            )}
+                  {material.dataClass && (
+                    <span
+                      className={`badge dashboard-badge ${
+                        material.dataClass === 'OFFICIAL_BENCHMARK'
+                          ? 'dashboard-badge--benchmark badge--info'
+                          : material.dataClass === 'MARKET_INDICATIVE'
+                          ? 'dashboard-badge--proxy badge--warning'
+                          : 'dashboard-badge--quote badge--neutral'
+                      }`}
+                    >
+                      {material.dataClass === 'OFFICIAL_BENCHMARK'
+                        ? 'Benchmark'
+                        : material.dataClass === 'MARKET_INDICATIVE'
+                        ? 'Proxy'
+                        : 'Quote'}
+                    </span>
+                  )}
+                </>
+              )}
+              {material.daysOfCover != null && (
+                <span
+                  className={`badge ${
+                    material.stockoutRisk === 'CRITICAL'
+                      ? 'badge--danger'
+                      : material.stockoutRisk === 'LOW'
+                      ? 'badge--warning'
+                      : 'badge--success'
+                  }`}
+                  style={{ fontSize: '11px', padding: '1px 6px' }}
+                >
+                  {material.stockoutRisk === 'CRITICAL'
+                    ? `CRITICAL: ${material.daysOfCover}d`
+                    : material.stockoutRisk === 'LOW'
+                    ? `LOW: ${material.daysOfCover}d`
+                    : `${material.daysOfCover}d cover`}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Quick-action links — id is tracked_materials.id (universal material ID) */}

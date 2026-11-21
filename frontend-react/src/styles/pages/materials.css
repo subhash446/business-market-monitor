@@ -353,3 +353,110 @@
     min-width: unset;
   }
 }
+
+/* ── V3-M1: Stock Profile Modal & Cover Badges ─────────────────── */
+.stock-modal {
+  max-width: 540px;
+  background-color: var(--color-bg-base, #09090b);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 8px);
+}
+
+.stock-modal-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stock-modal-icon {
+  font-size: 1.25rem;
+  color: var(--color-primary, #3b82f6);
+  margin-top: 2px;
+}
+
+.stock-modal-subtitle {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-secondary, #a1a1aa);
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+.stock-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+@media (max-width: 520px) {
+  .stock-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stock-preview-box {
+  background-color: var(--color-surface, #18181b);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md, 6px);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.stock-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.stock-preview-label {
+  font-size: var(--text-xs, 12px);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.stock-preview-metric {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #fafafa);
+  margin-bottom: 4px;
+}
+
+.stock-preview-unit {
+  font-size: var(--text-xs, 12px);
+  font-weight: 400;
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.stock-preview-desc {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-secondary, #a1a1aa);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.stock-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+}
+
+.stock-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-cover-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}

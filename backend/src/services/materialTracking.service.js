@@ -113,8 +113,22 @@ async function setExternalSymbol(businessId, materialId, externalSymbol) {
   return toPublicMaterial(updated);
 }
 
+// Added in V3-M1 (Inventory Profile Management) — purely additive.
+async function updateInventoryProfile(businessId, materialId, inventoryData) {
+  const existing = await materialRepository.findByIdForBusiness(materialId, businessId);
+  if (!existing) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
+  }
+
+  const updated = await materialRepository.updateInventoryProfile(materialId, inventoryData, businessId);
+  if (!updated) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
+  }
+  return toPublicMaterial(updated);
+}
+
 function toPublicMaterial(row) {
-  return {
+  const result = {
     id: row.id,
     rawMaterialId: row.raw_material_id,
     name: row.name,
@@ -124,6 +138,34 @@ function toPublicMaterial(row) {
     externalSymbol: row.external_symbol || null,
     createdAt: row.created_at,
   };
+
+  // Include inventory profile fields whenever present in the DB row or update payload
+  if (row.current_stock_qty !== undefined || row.daily_consumption_rate !== undefined) {
+    let inventoryUpdatedAt = row.inventory_updated_at || null;
+    if (inventoryUpdatedAt instanceof Date) {
+      inventoryUpdatedAt = inventoryUpdatedAt.toISOString();
+    }
+
+    const currentStockQty = row.current_stock_qty != null ? Number(row.current_stock_qty) : null;
+    const dailyConsumptionRate = row.daily_consumption_rate != null ? Number(row.daily_consumption_rate) : null;
+    const supplierLeadTimeDays = row.supplier_lead_time_days != null ? Number(row.supplier_lead_time_days) : null;
+    const maxStorageDays = row.max_storage_days != null ? Number(row.max_storage_days) : null;
+
+    result.currentStockQty = currentStockQty;
+    result.dailyConsumptionRate = dailyConsumptionRate;
+    result.supplierLeadTimeDays = supplierLeadTimeDays;
+    result.maxStorageDays = maxStorageDays;
+    result.inventoryUpdatedAt = inventoryUpdatedAt;
+    result.inventory = {
+      currentStockQty,
+      dailyConsumptionRate,
+      supplierLeadTimeDays,
+      maxStorageDays,
+      inventoryUpdatedAt,
+    };
+  }
+
+  return result;
 }
 
 module.exports = {
@@ -131,4 +173,6 @@ module.exports = {
   updateMaterial,
   createCustomMaterial,
   setExternalSymbol,
+  updateInventoryProfile,
+  toPublicMaterial,
 };
