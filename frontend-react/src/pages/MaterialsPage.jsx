@@ -210,7 +210,7 @@ export function MaterialsPage() {
 
   const handleStockSaved = (updatedMaterial) => {
     setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
-    showToast(`Stock profile updated for ${updatedMaterial.name}`, 'success');
+    showToast({ message: `Stock profile updated for ${updatedMaterial.name}`, type: 'success' });
   };
 
   /* ── Load data ──────────────────────────────────────────── */
@@ -747,7 +747,7 @@ function TrackButton({ material, busy, onToggle }) {
 /* ── Action links — shown only when isTracked === true ─────────
  * Links use material.id = tracked_materials.id (universal ID)
  * ──────────────────────────────────────────────────────────── */
-function ActionLinks({ material, onOpenStock: propOpenStock }) {
+export function ActionLinks({ material, onOpenStock: propOpenStock }) {
   const contextOpenStock = useContext(StockModalContext);
   const onOpenStock = propOpenStock || contextOpenStock;
   const logLabel = material.externalSymbol ? 'Log Price' : 'Log Supplier Quote';
@@ -786,7 +786,7 @@ function ActionLinks({ material, onOpenStock: propOpenStock }) {
 }
 
 /* ── Stock Cover Badge (V3-M1) ──────────────────────────────── */
-function StockCoverBadge({ material, onOpenStock: propOpenStock }) {
+export function StockCoverBadge({ material, onOpenStock: propOpenStock }) {
   const contextOpenStock = useContext(StockModalContext);
   const onOpenStock = propOpenStock || contextOpenStock;
 

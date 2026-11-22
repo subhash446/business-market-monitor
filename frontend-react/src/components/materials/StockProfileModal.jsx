@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { updateMaterialInventory } from '../../api/materials.api.js';
 
 /**
@@ -9,21 +10,29 @@ import { updateMaterialInventory } from '../../api/materials.api.js';
  * - Real-time calculation of Days of Cover and Stockout Risk preview.
  * - Clear stock profile capability.
  * - Accessible modal dialog semantics (role="dialog", aria-modal="true", ESC key, backdrop).
+ * - Uses standard BMM modal classes (.modal-backdrop--open, .modal, .modal__header, .modal__body, .modal__footer).
+ * - Mounts via createPortal directly to document.body for top-level stacking.
  */
 export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) {
-  const [stockQty, setStockQty] = useState(() => (material?.currentStockQty != null ? String(material.currentStockQty) : ''));
-  const [burnRate, setBurnRate] = useState(() => (material?.dailyConsumptionRate != null ? String(material.dailyConsumptionRate) : ''));
-  const [leadTime, setLeadTime] = useState(() => (material?.supplierLeadTimeDays != null ? String(material.supplierLeadTimeDays) : '7'));
-  const [maxStorage, setMaxStorage] = useState(() => (material?.maxStorageDays != null ? String(material.maxStorageDays) : ''));
+  const getInitialValue = (key, fallback = '') => {
+    if (material?.[key] != null) return String(material[key]);
+    if (material?.inventory?.[key] != null) return String(material.inventory[key]);
+    return fallback;
+  };
+
+  const [stockQty, setStockQty] = useState(() => getInitialValue('currentStockQty', ''));
+  const [burnRate, setBurnRate] = useState(() => getInitialValue('dailyConsumptionRate', ''));
+  const [leadTime, setLeadTime] = useState(() => getInitialValue('supplierLeadTimeDays', '7'));
+  const [maxStorage, setMaxStorage] = useState(() => getInitialValue('maxStorageDays', ''));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (material) {
-      setStockQty(material.currentStockQty != null ? String(material.currentStockQty) : '');
-      setBurnRate(material.dailyConsumptionRate != null ? String(material.dailyConsumptionRate) : '');
-      setLeadTime(material.supplierLeadTimeDays != null ? String(material.supplierLeadTimeDays) : '7');
-      setMaxStorage(material.maxStorageDays != null ? String(material.maxStorageDays) : '');
+      setStockQty(material.currentStockQty != null ? String(material.currentStockQty) : material.inventory?.currentStockQty != null ? String(material.inventory.currentStockQty) : '');
+      setBurnRate(material.dailyConsumptionRate != null ? String(material.dailyConsumptionRate) : material.inventory?.dailyConsumptionRate != null ? String(material.inventory.dailyConsumptionRate) : '');
+      setLeadTime(material.supplierLeadTimeDays != null ? String(material.supplierLeadTimeDays) : material.inventory?.supplierLeadTimeDays != null ? String(material.inventory.supplierLeadTimeDays) : '7');
+      setMaxStorage(material.maxStorageDays != null ? String(material.maxStorageDays) : material.inventory?.maxStorageDays != null ? String(material.inventory.maxStorageDays) : '');
       setFormError('');
     }
   }, [material]);
@@ -31,7 +40,7 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
   // Handle ESC key dismiss
   useEffect(() => {
     function handleKeyDown(e) {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && typeof onClose === 'function') {
         onClose();
       }
     }
@@ -40,6 +49,16 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined' || !document.body) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow || '';
+    };
+  }, [isOpen]);
 
   if (!isOpen || !material) return null;
 
@@ -62,9 +81,16 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
     }
   }
 
+  const targetMaterialId = material.id ?? material.trackedMaterialId;
+
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError('');
+
+    if (!targetMaterialId) {
+      setFormError('Material ID not found.');
+      return;
+    }
 
     const payload = {};
 
@@ -114,9 +140,13 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
 
     setSaving(true);
     try {
-      const updated = await updateMaterialInventory(material.id, payload);
-      onSaveSuccess(updated);
-      onClose();
+      const updated = await updateMaterialInventory(targetMaterialId, payload);
+      if (typeof onSaveSuccess === 'function') {
+        onSaveSuccess(updated);
+      }
+      if (typeof onClose === 'function') {
+        onClose();
+      }
     } catch (err) {
       setFormError(err.message || 'Failed to update stock profile. Please try again.');
     } finally {
@@ -125,17 +155,26 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
   }
 
   async function handleClearProfile() {
+    if (!targetMaterialId) {
+      setFormError('Material ID not found.');
+      return;
+    }
+
     setSaving(true);
     setFormError('');
     try {
-      const updated = await updateMaterialInventory(material.id, {
+      const updated = await updateMaterialInventory(targetMaterialId, {
         currentStockQty: null,
         dailyConsumptionRate: null,
         supplierLeadTimeDays: null,
         maxStorageDays: null,
       });
-      onSaveSuccess(updated);
-      onClose();
+      if (typeof onSaveSuccess === 'function') {
+        onSaveSuccess(updated);
+      }
+      if (typeof onClose === 'function') {
+        onClose();
+      }
     } catch (err) {
       setFormError(err.message || 'Failed to clear stock profile.');
     } finally {
@@ -143,25 +182,26 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
     }
   }
 
-  return (
+  const modalMarkup = (
     <div
-      className="modal-backdrop modal-backdrop--visible"
+      className="modal-backdrop modal-backdrop--open modal-backdrop--visible"
+      id="stock-profile-backdrop"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && typeof onClose === 'function') onClose();
       }}
       role="presentation"
     >
       <div
-        className="modal-dialog stock-modal"
+        className="modal modal-dialog stock-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="stock-modal-title"
       >
-        <div className="modal-header">
+        <div className="modal__header modal-header">
           <div className="stock-modal-title-row">
             <i className="fa-solid fa-boxes-stacked stock-modal-icon" aria-hidden="true" />
             <div>
-              <h2 id="stock-modal-title" className="modal-title">
+              <h2 id="stock-modal-title" className="modal__title modal-title">
                 Stock Profile — {material.name}
               </h2>
               <p className="stock-modal-subtitle">
@@ -171,7 +211,7 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
           </div>
           <button
             type="button"
-            className="modal-close-btn"
+            className="modal__close modal-close-btn"
             onClick={onClose}
             aria-label="Close stock profile modal"
           >
@@ -180,14 +220,14 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
         </div>
 
         {formError && (
-          <div className="form-alert form-alert--error form-alert--visible" role="alert">
+          <div className="form-alert form-alert--error form-alert--visible" role="alert" style={{ margin: 'var(--space-3) var(--space-6) 0' }}>
             <i className="fa-solid fa-circle-exclamation mr-1" aria-hidden="true" />
             <span>{formError}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="modal-body stock-modal-grid">
+          <div className="modal__body modal-body stock-modal-grid">
             {/* Current Stock */}
             <div className="form-group">
               <label className="form-label" htmlFor="stock-qty-input">
@@ -263,7 +303,7 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
 
           {/* Live Preview Panel */}
           {liveCover != null && (
-            <div className="stock-preview-box">
+            <div className="stock-preview-box" style={{ margin: '0 var(--space-6) var(--space-4)' }}>
               <div className="stock-preview-header">
                 <span className="stock-preview-label">Live Inventory Telemetry</span>
                 <span
@@ -295,7 +335,7 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
             </div>
           )}
 
-          <div className="modal-footer stock-modal-footer">
+          <div className="modal__footer modal-footer stock-modal-footer">
             <button
               type="button"
               className="btn btn--ghost text-muted btn--sm"
@@ -326,4 +366,9 @@ export function StockProfileModal({ material, isOpen, onClose, onSaveSuccess }) 
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
 }

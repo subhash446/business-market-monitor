@@ -355,6 +355,17 @@
 }
 
 /* ── V3-M1: Stock Profile Modal & Cover Badges ─────────────────── */
+.modal-backdrop--open,
+.modal-backdrop--visible {
+  opacity: 1 !important;
+  pointer-events: all !important;
+}
+
+.modal-backdrop--open .stock-modal,
+.modal-backdrop--visible .stock-modal {
+  transform: translateY(0);
+}
+
 .stock-modal {
   max-width: 540px;
   background-color: var(--color-bg-base, #09090b);
