@@ -85,6 +85,22 @@ async function updateInventoryProfile(req, res, next) {
   }
 }
 
+// PATCH /api/v1/materials/:materialId/landed-cost — V3-M3
+async function updateLandedCost(req, res, next) {
+  try {
+    const businessId = await resolveBusinessId(req.auth);
+    const { landedUnitFactor, landedDutyFreightPct, landedFixedSpreadInr } = req.body;
+    const material = await materialTrackingService.updateLandedCost(
+      businessId,
+      req.params.materialId,
+      { landedUnitFactor, landedDutyFreightPct, landedFixedSpreadInr }
+    );
+    sendSuccess(res, material);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // GET /api/v1/materials/:materialId/supplier-recommendations — T-08
 async function getSupplierRecommendations(req, res, next) {
   try {
@@ -119,6 +135,7 @@ module.exports = {
   addMaterial,
   setExternalSymbol,
   updateInventoryProfile,
+  updateLandedCost,
   getSupplierRecommendations,
   getPriceOutlook,
 };

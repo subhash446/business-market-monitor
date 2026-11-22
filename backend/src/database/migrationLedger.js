@@ -635,6 +635,37 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '033_add_fx_rates_and_landed_cost_config.js': {
+    tables: {
+      fx_rates: {
+        columns: {
+          id: { dataType: 'bigint' },
+          base_currency: { dataType: 'varchar', isNullable: 'NO' },
+          quote_currency: { dataType: 'varchar', isNullable: 'NO' },
+          rate: { dataType: 'decimal', isNullable: 'NO' },
+          rate_date: { dataType: 'date', isNullable: 'NO' },
+          source: { dataType: 'varchar', isNullable: 'NO' },
+          fetched_at: { dataType: ['datetime', 'timestamp'], isNullable: 'NO' },
+        },
+        indexes: {
+          uq_fx_rates_pair_date: { unique: true },
+        },
+      },
+      tracked_materials: {
+        columns: {
+          landed_unit_factor: { dataType: 'decimal', isNullable: 'YES' },
+          landed_duty_freight_pct: { dataType: 'decimal', isNullable: 'YES' },
+          landed_fixed_spread_inr: { dataType: 'decimal', isNullable: 'YES' },
+          landed_config_updated_at: { dataType: ['datetime', 'timestamp'], isNullable: 'YES' },
+        },
+      },
+      sync_statuses: {
+        columns: {
+          job_type: { dataType: 'enum', columnTypeIncludes: ['FX_INGESTION'], isNullable: 'NO' },
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

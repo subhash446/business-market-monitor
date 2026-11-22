@@ -58,6 +58,7 @@ import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { useToast }   from '../components/ui/Toast.jsx';
 import { StockProfileModal } from '../components/materials/StockProfileModal.jsx';
+import { LandedCostModal } from '../components/materials/LandedCostModal.jsx';
 import '../styles/pages/materials.css';
 
 /* ── Load state ────────────────────────────────────────────── */
@@ -177,6 +178,7 @@ export function getSymbolDescription(symbol) {
 }
 
 const StockModalContext = createContext(null);
+const LandedModalContext = createContext(null);
 
 export function MaterialsPage() {
   const { business, setBusiness } = useAuth();
@@ -208,9 +210,17 @@ export function MaterialsPage() {
   /* ── Stock profile modal target material (V3-M1) ────────── */
   const [stockModalMaterial, setStockModalMaterial] = useState(null);
 
+  /* ── Landed cost modal target material (V3-M3) ──────────── */
+  const [landedModalMaterial, setLandedModalMaterial] = useState(null);
+
   const handleStockSaved = (updatedMaterial) => {
     setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
     showToast({ message: `Stock profile updated for ${updatedMaterial.name}`, type: 'success' });
+  };
+
+  const handleLandedCostSaved = (updatedMaterial) => {
+    setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
+    showToast({ message: `Landed cost model updated for ${updatedMaterial.name}`, type: 'success' });
   };
 
   /* ── Load data ──────────────────────────────────────────── */
@@ -345,6 +355,7 @@ export function MaterialsPage() {
   /* ── Render ───────────────────────────────────────────────── */
   return (
     <StockModalContext.Provider value={setStockModalMaterial}>
+    <LandedModalContext.Provider value={setLandedModalMaterial}>
       <div className="page-container">
 
         {/* ── Page toolbar: filter + add button ─────────────────── */}
@@ -491,7 +502,15 @@ export function MaterialsPage() {
         onClose={() => setStockModalMaterial(null)}
         onSaveSuccess={handleStockSaved}
       />
+
+      <LandedCostModal
+        material={landedModalMaterial}
+        isOpen={Boolean(landedModalMaterial)}
+        onClose={() => setLandedModalMaterial(null)}
+        onSaveSuccess={handleLandedCostSaved}
+      />
     </div>
+    </LandedModalContext.Provider>
     </StockModalContext.Provider>
   );
 }
@@ -578,7 +597,14 @@ function MaterialsListContent({
 function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSetSymbol, onOpenStock }) {
   return (
     <tr>
-      <td className="table__cell font-medium">{material.name}</td>
+      <td className="table__cell font-medium">
+        {material.name}
+        {material.landedUnitFactor != null && (
+          <span className="badge badge--info" style={{ fontSize: '10px', padding: '1px 5px', marginLeft: '6px' }} title="Landed parity model active">
+            PARITY
+          </span>
+        )}
+      </td>
       <td className="table__cell">
         <span className="material-unit-pill">{material.unit}</span>
       </td>
@@ -633,7 +659,14 @@ function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSym
   return (
     <div className="card card--material material-card">
       <div className="material-card__header">
-        <span className="material-card__name">{material.name}</span>
+        <span className="material-card__name">
+          {material.name}
+          {material.landedUnitFactor != null && (
+            <span className="badge badge--info" style={{ fontSize: '10px', padding: '1px 5px', marginLeft: '6px' }} title="Landed parity model active">
+              PARITY
+            </span>
+          )}
+        </span>
         <SourceBadge isCustom={material.isCustom} />
       </div>
       <p className="material-card__unit">
@@ -747,9 +780,11 @@ function TrackButton({ material, busy, onToggle }) {
 /* ── Action links — shown only when isTracked === true ─────────
  * Links use material.id = tracked_materials.id (universal ID)
  * ──────────────────────────────────────────────────────────── */
-export function ActionLinks({ material, onOpenStock: propOpenStock }) {
+export function ActionLinks({ material, onOpenStock: propOpenStock, onOpenLanded: propOpenLanded }) {
   const contextOpenStock = useContext(StockModalContext);
   const onOpenStock = propOpenStock || contextOpenStock;
+  const contextOpenLanded = useContext(LandedModalContext);
+  const onOpenLanded = propOpenLanded || contextOpenLanded;
   const logLabel = material.externalSymbol ? 'Log Price' : 'Log Supplier Quote';
 
   return (
@@ -779,6 +814,15 @@ export function ActionLinks({ material, onOpenStock: propOpenStock }) {
           onClick={() => onOpenStock(material)}
         >
           Stock Profile
+        </button>
+      )}
+      {onOpenLanded && (
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost"
+          onClick={() => onOpenLanded(material)}
+        >
+          Landed Cost
         </button>
       )}
     </div>

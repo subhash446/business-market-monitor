@@ -139,3 +139,29 @@ export async function getMaterialPriceOutlook(materialId) {
   const { data } = await get(`/materials/${materialId}/price-outlook`);
   return data;
 }
+
+/**
+ * Update landed-cost normalization configuration for a tracked material (V3-M3).
+ * PATCH /api/v1/materials/:materialId/landed-cost
+ *
+ * @param {number|string} materialId
+ * @param {{ landedUnitFactor?: number|null, landedDutyFreightPct?: number|null, landedFixedSpreadInr?: number|null }} landedCostData
+ * @returns {Promise<Object>}
+ */
+export async function updateMaterialLandedCost(materialId, landedCostData) {
+  const { data } = await patch(`/materials/${materialId}/landed-cost`, landedCostData);
+  return data;
+}
+
+/**
+ * Fetch latest daily FX rate (V3-M3).
+ * GET /api/v1/fx/latest
+ *
+ * @param {string} [base='USD']
+ * @param {string} [quote='INR']
+ * @returns {Promise<Object>}
+ */
+export async function getLatestFxRate(base = 'USD', quote = 'INR') {
+  const { data } = await get(`/fx/latest?base=${encodeURIComponent(base)}&quote=${encodeURIComponent(quote)}`);
+  return data;
+}

@@ -174,9 +174,55 @@ function validateUpdateInventoryProfile(body) {
   return errors;
 }
 
+// Added in V3-M3 (Landed Cost Configuration) — purely additive.
+const ALLOWED_LANDED_FIELDS = [
+  'landedUnitFactor',
+  'landedDutyFreightPct',
+  'landedFixedSpreadInr',
+];
+
+function validateUpdateLandedCost(body) {
+  const errors = [];
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    errors.push({ field: 'body', issue: 'must be an object' });
+    return errors;
+  }
+
+  const providedFields = Object.keys(body);
+  const disallowed = providedFields.filter((f) => !ALLOWED_LANDED_FIELDS.includes(f));
+  disallowed.forEach((f) => errors.push({ field: f, issue: 'cannot be updated' }));
+
+  if (providedFields.length === 0) {
+    errors.push({ field: 'body', issue: 'must provide at least one landed-cost field to update' });
+    return errors;
+  }
+
+  // Refinement 3: Enforce safe numeric bounds matching MySQL column precision
+  if (body.landedUnitFactor !== undefined && body.landedUnitFactor !== null) {
+    if (typeof body.landedUnitFactor !== 'number' || isNaN(body.landedUnitFactor) || body.landedUnitFactor <= 0 || body.landedUnitFactor > 100000) {
+      errors.push({ field: 'landedUnitFactor', issue: 'must be a positive number <= 100000 or null' });
+    }
+  }
+
+  if (body.landedDutyFreightPct !== undefined && body.landedDutyFreightPct !== null) {
+    if (typeof body.landedDutyFreightPct !== 'number' || isNaN(body.landedDutyFreightPct) || body.landedDutyFreightPct < 0 || body.landedDutyFreightPct > 500) {
+      errors.push({ field: 'landedDutyFreightPct', issue: 'must be a non-negative number <= 500 or null' });
+    }
+  }
+
+  if (body.landedFixedSpreadInr !== undefined && body.landedFixedSpreadInr !== null) {
+    if (typeof body.landedFixedSpreadInr !== 'number' || isNaN(body.landedFixedSpreadInr) || body.landedFixedSpreadInr < 0 || body.landedFixedSpreadInr > 1000000) {
+      errors.push({ field: 'landedFixedSpreadInr', issue: 'must be a non-negative number <= 1000000 or null' });
+    }
+  }
+
+  return errors;
+}
+
 module.exports = {
   validateUpdateMaterial,
   validateCreateMaterial,
   validateSetExternalSymbol,
   validateUpdateInventoryProfile,
+  validateUpdateLandedCost,
 };

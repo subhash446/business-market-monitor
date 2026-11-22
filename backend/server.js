@@ -21,6 +21,7 @@ const newsIngestionJob  = require('./src/jobs/newsIngestion.job');
 const aiInsightsJob     = require('./src/jobs/aiInsights.job');
 const alertEvaluationJob = require('./src/jobs/alertEvaluation.job');
 const newsDigestJob      = require('./src/jobs/newsDigest.job');
+const fxIngestionJob     = require('./src/jobs/fxIngestion.job');
 
 // Production Hardening Phase B, finding H4: graceful shutdown. Captures
 // the http.Server instance returned by app.listen() so it can be closed
@@ -35,6 +36,7 @@ let newsJob;   // node-cron ScheduledTask -- stopped during shutdown
 let aiJob;     // node-cron ScheduledTask -- stopped during shutdown
 let alertJob;  // node-cron ScheduledTask -- stopped during shutdown
 let digestJob; // node-cron ScheduledTask -- stopped during shutdown
+let fxJob;     // node-cron ScheduledTask -- stopped during shutdown
 
 function shutdown(signal) {
   logger.info(`[server] Received ${signal}, shutting down gracefully...`);
@@ -68,6 +70,10 @@ function shutdown(signal) {
   if (digestJob) {
     digestJob.stop();
     logger.info('[server] News digest job stopped.');
+  }
+  if (fxJob) {
+    fxJob.stop();
+    logger.info('[server] FX ingestion job stopped.');
   }
 
   if (!server) {
@@ -113,6 +119,7 @@ async function start() {
     aiJob     = aiInsightsJob.start();
     alertJob  = alertEvaluationJob.start();
     digestJob = newsDigestJob.start();
+    fxJob     = fxIngestionJob.start();
   });
 }
 

@@ -20,6 +20,8 @@ const newsRepository = require('../repositories/news.repository');
 const aiInsightQueryService = require('./aiInsightQuery.service');
 const inventoryDecisionService = require('./inventoryDecision.service');
 const priceOutlookService = require('./priceOutlook.service');
+const fxRateService = require('./fxRate.service');
+const landedCostService = require('./landedCost.service');
 const { ACTION_RECOMMENDATION } = require('../constants/enums');
 const AppError = require('../utils/AppError');
 
@@ -311,12 +313,13 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
     throw new AppError(404, 'NOT_FOUND', 'Tracked material not found');
   }
 
-  const [prices, latestInsight, candidateNews] = await Promise.all([
+  const [prices, latestInsight, candidateNews, fxRate] = await Promise.all([
     getRecentPrices(materialId),
     aiInsightQueryService.getLatestInsight(businessId, materialId).catch(() => null),
     material.industry_id
       ? newsRepository.listRecentByIndustry(material.industry_id, 10).catch(() => [])
       : Promise.resolve([]),
+    fxRateService.getLatestRate('USD', 'INR').catch(() => null),
   ]);
 
   const quoteAnalysis = analyzeQuoteVsBenchmark(prices);
@@ -344,6 +347,22 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
     newsHeadlines: candidateNews || [],
     materialUnit: material.unit_abbreviation,
     materialName: material.name,
+  });
+
+  // V3-M3: Evaluate deterministic landed-cost parity & FX normalization
+  const landedCostConfig = {
+    unitFactor: material.landed_unit_factor != null ? Number(material.landed_unit_factor) : null,
+    dutyFreightPct: material.landed_duty_freight_pct != null ? Number(material.landed_duty_freight_pct) : 0,
+    fixedSpreadInr: material.landed_fixed_spread_inr != null ? Number(material.landed_fixed_spread_inr) : 0,
+    updatedAt: material.landed_config_updated_at,
+  };
+
+  const fxNormalizedComparison = landedCostService.evaluateLandedCostParity({
+    landedCostConfig,
+    latestBenchmark: quoteAnalysis.latestBenchmark,
+    latestQuote: quoteAnalysis.latestQuote,
+    fxRate,
+    materialUnit: material.unit_abbreviation,
   });
 
   const effectiveAction = (inventoryDecision.hasInventoryProfile && inventoryDecision.isBridgeOverride)
@@ -383,6 +402,7 @@ async function getMaterialSupplierRecommendations(businessId, materialId) {
       variancePercent: quoteAnalysis.variancePercent,
       crossCurrencyNote: quoteAnalysis.crossCurrencyNote,
     },
+    fxNormalizedComparison,
     inventoryDecision,
     priceOutlook,
     diversification,

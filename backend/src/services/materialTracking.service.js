@@ -127,6 +127,20 @@ async function updateInventoryProfile(businessId, materialId, inventoryData) {
   return toPublicMaterial(updated);
 }
 
+// Added in V3-M3 (Landed Cost Configuration) — purely additive.
+async function updateLandedCost(businessId, materialId, landedCostData) {
+  const existing = await materialRepository.findByIdForBusiness(materialId, businessId);
+  if (!existing) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
+  }
+
+  const updated = await materialRepository.updateLandedCost(materialId, landedCostData, businessId);
+  if (!updated) {
+    throw new AppError(404, 'NOT_FOUND', 'Material not found');
+  }
+  return toPublicMaterial(updated);
+}
+
 function toPublicMaterial(row) {
   const result = {
     id: row.id,
@@ -165,6 +179,29 @@ function toPublicMaterial(row) {
     };
   }
 
+  // Include landed-cost fields whenever present in the DB row or update payload
+  if (row.landed_unit_factor !== undefined || row.landed_duty_freight_pct !== undefined) {
+    let landedConfigUpdatedAt = row.landed_config_updated_at || null;
+    if (landedConfigUpdatedAt instanceof Date) {
+      landedConfigUpdatedAt = landedConfigUpdatedAt.toISOString();
+    }
+
+    const landedUnitFactor = row.landed_unit_factor != null ? Number(row.landed_unit_factor) : null;
+    const landedDutyFreightPct = row.landed_duty_freight_pct != null ? Number(row.landed_duty_freight_pct) : null;
+    const landedFixedSpreadInr = row.landed_fixed_spread_inr != null ? Number(row.landed_fixed_spread_inr) : null;
+
+    result.landedUnitFactor = landedUnitFactor;
+    result.landedDutyFreightPct = landedDutyFreightPct;
+    result.landedFixedSpreadInr = landedFixedSpreadInr;
+    result.landedConfigUpdatedAt = landedConfigUpdatedAt;
+    result.landedCost = {
+      unitFactor: landedUnitFactor,
+      dutyFreightPct: landedDutyFreightPct,
+      fixedSpreadInr: landedFixedSpreadInr,
+      updatedAt: landedConfigUpdatedAt,
+    };
+  }
+
   return result;
 }
 
@@ -174,5 +211,6 @@ module.exports = {
   createCustomMaterial,
   setExternalSymbol,
   updateInventoryProfile,
+  updateLandedCost,
   toPublicMaterial,
 };

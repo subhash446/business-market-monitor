@@ -23,6 +23,8 @@ const BASE_SELECT = `
          u.abbreviation AS unit_abbreviation, tm.is_tracked, tm.external_symbol,
          tm.current_stock_qty, tm.daily_consumption_rate, tm.supplier_lead_time_days,
          tm.max_storage_days, tm.inventory_updated_at,
+         tm.landed_unit_factor, tm.landed_duty_freight_pct, tm.landed_fixed_spread_inr,
+         tm.landed_config_updated_at,
          tm.created_at
   FROM tracked_materials tm
   LEFT JOIN raw_materials rm ON rm.id = tm.raw_material_id
@@ -300,6 +302,48 @@ async function updateInventoryProfile(materialId, inventoryData, businessId) {
   return findByIdForBusiness(materialId, businessId);
 }
 
+// Added in V3-M3 (Landed Cost Configuration) — purely additive.
+async function updateLandedCost(materialId, landedData, businessId) {
+  assertBusinessId(businessId, 'updateLandedCost');
+  const updates = [];
+  const params = [];
+
+  if (landedData.landedUnitFactor !== undefined) {
+    updates.push('landed_unit_factor = ?');
+    params.push(landedData.landedUnitFactor);
+  }
+  if (landedData.landedDutyFreightPct !== undefined) {
+    updates.push('landed_duty_freight_pct = ?');
+    params.push(landedData.landedDutyFreightPct);
+  }
+  if (landedData.landedFixedSpreadInr !== undefined) {
+    updates.push('landed_fixed_spread_inr = ?');
+    params.push(landedData.landedFixedSpreadInr);
+  }
+
+  // Refinement 3: Set landed_config_updated_at = NOW() on valid save, NULL when cleared.
+  if (landedData.landedUnitFactor !== undefined) {
+    if (landedData.landedUnitFactor !== null) {
+      updates.push('landed_config_updated_at = NOW()');
+    } else {
+      updates.push('landed_config_updated_at = NULL');
+    }
+  }
+
+  if (updates.length > 0) {
+    params.push(materialId, businessId);
+    const [result] = await pool.execute(
+      `UPDATE tracked_materials SET ${updates.join(', ')} WHERE id = ? AND business_id = ?`,
+      params
+    );
+    if (result && result.affectedRows === 0) {
+      return null;
+    }
+  }
+
+  return findByIdForBusiness(materialId, businessId);
+}
+
 module.exports = {
   listByBusinessId,
   findByIdForBusiness,
@@ -313,5 +357,6 @@ module.exports = {
   findTrackedByExternalSymbol,
   updateExternalSymbol,
   updateInventoryProfile,
+  updateLandedCost,
   findAllTracked,
 };

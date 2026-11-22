@@ -59,6 +59,7 @@ import { EmptyState }  from '../components/ui/EmptyState.jsx';
 import { ErrorState }  from '../components/ui/ErrorState.jsx';
 import { Pagination }  from '../components/ui/Pagination.jsx';
 import { InsightCard } from '../components/ui/InsightCard.jsx';
+import { LandedCostModal } from '../components/materials/LandedCostModal.jsx';
 import { formatDate, formatNumber } from '../utils/format.js';
 import '../styles/pages/trends.css';
 
@@ -126,6 +127,9 @@ export function TrendsPage() {
   const [supplierRec,        setSupplierRec]        = useState(null);
   const [supplierRecLoading, setSupplierRecLoading] = useState(false);
   const [supplierRecError,   setSupplierRecError]   = useState(null);
+
+  /* Landed cost modal state for Tab 1 (V3-M3) */
+  const [showLandedCostModal, setShowLandedCostModal] = useState(false);
 
   /* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const checkedCount = useMemo(
@@ -736,7 +740,28 @@ export function TrendsPage() {
               loading={supplierRecLoading}
               error={supplierRecError}
               materialName={selectedHistMaterial?.name}
+              onOpenLandedCost={() => setShowLandedCostModal(true)}
             />
+
+            {showLandedCostModal && selectedHistMaterial && (
+              <LandedCostModal
+                material={selectedHistMaterial}
+                isOpen={showLandedCostModal}
+                onClose={() => setShowLandedCostModal(false)}
+                onSaveSuccess={() => {
+                  if (selectedHistMaterial?.id) {
+                    getMaterialSupplierRecommendations(selectedHistMaterial.id)
+                      .then(setSupplierRec)
+                      .catch(() => {});
+                  }
+                }}
+                benchmarkPrice={supplierRec?.quoteComparison?.latestBenchmark?.price}
+                benchmarkCurrency={supplierRec?.quoteComparison?.latestBenchmark?.currency || 'USD'}
+                benchmarkUnit={supplierRec?.quoteComparison?.latestBenchmark?.unitLabel || 'bbl'}
+                domesticQuotePrice={supplierRec?.quoteComparison?.latestQuote?.price}
+                initialFxRate={supplierRec?.fxNormalizedComparison?.fxRate?.rate}
+              />
+            )}
           </div>
         )}
       </div>
@@ -1231,7 +1256,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
 /* ================================================================
  * SUPPLIER SOURCING GUIDANCE CARD (T-08 / FR-ALERT-06)
  * ================================================================ */
-export function SupplierGuidanceCard({ rec, loading, error, materialName }) {
+export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpenLandedCost }) {
   if (loading) {
     return (
       <div className="card supplier-guidance-card" id="supplier-guidance-card">
@@ -1429,11 +1454,95 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName }) {
               </div>
             ) : rec.quoteComparison.crossCurrencyNote ? (
               <div className="alert alert--warning" style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)' }}>
-                <i className="fa-solid fa-circle-info mr-1" /> {rec.quoteComparison.crossCurrencyNote}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <i className="fa-solid fa-circle-info mr-1" /> {rec.quoteComparison.crossCurrencyNote}
+                  </div>
+                  {onOpenLandedCost && (
+                    <button
+                      type="button"
+                      className="btn btn--sm btn--primary"
+                      style={{ fontSize: '11px', padding: '3px 8px' }}
+                      onClick={onOpenLandedCost}
+                    >
+                      Configure Landed-Cost Parity
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)' }}>
                 Single price stream active. Ingest or upload domestic quotes to evaluate procurement variance against benchmarks.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Landed-Cost & FX Parity Benchmark (V3-M3) */}
+        {rec.fxNormalizedComparison && rec.fxNormalizedComparison.isConfigured && rec.fxNormalizedComparison.estimatedLandedBenchmark != null && (
+          <div className="supplier-subpanel landed-parity-subpanel" id="landed-parity-panel">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-2)' }}>
+              <h4 className="supplier-subpanel__title" style={{ margin: 0 }}>
+                <i className="fa-solid fa-calculator mr-2" style={{ color: 'var(--color-primary)' }} />
+                Landed-Cost &amp; FX Parity Benchmark
+              </h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {rec.fxNormalizedComparison.fxRate && (
+                  <span className="badge badge--info font-mono" style={{ fontSize: '11px' }}>
+                    USD/INR: ₹{Number(rec.fxNormalizedComparison.fxRate.rate).toFixed(2)}
+                    {rec.fxNormalizedComparison.fxRate.isStale && ' (Stale)'}
+                  </span>
+                )}
+                {onOpenLandedCost && (
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--ghost"
+                    style={{ fontSize: '11px', padding: '2px 8px' }}
+                    onClick={onOpenLandedCost}
+                  >
+                    Edit Model
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="supplier-metric-grid">
+              <div className="supplier-metric-card">
+                <span className="supplier-metric-label">Estimated Landed Benchmark</span>
+                <span className="supplier-metric-value font-mono">
+                  ₹{Number(rec.fxNormalizedComparison.estimatedLandedBenchmark).toFixed(2)}/{rec.fxNormalizedComparison.targetUnit}
+                </span>
+              </div>
+
+              <div className="supplier-metric-card">
+                <span className="supplier-metric-label">Domestic Supplier Quote</span>
+                <span className="supplier-metric-value font-mono">
+                  {rec.fxNormalizedComparison.latestDomesticQuote != null
+                    ? `₹${Number(rec.fxNormalizedComparison.latestDomesticQuote).toFixed(2)}/${rec.fxNormalizedComparison.targetUnit}`
+                    : 'None Logged'}
+                </span>
+              </div>
+
+              <div className="supplier-metric-card">
+                <span className="supplier-metric-label">Landed Parity Variance</span>
+                <span
+                  className="supplier-metric-value font-mono"
+                  style={{
+                    color: rec.fxNormalizedComparison.variancePercent != null
+                      ? (rec.fxNormalizedComparison.variancePercent > 0 ? 'var(--color-danger)' : 'var(--color-success)')
+                      : 'var(--color-text-muted)',
+                  }}
+                >
+                  {rec.fxNormalizedComparison.variancePercent != null
+                    ? `${rec.fxNormalizedComparison.variancePercent > 0 ? '+' : ''}${rec.fxNormalizedComparison.variancePercent}%`
+                    : '—'}
+                </span>
+              </div>
+            </div>
+
+            {rec.fxNormalizedComparison.formulaBreakdown && (
+              <div style={{ marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                Parity Formula: {rec.fxNormalizedComparison.formulaBreakdown}
               </div>
             )}
           </div>

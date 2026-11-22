@@ -71,6 +71,8 @@ const env = {
     aiInsights: process.env.AI_INSIGHTS_CRON || '0 6 * * *',
     // Periodic news digest runs daily at 7 AM UTC (after AI insights).
     newsDigest: process.env.NEWS_DIGEST_CRON || '0 7 * * *',
+    // Daily official FX rate ingestion runs at 4:30 AM UTC (before price ingestion).
+    fxIngestion: process.env.FX_INGESTION_CRON || '30 4 * * *',
   },
 
   govDataApiKey: process.env.GOV_DATA_API_KEY || '',
@@ -187,6 +189,14 @@ const env = {
   // Opt-in: disabled by default (NEWS_DIGEST_ENABLED=true to activate).
   newsDigest: {
     enabled: (process.env.NEWS_DIGEST_ENABLED || 'false').toLowerCase() === 'true',
+  },
+
+  // Live USD/INR FX Ingestion via Frankfurter / ECB (V3-M3).
+  // Opt-in: disabled by default (FX_INGESTION_ENABLED=true to activate).
+  fx: {
+    enabled: (process.env.FX_INGESTION_ENABLED || 'false').toLowerCase() === 'true',
+    baseUrl: process.env.FRANKFURTER_BASE_URL || 'https://api.frankfurter.app',
+    timeoutMs: parseInt(process.env.FX_PROVIDER_TIMEOUT_MS, 10) || 10000,
   },
 };
 

@@ -12,6 +12,7 @@ router.use('/news', require('./news.routes'));
 router.use('/alerts', require('./alerts.routes'));
 router.use('/dashboard', require('./dashboard.routes'));
 router.use('/ai-insights', require('./aiInsights.routes')); // /business/latest
+router.use('/fx', require('./fx.routes'));                   // /fx/latest
 router.use('/health', require('./health.routes'));
 
 module.exports = router;
