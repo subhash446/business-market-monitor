@@ -448,7 +448,13 @@
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
+  gap: 8px;
   margin: 0;
+}
+
+.price-outlook-header__title i {
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .price-outlook-header__badges {

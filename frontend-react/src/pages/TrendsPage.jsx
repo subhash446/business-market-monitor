@@ -1012,7 +1012,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
       <div className="card price-outlook-card" id="price-outlook-card">
         <div className="price-outlook-header">
           <h3 className="price-outlook-header__title">
-            <i className="fa-solid fa-chart-line mr-2" style={{ color: 'var(--color-primary)' }} />
+            <i className="fa-solid fa-chart-line" style={{ color: 'var(--color-primary)', marginRight: '8px' }} />
             14d &amp; 30d Directional Price Outlook — {materialName || 'Tracked Material'}
           </h3>
           <span className="badge badge--neutral">INSUFFICIENT DATA</span>
@@ -1049,7 +1049,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
       <div className="price-outlook-header">
         <div className="price-outlook-header__left">
           <h3 className="price-outlook-header__title">
-            <i className="fa-solid fa-chart-line mr-2" style={{ color: 'var(--color-primary)' }} />
+            <i className="fa-solid fa-chart-line" style={{ color: 'var(--color-primary)', marginRight: '8px' }} />
             14d &amp; 30d Directional Price Outlook — {materialName || 'Tracked Material'}
           </h3>
           <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px' }}>

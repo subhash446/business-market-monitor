@@ -142,6 +142,7 @@ describe('V3-M2 — News-to-Price Impact Scoring & 14/30-Day Directional Price B
       );
 
       assert.ok(html.includes('14d &amp; 30d Directional Price Outlook — PET Resin'));
+      assert.ok(html.includes('margin-right:8px') || html.includes('margin-right: 8px') || html.includes('margin-right'));
       assert.ok(html.includes('outlook-dir-pill--up'));
       assert.ok(html.includes('Upward Cost Pressure'));
       assert.ok(html.includes('HIGH (85%)'));

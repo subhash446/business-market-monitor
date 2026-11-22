@@ -394,7 +394,7 @@ function MaterialsList({ items, onNavigate }) {
             <span className="dashboard-panel__item-name">{material.name}</span>
 
             {/* latestPrice with currency, unit, and classification */}
-            <div className="dashboard-panel__item-meta">
+            <div className="dashboard-panel__item-meta dashboard-material-meta">
               {material.latestPrice === null || material.latestPrice === undefined ? (
                 <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
                   No price recorded
@@ -437,7 +437,7 @@ function MaterialsList({ items, onNavigate }) {
                       ? 'badge--warning'
                       : 'badge--success'
                   }`}
-                  style={{ fontSize: '11px', padding: '1px 6px' }}
+                  style={{ fontSize: '11px', padding: '1px 6px', whiteSpace: 'nowrap' }}
                 >
                   {material.stockoutRisk === 'CRITICAL'
                     ? `CRITICAL: ${material.daysOfCover}d`
