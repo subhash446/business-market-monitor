@@ -12,8 +12,9 @@ const express = require('express');
 const router = express.Router();
 const whatsappCopilotController = require('../controllers/whatsappCopilot.controller');
 const auth = require('../middleware/auth.middleware');
+const { attachBusinessRole } = require('../middleware/rbac.middleware');
 
-router.post('/parse-quote', auth, whatsappCopilotController.parseQuote);
-router.get('/history', auth, whatsappCopilotController.getHistory);
+router.post('/parse-quote', auth, attachBusinessRole, whatsappCopilotController.parseQuote);
+router.get('/history', auth, attachBusinessRole, whatsappCopilotController.getHistory);
 
 module.exports = router;

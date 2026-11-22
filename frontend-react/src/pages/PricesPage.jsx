@@ -19,6 +19,7 @@ import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { Modal } from '../components/ui/Modal.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
+import { useAuth } from '../hooks/useAuth.js';
 import { formatPriceDisplay, formatUnitLabel, formatDate, toIsoDateString } from '../utils/format.js';
 import { resolveIsProxyPrice, refreshSourceInfoAfterManualQuote } from '../utils/priceSource.js';
 import '../styles/pages/prices.css';
@@ -30,6 +31,9 @@ export function PricesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { showToast } = useToast();
+  const { user, business } = useAuth();
+  const currentRole = business?.businessRole || user?.businessRole || 'OWNER';
+  const isViewer = currentRole === 'VIEWER';
 
   // Read ?materialId from URL — this is tracked_materials.id
   const materialId = searchParams.get('materialId');
@@ -231,6 +235,10 @@ export function PricesPage() {
 
   async function handleBulkSubmit() {
     setBulkError('');
+    if (isViewer) {
+      setBulkError('Viewers have read-only permissions.');
+      return;
+    }
     const validRows = parsedRows.filter((r) => r.isValid);
     if (validRows.length === 0) {
       setBulkError('No valid rows to upload. Please fix the errors highlighted in the preview.');
@@ -313,6 +321,11 @@ export function PricesPage() {
     }
 
     if (!valid) return;
+
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      return;
+    }
 
     setSubmitting(true);
     try {

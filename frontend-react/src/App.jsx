@@ -41,6 +41,8 @@ import { PricesPage }        from './pages/PricesPage.jsx';
 import { TrendsPage }        from './pages/TrendsPage.jsx';
 import { NewsPage }          from './pages/NewsPage.jsx';
 import { AlertsPage }        from './pages/AlertsPage.jsx';
+import { SettingsPage }      from './pages/SettingsPage.jsx';
+import { AcceptInvitePage }  from './pages/AcceptInvitePage.jsx';
 
 /* ----------------------------------------------------------------
  * App — provider order:
@@ -66,9 +68,10 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password"  element={<ResetPasswordPage />} />
 
-            {/* ── Auth-only — onboarding (no business yet) ──────── */}
+            {/* ── Auth-only — onboarding & accept-invite ──────── */}
             <Route element={<ProtectedRoute />}>
               <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/accept-invite" element={<AcceptInvitePage />} />
             </Route>
 
             {/* ── Auth + business required — full app shell ──────── */}
@@ -81,6 +84,7 @@ function App() {
                 <Route path="/trends"    element={<TrendsPage />} />
                 <Route path="/alerts"    element={<AlertsPage />} />
                 <Route path="/news"      element={<NewsPage />} />
+                <Route path="/settings"  element={<SettingsPage />} />
               </Route>
             </Route>
 

@@ -55,6 +55,7 @@ import { Pagination }     from '../components/ui/Pagination.jsx';
 import { Modal }          from '../components/ui/Modal.jsx';
 import { ConfirmDialog }  from '../components/ui/ConfirmDialog.jsx';
 import { useToast }       from '../components/ui/Toast.jsx';
+import { useAuth }        from '../hooks/useAuth.js';
 import { formatDateTime, formatNumber } from '../utils/format.js';
 import '../styles/pages/alerts.css';
 
@@ -91,6 +92,9 @@ function deliveryBadgeProps(status) {
  * ================================================================ */
 export function AlertsPage() {
   const { showToast } = useToast();
+  const { user, business } = useAuth();
+  const currentRole = business?.businessRole || user?.businessRole || 'OWNER';
+  const isViewer = currentRole === 'VIEWER';
 
   /* ── Data state ─────────────────────────────────────────────── */
   const [materials,     setMaterials]     = useState([]);
@@ -154,6 +158,10 @@ export function AlertsPage() {
 
   /* ── Toggle active/inactive ─────────────────────────────────── */
   async function handleToggleRule(rule) {
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      return;
+    }
     const newIsActive = !rule.isActive;
     setToggleBusy(prev => ({ ...prev, [rule.id]: true }));
     try {
@@ -171,6 +179,11 @@ export function AlertsPage() {
   /* ── Delete rule ────────────────────────────────────────────── */
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      setDeleteTarget(null);
+      return;
+    }
     const rule = deleteTarget;
     setDeleteTarget(null);
     try {
@@ -234,7 +247,15 @@ export function AlertsPage() {
             type="button"
             id="create-rule-btn"
             className="btn btn--primary btn--sm"
-            onClick={() => setCreateOpen(true)}
+            disabled={isViewer}
+            title={isViewer ? 'Viewers have read-only permissions' : undefined}
+            onClick={() => {
+              if (isViewer) {
+                showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+                return;
+              }
+              setCreateOpen(true);
+            }}
           >
             + Create Alert Rule
           </button>

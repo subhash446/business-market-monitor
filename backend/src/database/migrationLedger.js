@@ -696,6 +696,33 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '035_create_business_members_table.js': {
+    tables: {
+      business_members: {
+        columns: {
+          id: { dataType: 'bigint' },
+          business_id: { dataType: 'bigint', isNullable: 'NO' },
+          user_id: { dataType: 'bigint', isNullable: 'YES' },
+          invited_email: { dataType: 'varchar', isNullable: 'NO' },
+          role: { dataType: 'enum', columnTypeIncludes: ['OWNER', 'PURCHASE_MANAGER', 'VIEWER'], isNullable: 'NO' },
+          status: { dataType: 'enum', columnTypeIncludes: ['ACTIVE', 'INVITED', 'REVOKED'], isNullable: 'NO' },
+          invite_token_hash: { dataType: 'varchar', isNullable: 'YES' },
+          invite_expires_at: { dataType: ['datetime', 'timestamp'], isNullable: 'YES' },
+          invited_by: { dataType: 'bigint', isNullable: 'YES' },
+          accepted_at: { dataType: ['datetime', 'timestamp'], isNullable: 'YES' },
+          created_at: { dataType: ['datetime', 'timestamp'], isNullable: 'NO' },
+          updated_at: { dataType: ['datetime', 'timestamp'], isNullable: 'NO' },
+        },
+        indexes: {
+          uq_biz_member_active_user: { unique: true },
+          idx_biz_member_token_hash: {},
+          idx_biz_member_user_status: {},
+          idx_biz_member_email_status: {},
+          idx_biz_member_biz_role: {},
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

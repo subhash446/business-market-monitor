@@ -183,7 +183,11 @@ const LandedModalContext = createContext(null);
 
 export function MaterialsPage() {
   const { business, setBusiness } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
+
+  const currentRole = business?.businessRole || user?.businessRole || 'OWNER';
+  const isViewer = currentRole === 'VIEWER';
 
   /* ── Data state ─────────────────────────────────────────── */
   const [status,    setStatus]    = useState(STATUS.LOADING);
@@ -254,6 +258,10 @@ export function MaterialsPage() {
 
   /* ── Tracking toggle ────────────────────────────────────── */
   async function handleToggleTracking(material) {
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      return;
+    }
     const newState = !material.isTracked;
     setTrackingBusy(prev => ({ ...prev, [material.id]: true }));
     try {
@@ -271,6 +279,10 @@ export function MaterialsPage() {
 
   /* ── External symbol change ─────────────────────────────── */
   async function handleSetSymbol(material, newSymbol) {
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      return;
+    }
     // newSymbol is '' (empty string from select) → send null to clear
     const externalSymbol = newSymbol === '' ? null : newSymbol;
 
@@ -316,6 +328,10 @@ export function MaterialsPage() {
   /* ── Add custom material submit ─────────────────────────── */
   async function handleAddSubmit(e) {
     e.preventDefault();
+    if (isViewer) {
+      setCmFormErr('Viewers have read-only permissions.');
+      return;
+    }
     setCmNameErr('');
     setCmUnitErr('');
     setCmFormErr('');

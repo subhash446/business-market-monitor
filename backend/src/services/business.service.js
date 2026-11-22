@@ -3,6 +3,8 @@
  * BusinessService). Framework-agnostic — no req/res, no SQL (Document 3 §3).
  */
 const businessRepository = require('../repositories/business.repository');
+const businessMemberRepository = require('../repositories/businessMember.repository');
+const userRepository = require('../repositories/user.repository');
 const materialRepository = require('../repositories/material.repository');
 const templateGenerationService = require('./templateGeneration.service');
 const AppError = require('../utils/AppError');
@@ -21,6 +23,18 @@ async function createBusiness({ userId, name, industryId, contactEmail, contactP
   let business;
   try {
     business = await businessRepository.create({ userId, industryId, name, contactEmail, contactPhone, address });
+    // Record creator as active OWNER in business_members table
+    try {
+      const user = await userRepository.findById(userId);
+      await businessMemberRepository.addActiveMember({
+        businessId: business.id,
+        userId,
+        email: user?.email || contactEmail || `user_${userId}@bmm.internal`,
+        role: 'OWNER',
+      });
+    } catch (_) {
+      // Non-blocking in environments where migration 035 hasn't run yet
+    }
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
       throw new AppError(409, 'CONFLICT', 'This user already has a business');
@@ -36,6 +50,7 @@ async function createBusiness({ userId, name, industryId, contactEmail, contactP
     name: business.name,
     industryId: business.industry_id,
     industrySlug: business.industry_slug || null,
+    businessRole: 'OWNER',
     materialsGenerated,
     materials: (trackedList || []).map((m) => ({
       id: m.id,
@@ -89,6 +104,7 @@ function toPublicBusiness(business) {
     newsDigestFrequency: business.news_digest_frequency,
     newsDigestChannel: business.news_digest_channel || 'EMAIL',
     lastDigestSentAt: business.last_digest_sent_at || null,
+    businessRole: business.businessRole || business.business_role || 'OWNER',
   };
 }
 

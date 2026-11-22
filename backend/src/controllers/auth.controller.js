@@ -6,8 +6,32 @@
  * left as 501 stubs from Phase 1 — untouched.
  */
 const authService = require('../services/auth.service');
+const userRepository = require('../repositories/user.repository');
+const businessRepository = require('../repositories/business.repository');
+const AppError = require('../utils/AppError');
 const { sendSuccess } = require('../utils/response');
 const notImplemented = require('../utils/notImplemented');
+
+// GET /api/v1/auth/me — V3-M5
+async function getMe(req, res, next) {
+  try {
+    const { userId } = req.auth;
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new AppError(404, 'NOT_FOUND', 'User not found');
+    }
+    const business = await businessRepository.findByUserId(userId);
+    sendSuccess(res, {
+      id: user.id,
+      email: user.email,
+      fullName: user.full_name,
+      businessId: business ? business.id : null,
+      businessRole: business ? (business.businessRole || business.business_role || 'OWNER') : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 // POST /api/v1/auth/register — FR-AUTH-01, 02, 03
 async function register(req, res, next) {
@@ -73,6 +97,7 @@ async function confirmPasswordReset(req, res, next) {
 }
 
 module.exports = {
+  getMe,
   register,
   login,
   refresh,

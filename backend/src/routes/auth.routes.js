@@ -15,6 +15,7 @@ router.post('/password-reset/confirm', rateLimiter, validate(validateConfirmPass
 router.get('/email-verification/confirm', authController.confirmEmailVerification);
 
 // Protected
+router.get('/me', authMiddleware, authController.getMe);
 router.post('/logout', authMiddleware, authController.logout);
 router.post('/email-verification/request', authMiddleware, authController.requestEmailVerification);
 

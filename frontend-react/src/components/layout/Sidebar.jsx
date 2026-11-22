@@ -156,7 +156,7 @@ export function Sidebar({ isOpen, onClose }) {
             className="sidebar__action-btn"
             id="nav-settings-btn"
             aria-label="Business settings"
-            onClick={() => { onClose(); setSettingsOpen(true); }}
+            onClick={() => { onClose(); navigate('/settings'); }}
           >
             <span className="sidebar__action-icon" aria-hidden="true">
               <i className="fa-solid fa-gear" />

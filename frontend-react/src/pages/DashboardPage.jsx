@@ -32,6 +32,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getDashboard } from '../api/dashboard.api.js';
 import { getBusinessLatestInsights } from '../api/aiInsights.api.js';
+import { getSavingsRoi } from '../api/analytics.api.js';
 import { Skeleton }     from '../components/ui/Skeleton.jsx';
 import { EmptyState }   from '../components/ui/EmptyState.jsx';
 import { ErrorState }   from '../components/ui/ErrorState.jsx';
@@ -54,6 +55,10 @@ export function DashboardPage() {
   const [aiInsights,        setAiInsights]        = useState([]);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(true);
   const [aiInsightsError,   setAiInsightsError]   = useState(null);
+
+  // Savings ROI loaded independently (V3-M5)
+  const [savingsRoi,        setSavingsRoi]        = useState(null);
+  const [savingsRoiLoading, setSavingsRoiLoading] = useState(true);
 
   /* ── Load dashboard data ──────────────────────────────────────── */
   const loadDashboard = useCallback(async () => {
@@ -89,8 +94,22 @@ export function DashboardPage() {
     }
   }, []);
 
+  /* ── Load Savings ROI (V3-M5) ────────────────────────────────── */
+  const loadSavingsRoi = useCallback(async () => {
+    setSavingsRoiLoading(true);
+    try {
+      const result = await getSavingsRoi();
+      setSavingsRoi(result);
+    } catch {
+      setSavingsRoi(null);
+    } finally {
+      setSavingsRoiLoading(false);
+    }
+  }, []);
+
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
   useEffect(() => { loadAiInsights(); }, [loadAiInsights]);
+  useEffect(() => { loadSavingsRoi(); }, [loadSavingsRoi]);
 
   /* ── Render ───────────────────────────────────────────────────── */
   const isLoading = status === STATUS.LOADING;
@@ -168,6 +187,34 @@ export function DashboardPage() {
             </div>
             <div className="dashboard-stat__footer">
               <span className="dashboard-stat__subtext">Active market briefings</span>
+            </div>
+          </div>
+
+          <div className="card dashboard-stat" id="kpi-savings-roi">
+            <div className="dashboard-stat__header">
+              <span className="dashboard-stat__label">Procurement Savings ROI</span>
+              <i className="fa-solid fa-piggy-bank dashboard-stat__icon" aria-hidden="true" style={{ color: '#10b981' }} />
+            </div>
+            <div className="dashboard-stat__value font-mono font-bold" style={{ color: '#10b981' }}>
+              {savingsRoiLoading ? '—' : `₹${(savingsRoi?.totalMonthlySavingsInr || 0).toLocaleString('en-IN')}`}
+              <span style={{ fontSize: '13px', fontWeight: 'normal', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>/mo</span>
+            </div>
+            <div className="dashboard-stat__footer">
+              <span className="dashboard-stat__subtext">
+                {savingsRoiLoading ? (
+                  'Calculating verified ROI...'
+                ) : (savingsRoi?.totalMonthlySavingsInr || 0) > 0 ? (
+                  <>
+                    <strong>₹{(savingsRoi.annualizedSavingsInr || 0).toLocaleString('en-IN')}</strong>/yr projected ({savingsRoi.materialsScaledCount} scaled)
+                  </>
+                ) : (savingsRoi?.materialsWithSavings || 0) > 0 ? (
+                  <>
+                    <strong>{savingsRoi.materialsWithSavings}</strong> material(s) with unit savings
+                  </>
+                ) : (
+                  'Real-time parity & quote savings'
+                )}
+              </span>
             </div>
           </div>
         </div>

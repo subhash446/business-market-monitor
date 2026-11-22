@@ -113,6 +113,16 @@ async function parseQuote(req, res, next) {
 
       // 5. If autoLog is requested, persist quote to price_points & audit table
       if (autoLog) {
+        if (req.auth?.businessRole === 'VIEWER') {
+          return next(
+            new AppError(
+              403,
+              'FORBIDDEN',
+              "Insufficient permissions. Role 'VIEWER' cannot log quotes to prices. Required: OWNER, PURCHASE_MANAGER."
+            )
+          );
+        }
+
         if (drafts.unitConversion.unitMismatch) {
           return next(
             new AppError(
