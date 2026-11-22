@@ -785,7 +785,7 @@ export function ActionLinks({ material, onOpenStock: propOpenStock, onOpenLanded
   const onOpenStock = propOpenStock || contextOpenStock;
   const contextOpenLanded = useContext(LandedModalContext);
   const onOpenLanded = propOpenLanded || contextOpenLanded;
-  const logLabel = material.externalSymbol ? 'Log Price' : 'Log Supplier Quote';
+  const logLabel = material.externalSymbol ? 'Log Price' : 'Log Quote';
 
   return (
     <div className="materials-actions">

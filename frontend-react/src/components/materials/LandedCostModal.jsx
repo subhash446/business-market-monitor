@@ -245,9 +245,9 @@ export function LandedCostModal({
       >
         <div className="modal__header modal-header">
           <div>
-            <h3 id={titleId} className="modal__title modal-title font-semibold">
-              <i className="fa-solid fa-calculator mr-2" style={{ color: 'var(--color-primary)' }} />
-              Landed-Cost &amp; FX Parity Model — {material.name}
+            <h3 id={titleId} className="modal__title modal-title font-semibold" style={{ display: 'flex', alignItems: 'center' }}>
+              <i className="fa-solid fa-calculator" style={{ color: 'var(--color-primary)', marginRight: '8px' }} />
+              <span>Landed-Cost &amp; FX Parity Model — {material.name}</span>
             </h3>
             <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px' }}>
               Convert global USD benchmarks into actionable landed domestic INR/{matUnit} benchmark parity.
@@ -293,7 +293,7 @@ export function LandedCostModal({
                 </span>
               </div>
               <span className="text-muted" style={{ fontSize: '11px' }}>
-                Live Reference: {fxSource}
+                Live Reference: {fxSource === 'FRANKFURTER_ECB' ? 'ECB (Frankfurter)' : fxSource}
               </span>
             </div>
 
@@ -319,9 +319,13 @@ export function LandedCostModal({
 
             {/* Config Fields */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="unit-factor-input">
-                  Unit Conversion Factor *
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                <label
+                  className="form-label"
+                  htmlFor="unit-factor-input"
+                  style={{ minHeight: '20px', display: 'flex', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}
+                >
+                  Unit Factor *
                 </label>
                 <input
                   id="unit-factor-input"
@@ -329,7 +333,7 @@ export function LandedCostModal({
                   step="any"
                   min="0.000001"
                   max="100000"
-                  className="form-input font-mono"
+                  className="form-control font-mono"
                   placeholder="e.g. 0.00735"
                   value={unitFactor}
                   onChange={(e) => {
@@ -343,9 +347,13 @@ export function LandedCostModal({
                 </span>
               </div>
 
-              <div className="form-group">
-                <label className="form-label" htmlFor="duty-pct-input">
-                  Duty, Freight &amp; Insurance (%)
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                <label
+                  className="form-label"
+                  htmlFor="duty-pct-input"
+                  style={{ minHeight: '20px', display: 'flex', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}
+                >
+                  Duty &amp; Freight (%)
                 </label>
                 <input
                   id="duty-pct-input"
@@ -353,7 +361,7 @@ export function LandedCostModal({
                   step="any"
                   min="0"
                   max="500"
-                  className="form-input font-mono"
+                  className="form-control font-mono"
                   placeholder="e.g. 10.0"
                   value={dutyFreightPct}
                   onChange={(e) => {
@@ -366,8 +374,12 @@ export function LandedCostModal({
                 </span>
               </div>
 
-              <div className="form-group">
-                <label className="form-label" htmlFor="spread-inr-input">
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                <label
+                  className="form-label"
+                  htmlFor="spread-inr-input"
+                  style={{ minHeight: '20px', display: 'flex', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}
+                >
                   Fixed Spread (₹/{matUnit})
                 </label>
                 <input
@@ -376,7 +388,7 @@ export function LandedCostModal({
                   step="any"
                   min="0"
                   max="1000000"
-                  className="form-input font-mono"
+                  className="form-control font-mono"
                   placeholder="e.g. 32.00"
                   value={fixedSpreadInr}
                   onChange={(e) => {
