@@ -38,7 +38,11 @@ if (env.nodeEnv === 'production') {
 }
 
 app.use(cors({ origin: env.cors.allowedOrigin }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 
 // Serve the React production build from this same Express app (Document 3 §15 —
 // single Express deployment decision for V1).

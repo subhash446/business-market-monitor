@@ -59,6 +59,7 @@ import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { useToast }   from '../components/ui/Toast.jsx';
 import { StockProfileModal } from '../components/materials/StockProfileModal.jsx';
 import { LandedCostModal } from '../components/materials/LandedCostModal.jsx';
+import { WhatsAppCopilotModal } from '../components/ui/WhatsAppCopilotModal.jsx';
 import '../styles/pages/materials.css';
 
 /* ── Load state ────────────────────────────────────────────── */
@@ -212,6 +213,9 @@ export function MaterialsPage() {
 
   /* ── Landed cost modal target material (V3-M3) ──────────── */
   const [landedModalMaterial, setLandedModalMaterial] = useState(null);
+
+  /* ── WhatsApp Copilot modal open state (V3-M4) ───────────── */
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   const handleStockSaved = (updatedMaterial) => {
     setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
@@ -377,14 +381,27 @@ export function MaterialsPage() {
           </button>
         </div>
 
-        <button
-          type="button"
-          id="add-material-toggle-btn"
-          className="btn btn--secondary btn--sm"
-          onClick={handleTogglePanel}
-        >
-          {panelOpen ? 'Cancel' : '+ Add Custom Material'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            id="whatsapp-copilot-btn"
+            className="btn btn--secondary btn--sm"
+            onClick={() => setCopilotOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <i className="fa-brands fa-whatsapp text-success" style={{ color: '#22c55e', fontSize: '14px' }} />
+            WhatsApp Copilot
+          </button>
+
+          <button
+            type="button"
+            id="add-material-toggle-btn"
+            className="btn btn--secondary btn--sm"
+            onClick={handleTogglePanel}
+          >
+            {panelOpen ? 'Cancel' : '+ Add Custom Material'}
+          </button>
+        </div>
       </div>
 
       {/* ── Add Custom Material panel ────────────────────────── */}
@@ -508,6 +525,13 @@ export function MaterialsPage() {
         isOpen={Boolean(landedModalMaterial)}
         onClose={() => setLandedModalMaterial(null)}
         onSaveSuccess={handleLandedCostSaved}
+      />
+
+      <WhatsAppCopilotModal
+        isOpen={copilotOpen}
+        onClose={() => setCopilotOpen(false)}
+        materials={materials}
+        onQuoteLogged={() => loadPage()}
       />
     </div>
     </LandedModalContext.Provider>

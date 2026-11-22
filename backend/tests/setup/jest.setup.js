@@ -109,6 +109,8 @@ process.env.AI_INSIGHTS_ENABLED = 'false';
 process.env.ALERT_EVALUATION_ENABLED = 'false';
 process.env.INDIA_GOVT_DATA_ENABLED = 'false';
 process.env.WHATSAPP_ENABLED = 'false';
+process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'test_webhook_verify_token';
+process.env.WHATSAPP_APP_SECRET = 'test_whatsapp_app_secret_32_chars!';
 process.env.NEWS_DIGEST_ENABLED = 'false';
 
 // ---------------------------------------------------------------------------

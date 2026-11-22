@@ -666,6 +666,36 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '034_create_whatsapp_inbound_messages_table.js': {
+    tables: {
+      whatsapp_inbound_messages: {
+        columns: {
+          id: { dataType: 'bigint' },
+          business_id: { dataType: 'bigint', isNullable: 'NO' },
+          external_message_id: { dataType: 'varchar', isNullable: 'NO' },
+          sender_phone_masked: { dataType: 'varchar', isNullable: 'NO' },
+          sender_phone_hash: { dataType: 'varchar', isNullable: 'NO' },
+          raw_text: { dataType: ['text', 'varchar'], isNullable: 'NO' },
+          parsed_material_id: { dataType: 'bigint', isNullable: 'YES' },
+          parsed_price: { dataType: 'decimal', isNullable: 'YES' },
+          parsed_currency: { dataType: 'varchar', isNullable: 'YES' },
+          parsed_unit: { dataType: 'varchar', isNullable: 'YES' },
+          parsed_supplier_name: { dataType: 'varchar', isNullable: 'YES' },
+          logged_price_point_id: { dataType: 'bigint', isNullable: 'YES' },
+          suggested_counter_low: { dataType: 'decimal', isNullable: 'YES' },
+          suggested_counter_high: { dataType: 'decimal', isNullable: 'YES' },
+          processing_status: { dataType: 'enum', columnTypeIncludes: ['PARSED', 'UNRECOGNIZED', 'FAILED'], isNullable: 'NO' },
+          reply_status: { dataType: 'enum', columnTypeIncludes: ['PENDING', 'SENT', 'FAILED', 'SKIPPED'], isNullable: 'NO' },
+          created_at: { dataType: ['datetime', 'timestamp'], isNullable: 'NO' },
+        },
+        indexes: {
+          uq_whatsapp_inbound_external_id: { unique: true },
+          idx_whatsapp_inbound_biz_created: {},
+          idx_whatsapp_inbound_sender_hash: {},
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

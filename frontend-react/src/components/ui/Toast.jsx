@@ -27,7 +27,7 @@ import { createPortal } from 'react-dom';
  * Context
  * ---------------------------------------------------------------- */
 
-const ToastContext = createContext(null);
+export const ToastContext = createContext(null);
 
 /* ----------------------------------------------------------------
  * Icons (matching original toast.js ICONS map)

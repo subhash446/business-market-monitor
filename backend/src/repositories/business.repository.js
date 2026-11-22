@@ -87,9 +87,41 @@ async function listBusinessesDueForDigest(frequency = null) {
   return rows;
 }
 
+async function findByContactPhone(rawPhone) {
+  if (!rawPhone || typeof rawPhone !== 'string') return null;
+  const digits = rawPhone.replace(/\D/g, '');
+  if (!digits) return null;
+
+  const variants = new Set([rawPhone.trim(), digits, `+${digits}`]);
+  if (digits.startsWith('91') && digits.length === 12) {
+    const local = digits.slice(2);
+    variants.add(local);
+    variants.add(`+91${local}`);
+  } else if (digits.length === 10) {
+    variants.add(`91${digits}`);
+    variants.add(`+91${digits}`);
+  }
+
+  const candidateList = Array.from(variants);
+  const placeholders = candidateList.map(() => '?').join(', ');
+
+  const [rows] = await pool.execute(
+    `SELECT b.*, i.name AS industry_name, i.slug AS industry_slug
+     FROM businesses b
+     JOIN industries i ON i.id = b.industry_id
+     WHERE b.contact_phone IN (${placeholders})
+        OR REPLACE(REPLACE(REPLACE(b.contact_phone, '+', ''), ' ', ''), '-', '') IN (${placeholders})
+     LIMIT 1`,
+    [...candidateList, ...candidateList]
+  );
+
+  return rows[0] || null;
+}
+
 module.exports = {
   findByUserId,
   findById,
+  findByContactPhone,
   industryExists,
   create,
   update,

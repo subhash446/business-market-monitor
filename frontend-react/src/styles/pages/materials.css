@@ -366,7 +366,9 @@
 .modal-backdrop--open .stock-modal,
 .modal-backdrop--visible .stock-modal,
 .modal-backdrop--open .landed-cost-modal,
-.modal-backdrop--visible .landed-cost-modal {
+.modal-backdrop--visible .landed-cost-modal,
+.modal-backdrop--open .copilot-modal,
+.modal-backdrop--visible .copilot-modal {
   transform: translateY(0);
 }
 

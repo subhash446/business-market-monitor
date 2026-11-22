@@ -344,8 +344,13 @@ async function updateLandedCost(materialId, landedData, businessId) {
   return findByIdForBusiness(materialId, businessId);
 }
 
+async function findTrackedForBusiness(businessId) {
+  return listByBusinessId(businessId, true);
+}
+
 module.exports = {
   listByBusinessId,
+  findTrackedForBusiness,
   findByIdForBusiness,
   findById,
   updateMaterial,

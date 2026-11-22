@@ -183,6 +183,8 @@ const env = {
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
     baseUrl: process.env.WHATSAPP_BASE_URL || 'https://graph.facebook.com/v20.0',
     timeoutMs: parseInt(process.env.WHATSAPP_TIMEOUT_MS, 10) || 15000,
+    get webhookVerifyToken() { return process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN; },
+    get appSecret() { return process.env.WHATSAPP_APP_SECRET; },
   },
 
   // Periodic News & Market Digest job (FR-ALERT-06 / T-08).

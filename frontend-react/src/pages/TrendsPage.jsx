@@ -60,6 +60,7 @@ import { ErrorState }  from '../components/ui/ErrorState.jsx';
 import { Pagination }  from '../components/ui/Pagination.jsx';
 import { InsightCard } from '../components/ui/InsightCard.jsx';
 import { LandedCostModal } from '../components/materials/LandedCostModal.jsx';
+import { WhatsAppCopilotModal } from '../components/ui/WhatsAppCopilotModal.jsx';
 import { formatDate, formatNumber } from '../utils/format.js';
 import '../styles/pages/trends.css';
 
@@ -130,6 +131,9 @@ export function TrendsPage() {
 
   /* Landed cost modal state for Tab 1 (V3-M3) */
   const [showLandedCostModal, setShowLandedCostModal] = useState(false);
+
+  /* WhatsApp Copilot modal state for Tab 1 (V3-M4) */
+  const [showCopilotModal, setShowCopilotModal] = useState(false);
 
   /* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const checkedCount = useMemo(
@@ -741,6 +745,7 @@ export function TrendsPage() {
               error={supplierRecError}
               materialName={selectedHistMaterial?.name}
               onOpenLandedCost={() => setShowLandedCostModal(true)}
+              onOpenCopilot={() => setShowCopilotModal(true)}
             />
 
             {showLandedCostModal && selectedHistMaterial && (
@@ -760,6 +765,23 @@ export function TrendsPage() {
                 benchmarkUnit={supplierRec?.quoteComparison?.latestBenchmark?.unitLabel || 'bbl'}
                 domesticQuotePrice={supplierRec?.quoteComparison?.latestQuote?.price}
                 initialFxRate={supplierRec?.fxNormalizedComparison?.fxRate?.rate}
+              />
+            )}
+
+            {showCopilotModal && (
+              <WhatsAppCopilotModal
+                isOpen={showCopilotModal}
+                onClose={() => setShowCopilotModal(false)}
+                materials={trackedMaterials}
+                initialMaterialId={phMaterialId}
+                onQuoteLogged={() => {
+                  if (phMaterialId) {
+                    loadPriceHistory(phMaterialId, phPage);
+                    getMaterialSupplierRecommendations(phMaterialId)
+                      .then(setSupplierRec)
+                      .catch(() => {});
+                  }
+                }}
               />
             )}
           </div>
@@ -1256,7 +1278,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
 /* ================================================================
  * SUPPLIER SOURCING GUIDANCE CARD (T-08 / FR-ALERT-06)
  * ================================================================ */
-export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpenLandedCost }) {
+export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpenLandedCost, onOpenCopilot }) {
   if (loading) {
     return (
       <div className="card supplier-guidance-card" id="supplier-guidance-card">
@@ -1298,9 +1320,23 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
           <i className="fa-solid fa-boxes-packing mr-2" style={{ color: 'var(--color-primary)' }} />
           Supplier Sourcing &amp; Inventory Guidance — {materialName || 'Tracked Material'}
         </h3>
-        <span className={`supplier-action-pill ${pillClass}`}>
-          {actionLabel}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {onOpenCopilot && (
+            <button
+              type="button"
+              id="whatsapp-copilot-trends-btn"
+              className="btn btn--sm btn--secondary"
+              style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              onClick={onOpenCopilot}
+            >
+              <i className="fa-brands fa-whatsapp text-success" style={{ color: '#22c55e' }} />
+              WhatsApp Copilot
+            </button>
+          )}
+          <span className={`supplier-action-pill ${pillClass}`}>
+            {actionLabel}
+          </span>
+        </div>
       </div>
 
       <div className="supplier-guidance-body">

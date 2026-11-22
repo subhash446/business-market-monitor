@@ -13,6 +13,8 @@ router.use('/alerts', require('./alerts.routes'));
 router.use('/dashboard', require('./dashboard.routes'));
 router.use('/ai-insights', require('./aiInsights.routes')); // /business/latest
 router.use('/fx', require('./fx.routes'));                   // /fx/latest
+router.use('/webhooks/whatsapp', require('./whatsappWebhook.routes')); // Meta WhatsApp Webhook
+router.use('/copilot/whatsapp', require('./whatsappCopilot.routes'));  // In-app WhatsApp Copilot
 router.use('/health', require('./health.routes'));
 
 module.exports = router;
