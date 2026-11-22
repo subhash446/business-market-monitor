@@ -26,6 +26,7 @@ describe('WhatsApp Copilot Service (V3-M4)', () => {
     { id: 4, name: 'Shrink Film', unit: 'kg', isTracked: true },
     { id: 5, name: 'PP Granules', unit: 'kg', isTracked: true },
     { id: 6, name: 'Mustard Oil', unit: 'litre', isTracked: true },
+    { id: 7, name: 'Bottle Caps', unit_abbreviation: 'pcs', is_tracked: true },
   ];
 
   // =========================================================================
@@ -221,6 +222,34 @@ describe('WhatsApp Copilot Service (V3-M4)', () => {
         expect(parsed.isMatch).toBe(false);
       });
     });
+
+    test('regression test: parses "Bottle Caps Rs 123.50/pcs Sharma Polymers" on pcs material', () => {
+      const parsed = parseWhatsAppQuote('Bottle Caps Rs 123.50/pcs Sharma Polymers', mockTrackedMaterials);
+      expect(parsed.isMatch).toBe(true);
+      expect(parsed.matchedMaterial.name).toBe('Bottle Caps');
+      expect(parsed.matchedMaterial.unit).toBe('pcs');
+      expect(parsed.rawPrice).toBe(123.5);
+      expect(parsed.rawUnit).toBe('pcs');
+      expect(parsed.supplierName).toBe('Sharma Polymers');
+
+      const drafts = generateNegotiationDrafts({
+        materialName: parsed.matchedMaterial.name,
+        materialUnit: parsed.matchedMaterial.unit,
+        quotedPrice: parsed.rawPrice,
+        quotedUnit: parsed.rawUnit,
+        supplierName: parsed.supplierName,
+        benchmarkPrice: null,
+      });
+
+      expect(drafts.unitConversion.unitMismatch).toBe(false);
+      expect(drafts.quotedPrice).toBe(123.5);
+      expect(drafts.quotedUnit).toBe('pcs');
+      expect(drafts.materialUnit).toBe('pcs');
+      expect(drafts.counterOfferMessage).toContain('₹123.50/pcs');
+      expect(drafts.counterOfferMessage).toContain('Our target counter-offer is');
+      expect(drafts.counterOfferMessage).toMatch(/for Bottle Caps\.\nOur target counter-offer is/);
+      expect(drafts.rfqMessage).toContain('Bottle Caps (pcs)');
+    });
   });
 
   // =========================================================================
@@ -242,7 +271,7 @@ describe('WhatsApp Copilot Service (V3-M4)', () => {
       expect(drafts.suggestedCounterLow).toBeLessThanOrEqual(drafts.suggestedCounterHigh);
       expect(drafts.suggestedCounterLow).toBeGreaterThan(0);
       expect(drafts.suggestedCounterHigh).toBeGreaterThan(0);
-      expect(drafts.counterOfferMessage).toContain('₹125/kg');
+      expect(drafts.counterOfferMessage).toContain('₹125.00/kg');
       expect(drafts.counterOfferMessage).toContain('PET Resin');
       expect(drafts.counterOfferMessage).toContain('target counter-offer');
       expect(drafts.waMeLink).toContain('https://wa.me/?text=');

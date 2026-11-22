@@ -357,7 +357,7 @@ function WhatsAppCopilotModalContent({
                 <div style={{ padding: '8px', backgroundColor: 'var(--color-bg-base, #09090b)', borderRadius: 'var(--radius-sm)' }}>
                   <span className="text-xs text-muted" style={{ display: 'block' }}>Quoted Rate</span>
                   <strong className="font-mono" style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                    ₹{parsed.rawPrice}/{parsed.rawUnit}
+                    {parsed.currency === 'USD' ? '$' : '₹'}{Number(parsed.rawPrice).toFixed(2)}/{parsed.rawUnit}
                   </strong>
                   {parsed.supplierName && (
                     <span className="text-xs text-muted" style={{ display: 'block', fontSize: '10px' }}>
@@ -369,7 +369,9 @@ function WhatsAppCopilotModalContent({
                 <div style={{ padding: '8px', backgroundColor: 'var(--color-bg-base, #09090b)', borderRadius: 'var(--radius-sm)' }}>
                   <span className="text-xs text-muted" style={{ display: 'block' }}>Landed Parity Ref</span>
                   <strong className="font-mono" style={{ fontSize: '14px' }}>
-                    {drafts?.benchmarkPrice != null ? `₹${Number(drafts.benchmarkPrice).toFixed(2)}/${drafts.materialUnit}` : 'No Benchmark'}
+                    {drafts?.benchmarkPrice != null
+                      ? `₹${Number(drafts.benchmarkPrice).toFixed(2)}/${drafts.materialUnit || parsed.rawUnit}`
+                      : 'No Benchmark'}
                   </strong>
                 </div>
 
@@ -389,7 +391,9 @@ function WhatsAppCopilotModalContent({
                 <div style={{ padding: '8px', backgroundColor: 'var(--color-bg-base, #09090b)', borderRadius: 'var(--radius-sm)' }}>
                   <span className="text-xs text-muted" style={{ display: 'block' }}>Suggested Counter</span>
                   <strong className="font-mono" style={{ fontSize: '14px', color: 'var(--color-accent, #38bdf8)' }}>
-                    {drafts?.suggestedCounterLow != null ? `₹${drafts.suggestedCounterLow} – ₹${drafts.suggestedCounterHigh}` : '—'}
+                    {drafts?.suggestedCounterLow != null
+                      ? `₹${Number(drafts.suggestedCounterLow).toFixed(2)} – ₹${Number(drafts.suggestedCounterHigh).toFixed(2)}`
+                      : '—'}
                   </strong>
                 </div>
               </div>
@@ -482,8 +486,8 @@ function WhatsAppCopilotModalContent({
 
         {/* Footer */}
         <div className="modal__footer modal-footer" style={{ padding: 'var(--space-3) var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="text-xs text-muted">
-            <i className="fa-solid fa-shield-halved mr-1 text-success" />
+          <span className="text-xs text-muted" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <i className="fa-solid fa-shield-halved text-success" style={{ marginRight: '6px' }} />
             Zero-exposure audit trail. No plaintext phone numbers leaked.
           </span>
           <button

@@ -100,6 +100,7 @@ describe('V3-M4 — Two-Way WhatsApp Quote Capture & Negotiation Copilot', () =>
       assert.ok(html.includes('PET Resin Rs 123.50/kg Sharma Polymers'), 'Must render dynamic sample chip for tracked material');
       assert.ok(html.includes('id="material-override-select"'), 'Must render material match select');
       assert.ok(html.includes('Analyze Quote'), 'Must render parse trigger button');
+      assert.ok(html.includes('margin-right:6px') || html.includes('margin-right: 6px'), 'Must apply marginRight 6px on footer shield icon');
     });
 
     test('re-export from components/materials/WhatsAppCopilotModal.jsx works identically', async () => {

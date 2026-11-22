@@ -20,6 +20,7 @@ function assertBusinessId(businessId, operation) {
 
 const BASE_SELECT = `
   SELECT tm.id, tm.raw_material_id, tm.unit_id, COALESCE(rm.name, tm.custom_name) AS name,
+         u.abbreviation AS unit,
          u.abbreviation AS unit_abbreviation, tm.is_tracked, tm.external_symbol,
          tm.current_stock_qty, tm.daily_consumption_rate, tm.supplier_lead_time_days,
          tm.max_storage_days, tm.inventory_updated_at,
@@ -345,7 +346,12 @@ async function updateLandedCost(materialId, landedData, businessId) {
 }
 
 async function findTrackedForBusiness(businessId) {
-  return listByBusinessId(businessId, true);
+  const rows = await listByBusinessId(businessId, true);
+  return rows.map((r) => ({
+    ...r,
+    unit: r.unit || r.unit_abbreviation,
+    unit_abbreviation: r.unit_abbreviation || r.unit,
+  }));
 }
 
 module.exports = {

@@ -20,6 +20,7 @@ const {
   parseWhatsAppQuote,
   generateNegotiationDrafts,
   logParsedSupplierQuote,
+  resolveMaterialUnit,
 } = require('../services/whatsappCopilot.service');
 const AppError = require('../utils/AppError');
 
@@ -48,12 +49,16 @@ async function parseQuote(req, res, next) {
     if (materialId != null) {
       const explicitMat = trackedMaterials.find((m) => Number(m.id) === Number(materialId));
       if (explicitMat) {
+        const explicitUnit = resolveMaterialUnit(explicitMat) || 'kg';
         activeMaterial = {
           id: explicitMat.id,
           name: explicitMat.name,
-          unit: explicitMat.unit,
-          isTracked: explicitMat.isTracked,
-          landedUnitFactor: explicitMat.landedUnitFactor,
+          unit: explicitUnit,
+          unit_abbreviation: explicitUnit,
+          isTracked: explicitMat.isTracked ?? explicitMat.is_tracked ?? true,
+          landedUnitFactor: explicitMat.landedUnitFactor ?? explicitMat.landed_unit_factor ?? null,
+          landedDutyFreightPct: explicitMat.landedDutyFreightPct ?? explicitMat.landed_duty_freight_pct ?? null,
+          landedFixedSpreadInr: explicitMat.landedFixedSpreadInr ?? explicitMat.landed_fixed_spread_inr ?? null,
         };
         parsed.matchedMaterial = activeMaterial;
         parsed.isMatch = true;
@@ -84,7 +89,7 @@ async function parseQuote(req, res, next) {
             },
             latestBenchmark: latestPoint ? { price: Number(latestPoint.price), currency: latestPoint.currency || 'USD' } : null,
             fxRate: fx,
-            materialUnit: activeMaterial.unit || 'kg',
+            materialUnit: resolveMaterialUnit(activeMaterial) || 'kg',
           });
 
           if (parityRes && parityRes.estimatedLandedBenchmark) {
@@ -94,11 +99,12 @@ async function parseQuote(req, res, next) {
       } catch (_) {}
 
       // 4. Generate drafts
+      const effectiveMatUnit = resolveMaterialUnit(activeMaterial) || 'kg';
       drafts = generateNegotiationDrafts({
         materialName: activeMaterial.name,
-        materialUnit: activeMaterial.unit || 'kg',
+        materialUnit: effectiveMatUnit,
         quotedPrice: parsed.rawPrice,
-        quotedUnit: parsed.rawUnit || 'kg',
+        quotedUnit: parsed.rawUnit || effectiveMatUnit,
         currency: parsed.currency,
         supplierName: parsed.supplierName,
         benchmarkPrice,

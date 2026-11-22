@@ -108,12 +108,61 @@ describe('WhatsApp Copilot In-App Controller (V3-M4)', () => {
       expect(res.body.data.parsed.rawPrice).toBe(123.5);
       expect(res.body.data.drafts).toBeDefined();
       expect(res.body.data.drafts.variancePercent).toBe(7.39);
-      expect(res.body.data.drafts.counterOfferMessage).toContain('₹123.5/kg');
+      expect(res.body.data.drafts.counterOfferMessage).toContain('₹123.50/kg');
       expect(res.body.data.loggedPoint).toBeNull();
 
       // Zero writes
       expect(createPriceSpy).not.toHaveBeenCalled();
       expect(createInboundSpy).not.toHaveBeenCalled();
+    });
+
+    test('regression test: parses "Bottle Caps Rs 123.50/pcs Sharma Polymers" on pcs material without unit mismatch and enables logging', async () => {
+      jest.spyOn(materialRepository, 'findTrackedForBusiness').mockResolvedValue([
+        { id: 2, name: 'Bottle Caps', unit_abbreviation: 'pcs', is_tracked: true },
+      ]);
+      jest.spyOn(materialRepository, 'findByIdForBusiness').mockResolvedValue({
+        id: 2,
+        name: 'Bottle Caps',
+        unit_abbreviation: 'pcs',
+        is_tracked: true,
+      });
+
+      const createPriceSpy = jest.spyOn(priceRepository, 'create').mockResolvedValue({
+        id: 99,
+        price: '123.5000',
+        source: 'SUPPLIER_INTEGRATION',
+      });
+      const createInboundSpy = jest.spyOn(whatsappInboundRepository, 'createInboundMessage').mockResolvedValue({
+        id: 55,
+      });
+
+      const req = {
+        auth: { userId: TEST_USER_ID, businessId: TEST_BUSINESS_ID },
+        body: {
+          text: 'Bottle Caps Rs 123.50/pcs Sharma Polymers',
+          autoLog: true,
+        },
+      };
+      const res = createMockRes();
+      const next = jest.fn();
+
+      await whatsappCopilotController.parseQuote(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.parsed.isMatch).toBe(true);
+      expect(res.body.data.parsed.matchedMaterial.name).toBe('Bottle Caps');
+      expect(res.body.data.parsed.matchedMaterial.unit).toBe('pcs');
+      expect(res.body.data.parsed.supplierName).toBe('Sharma Polymers');
+      expect(res.body.data.drafts.unitConversion.unitMismatch).toBe(false);
+      expect(res.body.data.drafts.quotedUnit).toBe('pcs');
+      expect(res.body.data.drafts.materialUnit).toBe('pcs');
+      expect(res.body.data.drafts.counterOfferMessage).toContain('₹123.50/pcs');
+      expect(res.body.data.drafts.counterOfferMessage).toContain('Our target counter-offer is');
+      expect(res.body.data.drafts.counterOfferMessage).toMatch(/for Bottle Caps\.\nOur target counter-offer is/);
+      expect(res.body.data.loggedPoint).toBeDefined();
+      expect(createPriceSpy).toHaveBeenCalled();
+      expect(createInboundSpy).toHaveBeenCalled();
     });
 
     test('rejects autoLog with 400 UNIT_MISMATCH on incompatible units (e.g. pcs vs kg)', async () => {

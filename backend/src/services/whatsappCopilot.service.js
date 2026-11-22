@@ -53,7 +53,48 @@ const UNIT_MAP = {
   pcs: 'pcs',
   piece: 'pcs',
   pieces: 'pcs',
+  pc: 'pcs',
+  nos: 'pcs',
+  unit: 'pcs',
+  units: 'pcs',
 };
+
+/**
+ * Resolves tracked material unit regardless of property naming convention across repositories,
+ * controllers, and services (unit, unit_abbreviation, unitAbbreviation, unit_symbol, etc.)
+ */
+function resolveMaterialUnit(material) {
+  if (!material) return null;
+  const unit =
+    material.unit ||
+    material.unit_abbreviation ||
+    material.unitAbbreviation ||
+    material.unit_symbol ||
+    material.unitSymbol ||
+    material.unit_code ||
+    material.unitCode ||
+    material.unit_name ||
+    material.unitName ||
+    material.abbreviation ||
+    null;
+  return unit ? String(unit).trim() : null;
+}
+
+/**
+ * Cleanly strips leading/trailing unit tokens, prepositions, or punctuation
+ * so tokens like "/pcs", "pcs", "per kg" never leak into the supplier name.
+ */
+function sanitizeSupplierName(name) {
+  if (!name || typeof name !== 'string') return null;
+  let clean = name.trim();
+  // Strip leading unit token (e.g. "/pcs", "pcs", "per pcs", "kg", "/kg", "per kg")
+  clean = clean.replace(/^(?:\/|per\s+)?(?:pcs|piece|pieces|pc|nos|unit|units|kg|kgs|kilogram|kilograms|mt|ton|tons|tonne|tonnes|qtl|qtls|quintal|quintals|bbl|barrel|ltr|litre|litres|liter|liters)\s+/i, '');
+  // Strip leading or trailing punctuation/noise symbols
+  clean = clean.replace(/^[\s,./\\:;@#-]+/, '').replace(/[\s,./\\:;@#-]+$/, '').trim();
+  // Strip noisy conversational prefixes
+  clean = clean.replace(/^(?:today|rate|quote|price|is|at|from|m\/s\.?)\s+/i, '').trim();
+  return clean.length >= 2 ? clean : null;
+}
 
 // Conversions to kg
 const MASS_TO_KG = {
@@ -188,6 +229,7 @@ function parseWhatsAppQuote(rawText, trackedMaterials = []) {
 
   let rawPrice = null;
   let rawUnit = null;
+  let matchedPriceSnippet = null;
 
   for (const rx of priceRegexes) {
     const match = text.match(rx);
@@ -195,6 +237,7 @@ function parseWhatsAppQuote(rawText, trackedMaterials = []) {
       const parsedNum = parseIndianNumber(match[1]);
       if (parsedNum !== null) {
         rawPrice = parsedNum;
+        matchedPriceSnippet = match[0];
         if (match[2]) {
           rawUnit = match[2].trim();
         }
@@ -203,13 +246,15 @@ function parseWhatsAppQuote(rawText, trackedMaterials = []) {
     }
   }
 
+  const resolvedMatUnit = resolveMaterialUnit(matchedMaterial);
+
   // Fallback unit if not captured in price regex: check text for standalone units
   if (!rawUnit) {
-    const unitMatch = text.match(/\b(kg|kgs|kilogram|mt|metric ton|ton|tonnes|qtl|quintal|bbl|barrel|ltr|litre|pcs|pieces)\b/i);
+    const unitMatch = text.match(/\b(kg|kgs|kilogram|mt|metric ton|ton|tonnes|qtl|quintal|bbl|barrel|ltr|litre|pcs|pieces|pc|nos|unit|units)\b/i);
     if (unitMatch) {
       rawUnit = unitMatch[1];
     } else if (matchedMaterial) {
-      rawUnit = matchedMaterial.unit || 'kg';
+      rawUnit = resolvedMatUnit || 'kg';
     } else {
       rawUnit = 'kg';
     }
@@ -226,30 +271,55 @@ function parseWhatsAppQuote(rawText, trackedMaterials = []) {
   }
 
   // 3. Extract supplier name
+  // Prepare cleaned text for supplier extraction by stripping matched price, unit, and material tokens
+  let supplierSearchText = text;
+
+  if (matchedPriceSnippet) {
+    supplierSearchText = supplierSearchText.replace(matchedPriceSnippet, ' ');
+  }
+
+  // Strip matched material name from search text so it cannot match as a company word
+  if (matchedMaterial && matchedMaterial.name) {
+    const matNameEsc = matchedMaterial.name.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+    supplierSearchText = supplierSearchText.replace(new RegExp(`\\b${matNameEsc}\\b`, 'gi'), ' ');
+  }
+
+  // Strip lingering price/unit/rate tokens (e.g. /pcs, /kg, per kg, Rs 123.50, pcs, kg)
+  supplierSearchText = supplierSearchText
+    .replace(/(?:Rs\.?|₹|INR|\$)\s*[0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?/gi, ' ')
+    .replace(/(?:\/|per\s+)\s*(?:pcs|piece|pieces|pc|nos|unit|units|kg|kgs|kilogram|kilograms|mt|ton|tons|tonne|tonnes|qtl|qtls|quintal|quintals|bbl|barrel|ltr|litre|litres|liter|liters)\b/gi, ' ')
+    .replace(/\b(?:pcs|piece|pieces|pc|nos|unit|units|kg|kgs|kilogram|kilograms|mt|ton|tons|tonne|tonnes|qtl|qtls|quintal|quintals|bbl|barrel|ltr|litre|litres|liter|liters)\b/gi, ' ')
+    .replace(/\b(?:rate|quote|price|today|offer|quoted|inr|usd)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   let supplierName = null;
 
   // Pattern A: Trailing comma supplier: e.g. ", Sharma Bros"
-  const commaMatch = text.match(/,\s*([A-Z][A-Za-z0-9&. ]{2,35})\s*$/);
-  if (commaMatch && !/^\s*(?:today|rate|kg|mt|quintal|qtl)\b/i.test(commaMatch[1])) {
-    supplierName = commaMatch[1].trim();
+  const commaMatch = supplierSearchText.match(/,\s*([A-Z][A-Za-z0-9&. ]{2,35})\s*$/) ||
+                     text.match(/,\s*([A-Z][A-Za-z0-9&. ]{2,35})\s*$/);
+  if (commaMatch && !/^\s*(?:today|rate|kg|mt|quintal|qtl|pcs)\b/i.test(commaMatch[1])) {
+    supplierName = sanitizeSupplierName(commaMatch[1]);
   }
 
   // Pattern B: "from <Supplier>", "by <Supplier>", "M/s <Supplier>"
   if (!supplierName) {
-    const fromMatch = text.match(/(?:\bfrom\b|\bm\/s\.?\s+|\bsupplier\s*:\s*)\s*([A-Z0-9][A-Za-z0-9&., ]{2,35})/i);
+    const fromMatch = supplierSearchText.match(/(?:\bfrom\b|\bm\/s\.?\s+|\bsupplier\s*:\s*)\s*([A-Z0-9][A-Za-z0-9&., ]{2,35})/i) ||
+                      text.match(/(?:\bfrom\b|\bm\/s\.?\s+|\bsupplier\s*:\s*)\s*([A-Z0-9][A-Za-z0-9&., ]{2,35})/i);
     if (fromMatch && fromMatch[1]) {
       const candidate = fromMatch[1].trim().replace(/[,.-]$/, '');
       if (candidate.length >= 2 && !candidate.toLowerCase().includes('http')) {
-        supplierName = candidate;
+        supplierName = sanitizeSupplierName(candidate);
       }
     }
   }
 
   // Pattern C: Known company suffix: e.g. "Sharma Polymers", "ABC Plastics", "Indore Mandi"
   if (!supplierName) {
-    const compMatch = text.match(/\b([A-Z][A-Za-z0-9&]*(?:\s+[A-Z][A-Za-z0-9&]*)*\s+(?:Polymers|Plastics|Enterprises|Traders|Industries|Chemicals|Mandi|Bros|Corp|Corporation|Pvt Ltd|Ltd))\b/i);
+    const compMatch = supplierSearchText.match(/\b([A-Z][A-Za-z0-9&]*(?:\s+[A-Z][A-Za-z0-9&]*)*\s+(?:Polymers|Plastics|Enterprises|Traders|Industries|Chemicals|Mandi|Bros|Corp|Corporation|Pvt Ltd|Ltd))\b/i) ||
+                      text.match(/\b([A-Z][A-Za-z0-9&]*(?:\s+[A-Z][A-Za-z0-9&]*)*\s+(?:Polymers|Plastics|Enterprises|Traders|Industries|Chemicals|Mandi|Bros|Corp|Corporation|Pvt Ltd|Ltd))\b/i);
     if (compMatch && compMatch[1]) {
-      supplierName = compMatch[1].trim();
+      supplierName = sanitizeSupplierName(compMatch[1]);
     }
   }
 
@@ -263,9 +333,10 @@ function parseWhatsAppQuote(rawText, trackedMaterials = []) {
       ? {
           id: matchedMaterial.id,
           name: matchedMaterial.name,
-          unit: matchedMaterial.unit,
-          isTracked: matchedMaterial.isTracked,
-          landedUnitFactor: matchedMaterial.landedUnitFactor,
+          unit: resolvedMatUnit || 'kg',
+          unit_abbreviation: resolvedMatUnit || 'kg',
+          isTracked: matchedMaterial.isTracked ?? matchedMaterial.is_tracked ?? true,
+          landedUnitFactor: matchedMaterial.landedUnitFactor ?? matchedMaterial.landed_unit_factor ?? null,
         }
       : null,
     rawPrice,
@@ -336,16 +407,21 @@ function generateNegotiationDrafts({
 
   const supplierLabel = supplierName || 'Partner';
   const currencySymbol = currency === 'USD' ? '$' : '₹';
+  const formattedQuotedPrice = Number(quotedPrice).toFixed(2);
+  const formattedCounterLow = Number(suggestedCounterLow).toFixed(2);
+  const formattedCounterHigh = Number(suggestedCounterHigh).toFixed(2);
 
   // Ready-to-send counter-offer WhatsApp message
-  const benchmarkText = effectiveBenchmark != null
-    ? `Based on current landed market benchmarks (${currencySymbol}${effectiveBenchmark.toFixed(2)}/${normMatUnit}), `
+  const benchmarkIntro = effectiveBenchmark != null
+    ? `Based on current landed market benchmarks (${currencySymbol}${Number(effectiveBenchmark).toFixed(2)}/${normMatUnit}), `
     : '';
 
+  const counterOfferStart = benchmarkIntro ? `${benchmarkIntro}our` : 'Our';
+
   const counterOfferMessage =
-    `Hi ${supplierLabel}, received your quote of ${currencySymbol}${quotedPrice}/${normQuoteUnit} for ${materialName}.\n` +
-    `${benchmarkText}our target counter-offer is ${currencySymbol}${suggestedCounterLow.toFixed(2)}–${currencySymbol}${suggestedCounterHigh.toFixed(2)}/${normMatUnit}.\n` +
-    `Can we confirm an immediate purchase order at ${currencySymbol}${suggestedCounterLow.toFixed(2)}/${normMatUnit}? Please let us know if we can close this today.`;
+    `Hi ${supplierLabel}, received your quote of ${currencySymbol}${formattedQuotedPrice}/${normQuoteUnit} for ${materialName}.\n` +
+    `${counterOfferStart} target counter-offer is ${currencySymbol}${formattedCounterLow}–${currencySymbol}${formattedCounterHigh}/${normMatUnit}.\n` +
+    `Can we confirm an immediate purchase order at ${currencySymbol}${formattedCounterLow}/${normMatUnit}? Please let us know if we can close this today.`;
 
   // Ready-to-send RFQ WhatsApp message
   const rfqMessage =
@@ -404,7 +480,7 @@ async function logParsedSupplierQuote({
         recordedAt: attemptTime,
         source: 'SUPPLIER_INTEGRATION',
         currency: currency || 'INR',
-        unitLabel: unitLabel || material.unit_abbreviation || material.unit || null,
+        unitLabel: unitLabel || resolveMaterialUnit(material) || 'kg',
         region: 'Domestic (India)',
         grade: null,
         providerName: supplierName || 'WhatsApp Inbound',
@@ -447,6 +523,8 @@ async function logParsedSupplierQuote({
 module.exports = {
   parseIndianNumber,
   normalizeUnit,
+  resolveMaterialUnit,
+  sanitizeSupplierName,
   evaluateUnitConversion,
   parseWhatsAppQuote,
   generateNegotiationDrafts,

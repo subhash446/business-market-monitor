@@ -23,6 +23,7 @@ const {
   parseWhatsAppQuote,
   generateNegotiationDrafts,
   logParsedSupplierQuote,
+  resolveMaterialUnit,
 } = require('../services/whatsappCopilot.service');
 
 /**
@@ -168,7 +169,7 @@ async function handleInboundWebhook(req, res) {
                 },
                 latestBenchmark: latestPrices ? { price: Number(latestPrices.price), currency: latestPrices.currency || 'USD' } : null,
                 fxRate: fx,
-                materialUnit: parsed.matchedMaterial.unit || 'kg',
+                materialUnit: resolveMaterialUnit(parsed.matchedMaterial) || 'kg',
               });
 
               if (parityRes && parityRes.estimatedLandedBenchmark) {
@@ -178,11 +179,12 @@ async function handleInboundWebhook(req, res) {
           } catch (_) {}
 
           // Generate negotiation drafts
+          const effectiveMatUnit = resolveMaterialUnit(parsed.matchedMaterial) || 'kg';
           const drafts = generateNegotiationDrafts({
             materialName: parsed.matchedMaterial.name,
-            materialUnit: parsed.matchedMaterial.unit || 'kg',
+            materialUnit: effectiveMatUnit,
             quotedPrice: parsed.rawPrice,
-            quotedUnit: parsed.rawUnit || 'kg',
+            quotedUnit: parsed.rawUnit || effectiveMatUnit,
             currency: parsed.currency,
             supplierName: parsed.supplierName,
             benchmarkPrice: latestBenchmarkPrice,
