@@ -17,6 +17,7 @@ import { formatDateTime, getInitialsFromEmail } from '../utils/format.js';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx';
+import { PricingPlansSection } from '../components/billing/PricingPlansSection.jsx';
 import '../styles/pages/settings.css';
 
 const DIGEST_VALUES = ['DAILY', 'WEEKLY', 'MONTHLY'];
@@ -26,7 +27,7 @@ export function SettingsPage() {
   const { user, business: cachedBusiness, setBusiness } = useAuth();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'team'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'team' | 'billing'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [digestSending, setDigestSending] = useState(false);
@@ -284,6 +285,17 @@ export function SettingsPage() {
         >
           <i className="fa-solid fa-users" aria-hidden="true" />
           <span>Team &amp; Workspace RBAC</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="tab-billing-btn"
+          aria-selected={activeTab === 'billing'}
+          className={`settings-tab-btn${activeTab === 'billing' ? ' settings-tab-btn--active' : ''}`}
+          onClick={() => setActiveTab('billing')}
+        >
+          <i className="fa-solid fa-credit-card" aria-hidden="true" />
+          <span>Plans &amp; Billing</span>
         </button>
       </div>
 
@@ -643,6 +655,62 @@ export function SettingsPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Tab 3: Plans & Billing */}
+      {activeTab === 'billing' && (
+        <div className="settings-billing-tab" data-testid="settings-billing-tab">
+          {/* Top Status Card */}
+          <div className="settings-card mb-6" style={{ marginBottom: 'var(--space-6)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 'var(--space-4)',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span className="badge badge--success" style={{ fontSize: '11px', fontWeight: 600 }}>
+                    ACTIVE WORKSPACE
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#a1a1aa' }}>
+                    {cachedBusiness?.name || profileForm.name || 'Workspace'}
+                  </span>
+                </div>
+                <h2 className="settings-card__title" style={{ margin: '0 0 4px 0', fontSize: '1.125rem' }}>
+                  Current Plan: Early Access — All Pro Features Unlocked at ₹0
+                </h2>
+                <p className="settings-card__subtitle" style={{ margin: 0 }}>
+                  Automated subscription billing is launching soon. Your team currently has unrestricted access to all multi-material tracking, WhatsApp Copilot, and Landed-Cost features.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  className="badge"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.12)',
+                    color: '#93c5fd',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <i className="fa-solid fa-bolt mr-1" /> Early Adopter Status
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Reusable 3-Column Pricing Grid */}
+          <PricingPlansSection
+            mode="settings"
+            currentWorkspaceName={cachedBusiness?.name || profileForm.name}
+            userEmail={user?.email}
+          />
         </div>
       )}
 

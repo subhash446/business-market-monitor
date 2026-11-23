@@ -1,0 +1,392 @@
+/**
+ * Pricing Plans & Early Access Modal Styles (SaaS 3-Column Experience)
+ * Business Market Monitor — Frontend
+ *
+ * Strict Dark Zinc aesthetic, responsive 3-column grid, tabular-nums pricing.
+ * Zero loud gradients or glowing drop shadows.
+ */
+
+/* ==========================================================================
+   Pricing Section Container & Header
+   ========================================================================== */
+.pricing-plans-section {
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+/* Billing Cycle Segmented Toggle */
+.pricing-cycle-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-8, 2rem);
+}
+
+.pricing-cycle-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: #141414;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-full, 9999px);
+  padding: 4px;
+  gap: 4px;
+}
+
+.pricing-cycle-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 18px;
+  font-size: var(--text-sm, 13px);
+  font-weight: var(--weight-medium, 500);
+  color: var(--color-text-secondary, #a1a1aa);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.pricing-cycle-btn:hover {
+  color: var(--color-text-primary, #f4f4f5);
+}
+
+.pricing-cycle-btn--active {
+  background: var(--color-bg-elevated, #27272a);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.pricing-discount-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(34, 197, 94, 0.14);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: var(--radius-full, 9999px);
+  margin-left: 6px;
+}
+
+/* ==========================================================================
+   3-Column Pricing Grid
+   ========================================================================== */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 960px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* Pricing Card */
+.pricing-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-surface, #18181b);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 12px);
+  padding: 28px 24px;
+  position: relative;
+  transition: border-color var(--transition-fast, 150ms ease);
+}
+
+.pricing-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* Growth Elevated Tier */
+.pricing-card--recommended {
+  background: #202023;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.pricing-card--recommended:hover {
+  border-color: rgba(59, 130, 246, 0.55);
+}
+
+/* Card Header & Badges */
+.pricing-card__header {
+  margin-bottom: 20px;
+}
+
+.pricing-card__badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  margin-bottom: 10px;
+}
+
+.pricing-card__badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary, #a1a1aa);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pricing-card__badge--highlight {
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.pricing-card__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #f4f4f5);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.pricing-card__subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #a1a1aa);
+  margin: 0 0 16px 0;
+  min-height: 36px;
+  line-height: 1.45;
+}
+
+/* Price Value */
+.pricing-card__price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.pricing-card__amount {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #f4f4f5);
+  letter-spacing: -0.02em;
+}
+
+.pricing-card__period {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.pricing-card__billing-note {
+  font-size: 0.75rem;
+  color: #71717a;
+  min-height: 18px;
+  margin-bottom: 20px;
+}
+
+/* Feature List */
+.pricing-card__features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  border-top: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  padding-top: 18px;
+}
+
+.pricing-card__feature-item {
+  display: flex;
+  align-items: flex-start;
+  font-size: 0.8125rem;
+  color: #d4d4d8;
+  line-height: 1.45;
+}
+
+.pricing-card__check-icon {
+  color: #22c55e;
+  margin-right: 8px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+/* Action CTA Area */
+.pricing-card__action {
+  margin-top: auto;
+}
+
+.pricing-card__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--radius-md, 6px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+  text-decoration: none;
+  text-align: center;
+}
+
+.pricing-card__btn--primary {
+  background: #3b82f6;
+  color: #ffffff;
+  border: 1px solid #3b82f6;
+}
+
+.pricing-card__btn--primary:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.pricing-card__btn--outline {
+  background: transparent;
+  color: #f4f4f5;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.pricing-card__btn--outline:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.pricing-card__btn--neutral {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-secondary, #a1a1aa);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: default;
+}
+
+/* ==========================================================================
+   Early Access Modal
+   ========================================================================== */
+.early-access-modal {
+  max-width: 520px;
+  width: 100%;
+}
+
+.early-access-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.early-access-plan-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.early-access-unlocked-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.early-access-copy {
+  font-size: 0.875rem;
+  color: #d4d4d8;
+  line-height: 1.6;
+  margin: 0 0 18px 0;
+}
+
+.early-access-features-box {
+  background: #141414;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 6px);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.early-access-features-box__title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary, #a1a1aa);
+  margin-bottom: 8px;
+}
+
+.early-access-features-box__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.early-access-features-box__item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #e4e4e7;
+}
+
+.early-access-confirmed-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: var(--radius-md, 6px);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  color: #86efac;
+}
+
+.early-access-confirmed-callout__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4ade80;
+  margin-bottom: 3px;
+}
+
+.early-access-confirmed-callout__desc {
+  font-size: 12.5px;
+  color: #bbf7d0;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.early-access-landing-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: #93c5fd;
+  text-decoration: none;
+  transition: color var(--transition-fast, 150ms ease);
+}
+
+.early-access-landing-link:hover {
+  color: #bfdbfe;
+  text-decoration: underline;
+}
