@@ -131,3 +131,114 @@
   justify-content: center;
   gap: var(--space-2);
 }
+
+/* Auth Brand Link & Badge (Migration 036) */
+.auth-brand-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.auth-brand-link:hover {
+  opacity: 0.9;
+}
+
+.auth-brand__badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 4px);
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Auth Mode Switcher (Email OTP vs Password) */
+.auth-mode-toggle {
+  display: flex;
+  background: #141414;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin-bottom: var(--space-5);
+  gap: 3px;
+}
+
+.auth-mode-btn {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.auth-mode-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.auth-mode-btn--active {
+  background: var(--color-bg-elevated);
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* Google Sign-in slot */
+.google-auth-container {
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+/* 6-Digit OTP Verification Container */
+.otp-input-container {
+  margin: var(--space-4) 0;
+}
+
+.otp-digit-input {
+  width: 100%;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-align: center;
+  padding: 12px 16px;
+  background-color: #09090b;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.otp-digit-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+.otp-resend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.otp-countdown-text {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}

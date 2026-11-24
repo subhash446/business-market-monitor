@@ -723,6 +723,37 @@ const BASELINE_SCHEMA_SPECS = Object.freeze({
       },
     },
   },
+  '036_add_google_oauth_and_email_otp.js': {
+    tables: {
+      users: {
+        columns: {
+          password_hash: { dataType: 'varchar', isNullable: 'YES' },
+          auth_provider: { dataType: 'enum', columnTypeIncludes: ['LOCAL', 'GOOGLE', 'EMAIL_OTP'], isNullable: 'NO' },
+          google_sub: { dataType: 'varchar', isNullable: 'YES' },
+          email_verified: { dataType: 'tinyint', isNullable: 'NO' },
+        },
+        indexes: {
+          google_sub: { unique: true },
+        },
+      },
+      email_verification_otps: {
+        columns: {
+          id: { dataType: 'bigint' },
+          email: { dataType: 'varchar', isNullable: 'NO' },
+          purpose: { dataType: 'enum', columnTypeIncludes: ['VERIFY_EMAIL', 'LOGIN_OTP'], isNullable: 'NO' },
+          otp_hash: { dataType: 'varchar', isNullable: 'NO' },
+          attempts: { dataType: 'tinyint', isNullable: 'NO' },
+          expires_at: { dataType: ['timestamp', 'datetime'], isNullable: 'NO' },
+          consumed_at: { dataType: ['timestamp', 'datetime'], isNullable: 'YES' },
+          created_at: { dataType: ['timestamp', 'datetime'], isNullable: 'NO' },
+        },
+        indexes: {
+          idx_evo_email_purpose_created: {},
+          idx_evo_expires: {},
+        },
+      },
+    },
+  },
 });
 
 async function verifyMigration027BaselineData(session) {

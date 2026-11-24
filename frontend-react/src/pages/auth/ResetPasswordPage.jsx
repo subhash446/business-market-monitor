@@ -115,12 +115,15 @@ export function ResetPasswordPage() {
       <main id="main-content" className="auth-container">
 
         {/* Brand */}
-        <div className="auth-brand">
+        <Link to="/" className="auth-brand auth-brand-link" aria-label="Business Market Monitor Home">
           <div className="auth-logo-mark" aria-hidden="true">
             <i className="fa-solid fa-chart-column" />
           </div>
-          <span className="auth-brand__name">Market Monitor</span>
-        </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="auth-brand__name">Business Market Monitor</span>
+            <span className="auth-brand__badge">BMM</span>
+          </div>
+        </Link>
 
         {/* Card */}
         <div className="auth-card">

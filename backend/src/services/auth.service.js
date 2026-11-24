@@ -17,6 +17,8 @@ const logger = require('../utils/logger');
 const AppError = require('../utils/AppError');
 const mailer = require('../email/mailer');
 const { buildPasswordResetEmail } = require('../email/templates/passwordReset.template');
+const googleAuthService = require('./googleAuth.service');
+const emailOtpService = require('./emailOtp.service');
 
 // Production Hardening Phase B, finding H-3: looks up the user's business
 // once, at token-issuance time (login/refresh), instead of leaving
@@ -30,7 +32,7 @@ async function getBusinessIdForUser(userId) {
   return business ? business.id : null;
 }
 
-async function registerUser({ email, password, fullName }) {
+async function registerUser({ email, password, fullName, sendVerificationOtp = false }) {
   const existing = await userRepository.findByEmail(email);
   if (existing) {
     throw new AppError(409, 'CONFLICT', 'Email already registered');
@@ -40,7 +42,13 @@ async function registerUser({ email, password, fullName }) {
 
   let user;
   try {
-    user = await userRepository.create({ email, passwordHash, fullName });
+    user = await userRepository.create({
+      email,
+      passwordHash,
+      fullName,
+      authProvider: 'LOCAL',
+      emailVerified: sendVerificationOtp ? 0 : 1,
+    });
   } catch (err) {
     // DB-level safety net behind the application-level check above
     // (Document 4 §5.1 UNIQUE KEY uq_users_email) — closes the race-condition gap.
@@ -48,6 +56,19 @@ async function registerUser({ email, password, fullName }) {
       throw new AppError(409, 'CONFLICT', 'Email already registered');
     }
     throw err;
+  }
+
+  if (sendVerificationOtp) {
+    const otpMeta = await emailOtpService.requestOtp({
+      email,
+      name: fullName,
+      purpose: 'VERIFY_EMAIL',
+    });
+    return {
+      ...toPublicUser(user),
+      emailVerificationPending: true,
+      otpMeta,
+    };
   }
 
   return toPublicUser(user);
@@ -167,4 +188,90 @@ async function confirmPasswordReset(rawToken, newPassword) {
   await userTokenRepository.markConsumed(tokenRow.id);
 }
 
-module.exports = { registerUser, authenticate, refreshAccessToken, requestPasswordReset, confirmPasswordReset };
+/**
+ * Google ID token authentication (Migration 036).
+ * Automatically logs in or registers user and links Google Subject ID.
+ */
+async function authenticateWithGoogle({ credential }) {
+  const profile = await googleAuthService.verifyGoogleIdToken(credential);
+  const normalizedEmail = profile.email.toLowerCase().trim();
+
+  let user = await userRepository.findByGoogleSub(profile.sub);
+  if (!user) {
+    user = await userRepository.findByEmail(normalizedEmail);
+    if (user) {
+      await userRepository.updateGoogleSub(user.id, profile.sub);
+      user = await userRepository.findById(user.id);
+    } else {
+      user = await userRepository.create({
+        email: normalizedEmail,
+        passwordHash: null,
+        fullName: profile.name || normalizedEmail.split('@')[0],
+        authProvider: 'GOOGLE',
+        googleSub: profile.sub,
+        emailVerified: 1,
+      });
+    }
+  }
+
+  return issueTokens(user);
+}
+
+/**
+ * Dispatches 6-digit verification code to email (Migration 036).
+ */
+async function requestEmailOtp({ email, name = '', purpose = 'LOGIN_OTP' }) {
+  return emailOtpService.requestOtp({ email, name, purpose });
+}
+
+/**
+ * Verifies 6-digit OTP code and signs in user (auto-registering if first-time).
+ */
+async function verifyEmailOtpAndAuthenticate({ email, otp, name = '' }) {
+  const verifiedResult = await emailOtpService.verifyOtp({ email, otp, purpose: 'LOGIN_OTP' });
+  const normalizedEmail = verifiedResult.email;
+
+  let user = await userRepository.findByEmail(normalizedEmail);
+  if (!user) {
+    user = await userRepository.create({
+      email: normalizedEmail,
+      passwordHash: null,
+      fullName: name || normalizedEmail.split('@')[0],
+      authProvider: 'EMAIL_OTP',
+      googleSub: null,
+      emailVerified: 1,
+    });
+  } else if (!user.email_verified) {
+    await userRepository.updateEmailVerified(user.id, 1);
+  }
+
+  return issueTokens(user);
+}
+
+/**
+ * Verifies email address via 6-digit OTP and activates account.
+ */
+async function verifyEmailAndActivate({ email, otp }) {
+  const verifiedResult = await emailOtpService.verifyOtp({ email, otp, purpose: 'VERIFY_EMAIL' });
+  const normalizedEmail = verifiedResult.email;
+
+  const user = await userRepository.findByEmail(normalizedEmail);
+  if (!user) {
+    throw new AppError(404, 'NOT_FOUND', 'User account not found');
+  }
+
+  await userRepository.updateEmailVerified(user.id, 1);
+  return issueTokens(user);
+}
+
+module.exports = {
+  registerUser,
+  authenticate,
+  refreshAccessToken,
+  requestPasswordReset,
+  confirmPasswordReset,
+  authenticateWithGoogle,
+  requestEmailOtp,
+  verifyEmailOtpAndAuthenticate,
+  verifyEmailAndActivate,
+};

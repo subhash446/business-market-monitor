@@ -200,6 +200,11 @@ const env = {
     baseUrl: process.env.FRANKFURTER_BASE_URL || 'https://api.frankfurter.app',
     timeoutMs: parseInt(process.env.FX_PROVIDER_TIMEOUT_MS, 10) || 10000,
   },
+
+  // Google OAuth 2.0 / Identity Services Client ID (optional/opt-in)
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+  },
 };
 
 module.exports = env;

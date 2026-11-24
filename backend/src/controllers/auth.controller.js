@@ -11,6 +11,7 @@ const businessRepository = require('../repositories/business.repository');
 const AppError = require('../utils/AppError');
 const { sendSuccess } = require('../utils/response');
 const notImplemented = require('../utils/notImplemented');
+const env = require('../config/env');
 
 // GET /api/v1/auth/me — V3-M5
 async function getMe(req, res, next) {
@@ -36,8 +37,8 @@ async function getMe(req, res, next) {
 // POST /api/v1/auth/register — FR-AUTH-01, 02, 03
 async function register(req, res, next) {
   try {
-    const { email, password, fullName } = req.body;
-    const user = await authService.registerUser({ email, password, fullName });
+    const { email, password, fullName, sendVerificationOtp } = req.body;
+    const user = await authService.registerUser({ email, password, fullName, sendVerificationOtp });
     sendSuccess(res, user, undefined, 201);
   } catch (err) {
     next(err);
@@ -96,6 +97,57 @@ async function confirmPasswordReset(req, res, next) {
   }
 }
 
+// GET /api/v1/auth/config — Migration 036
+function getConfig(req, res) {
+  const googleClientId = env.google?.clientId || null;
+  sendSuccess(res, {
+    googleEnabled: Boolean(googleClientId),
+    googleClientId,
+    emailOtpEnabled: true,
+  });
+}
+
+// POST /api/v1/auth/google — Migration 036
+async function googleLogin(req, res, next) {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Google credential is required');
+    }
+    const tokens = await authService.authenticateWithGoogle({ credential });
+    sendSuccess(res, tokens);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/v1/auth/email-otp/request — Migration 036
+async function requestEmailOtp(req, res, next) {
+  try {
+    const { email, name, purpose } = req.body;
+    const result = await authService.requestEmailOtp({ email, name, purpose });
+    sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/v1/auth/email-otp/verify — Migration 036
+async function verifyEmailOtp(req, res, next) {
+  try {
+    const { email, otp, name, purpose } = req.body;
+    let tokens;
+    if (purpose === 'VERIFY_EMAIL') {
+      tokens = await authService.verifyEmailAndActivate({ email, otp });
+    } else {
+      tokens = await authService.verifyEmailOtpAndAuthenticate({ email, otp, name });
+    }
+    sendSuccess(res, tokens);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getMe,
   register,
@@ -104,6 +156,10 @@ module.exports = {
   logout,
   requestPasswordReset,
   confirmPasswordReset,
+  getConfig,
+  googleLogin,
+  requestEmailOtp,
+  verifyEmailOtp,
   // Out of scope (FR-AUTH-08 is optional/non-blocking, not requested here) — untouched:
   requestEmailVerification: notImplemented,
   confirmEmailVerification: notImplemented,

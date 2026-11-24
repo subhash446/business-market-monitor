@@ -10,7 +10,7 @@
  * Doc 3 §3 — no feature-specific logic; envelope unwrapping done in client.js.
  */
 
-import { post } from './client.js';
+import { get, post } from './client.js';
 
 /**
  * Authenticate an existing user.
@@ -74,4 +74,51 @@ export async function requestPasswordReset(email) {
  */
 export async function confirmPasswordReset(token, newPassword) {
   await post('/auth/password-reset/confirm', { token, newPassword }, { skipAuth: true });
+}
+
+/**
+ * Fetch public auth provider configuration (Google client ID, OTP status).
+ *
+ * GET /api/v1/auth/config
+ * @returns {Promise<{ googleEnabled: boolean, googleClientId: string|null, emailOtpEnabled: boolean }>}
+ */
+export async function getAuthConfig() {
+  const { data } = await get('/auth/config', {}, { skipAuth: true });
+  return data;
+}
+
+/**
+ * Sign in or auto-register with Google Identity Services ID token.
+ *
+ * POST /api/v1/auth/google
+ * @param {{ credential: string }} payload
+ * @returns {Promise<{ accessToken: string, refreshToken: string, expiresIn: number }>}
+ */
+export async function loginWithGoogle({ credential }) {
+  const { data } = await post('/auth/google', { credential }, { skipAuth: true });
+  return data;
+}
+
+/**
+ * Request a 6-digit email OTP for login or email verification.
+ *
+ * POST /api/v1/auth/email-otp/request
+ * @param {{ email: string, name?: string, purpose?: 'LOGIN_OTP'|'VERIFY_EMAIL' }} payload
+ * @returns {Promise<{ sent: boolean, expiresInSeconds: number, cooldownSeconds: number, maskedEmail: string }>}
+ */
+export async function requestEmailOtp({ email, name, purpose = 'LOGIN_OTP' }) {
+  const { data } = await post('/auth/email-otp/request', { email, name, purpose }, { skipAuth: true });
+  return data;
+}
+
+/**
+ * Verify 6-digit email OTP code and sign in (or activate email).
+ *
+ * POST /api/v1/auth/email-otp/verify
+ * @param {{ email: string, otp: string, name?: string, purpose?: 'LOGIN_OTP'|'VERIFY_EMAIL' }} payload
+ * @returns {Promise<{ accessToken: string, refreshToken: string, expiresIn: number }>}
+ */
+export async function verifyEmailOtp({ email, otp, name, purpose = 'LOGIN_OTP' }) {
+  const { data } = await post('/auth/email-otp/verify', { email, otp, name, purpose }, { skipAuth: true });
+  return data;
 }
