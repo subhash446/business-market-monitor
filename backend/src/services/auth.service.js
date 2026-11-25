@@ -219,9 +219,78 @@ async function authenticateWithGoogle({ credential }) {
 
 /**
  * Dispatches 6-digit verification code to email (Migration 036).
+ * Blocks duplicate account signups early when purpose === 'VERIFY_EMAIL'.
  */
 async function requestEmailOtp({ email, name = '', purpose = 'LOGIN_OTP' }) {
-  return emailOtpService.requestOtp({ email, name, purpose });
+  const normalizedEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+  if (purpose === 'VERIFY_EMAIL' && normalizedEmail) {
+    const existingUser = await userRepository.findByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new AppError(
+        409,
+        'EMAIL_ALREADY_EXISTS',
+        'An account with this email already exists. Please sign in instead.'
+      );
+    }
+  }
+  return emailOtpService.requestOtp({ email: normalizedEmail || email, name, purpose });
+}
+
+/**
+ * Atomic 2-step registration: verifies VERIFY_EMAIL OTP, checks duplicates,
+ * creates verified LOCAL user with hashed password, marks OTP consumed, and issues tokens.
+ */
+async function registerWithVerifiedOtp({ name, fullName, email, otp, password }) {
+  const normalizedEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+  const trimmedName = String(name ?? fullName ?? '').trim();
+
+  // 1. Verify active VERIFY_EMAIL OTP before creating any user record
+  const verifiedResult = await emailOtpService.verifyOtp({
+    email: normalizedEmail,
+    otp,
+    purpose: 'VERIFY_EMAIL',
+    consume: false,
+  });
+
+  // 2. Duplicate email guard
+  const existing = await userRepository.findByEmail(verifiedResult.email);
+  if (existing) {
+    throw new AppError(
+      409,
+      'EMAIL_ALREADY_EXISTS',
+      'An account with this email already exists. Please sign in instead.'
+    );
+  }
+
+  // 3. Hash password and create verified LOCAL user
+  const passwordHash = await hashPassword(password);
+  let user;
+  try {
+    user = await userRepository.create({
+      email: verifiedResult.email,
+      passwordHash,
+      fullName: trimmedName,
+      authProvider: 'LOCAL',
+      googleSub: null,
+      emailVerified: 1,
+    });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      throw new AppError(
+        409,
+        'EMAIL_ALREADY_EXISTS',
+        'An account with this email already exists. Please sign in instead.'
+      );
+    }
+    throw err;
+  }
+
+  // 4. Consume OTP now that user record is safely persisted
+  if (verifiedResult.otpId) {
+    await emailOtpService.consumeOtp(verifiedResult.otpId);
+  }
+
+  return issueTokens(user);
 }
 
 /**
@@ -272,6 +341,7 @@ module.exports = {
   confirmPasswordReset,
   authenticateWithGoogle,
   requestEmailOtp,
+  registerWithVerifiedOtp,
   verifyEmailOtpAndAuthenticate,
   verifyEmailAndActivate,
 };

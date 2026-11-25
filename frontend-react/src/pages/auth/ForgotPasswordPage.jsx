@@ -104,10 +104,7 @@ export function ForgotPasswordPage() {
           <div className="auth-logo-mark" aria-hidden="true">
             <i className="fa-solid fa-chart-column" />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="auth-brand__name">Business Market Monitor</span>
-            <span className="auth-brand__badge">BMM</span>
-          </div>
+          <span className="auth-brand__name">Business Market Monitor</span>
         </Link>
 
         {/* Card */}

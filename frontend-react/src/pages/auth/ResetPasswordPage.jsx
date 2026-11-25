@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { confirmPasswordReset } from '../../api/auth.api.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { PasswordInput } from '../../components/auth/PasswordInput.jsx';
 import '../../styles/pages/auth.css';
 
 export function ResetPasswordPage() {
@@ -119,10 +120,7 @@ export function ResetPasswordPage() {
           <div className="auth-logo-mark" aria-hidden="true">
             <i className="fa-solid fa-chart-column" />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="auth-brand__name">Business Market Monitor</span>
-            <span className="auth-brand__badge">BMM</span>
-          </div>
+          <span className="auth-brand__name">Business Market Monitor</span>
         </Link>
 
         {/* Card */}
@@ -190,17 +188,16 @@ export function ResetPasswordPage() {
                   <label className="form-label form-label--required" htmlFor="rp-password">
                     New password
                   </label>
-                  <input
-                    ref={passwordRef}
-                    type="password"
+                  <PasswordInput
+                    inputRef={passwordRef}
                     id="rp-password"
                     name="newPassword"
-                    className={`form-control${passErr ? ' form-control--error' : ''}`}
                     placeholder="New password"
                     autoComplete="new-password"
                     required
-                    aria-required="true"
-                    aria-describedby="rp-password-hint rp-password-error"
+                    ariaRequired="true"
+                    ariaDescribedBy="rp-password-hint rp-password-error"
+                    hasError={Boolean(passErr)}
                     value={password}
                     onChange={e => { setPassword(e.target.value); clearErrors(); }}
                   />

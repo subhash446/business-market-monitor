@@ -98,8 +98,9 @@ async function requestOtp({ email, name = '', purpose = 'LOGIN_OTP' }) {
 
 /**
  * Verifies a 6-digit OTP code. Enforces maximum 5 attempts and single consumption.
+ * Pass `consume: false` when downstream user creation must succeed before marking consumed.
  */
-async function verifyOtp({ email, otp, purpose = 'LOGIN_OTP' }) {
+async function verifyOtp({ email, otp, purpose = 'LOGIN_OTP', consume = true }) {
   if (!email || !otp) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Email and 6-digit OTP code are required');
   }
@@ -134,19 +135,30 @@ async function verifyOtp({ email, otp, purpose = 'LOGIN_OTP' }) {
     throw new AppError(400, 'INVALID_OTP', `Invalid code. ${remaining} attempts remaining.`);
   }
 
-  // Mark consumed on successful verification
-  await emailOtpRepository.markConsumed(otpRow.id);
-  logger.info(`[emailOtp] Successfully verified ${validPurpose} OTP for ${maskEmail(normalizedEmail)}`);
+  if (consume) {
+    await emailOtpRepository.markConsumed(otpRow.id);
+    logger.info(`[emailOtp] Successfully verified ${validPurpose} OTP for ${maskEmail(normalizedEmail)}`);
+  }
 
   return {
     verified: true,
     email: normalizedEmail,
+    otpId: otpRow.id,
   };
+}
+
+/**
+ * Marks a previously verified OTP row as consumed.
+ */
+async function consumeOtp(otpId) {
+  if (!otpId) return;
+  await emailOtpRepository.markConsumed(otpId);
 }
 
 module.exports = {
   requestOtp,
   verifyOtp,
+  consumeOtp,
   hashOtp,
   maskEmail,
 };

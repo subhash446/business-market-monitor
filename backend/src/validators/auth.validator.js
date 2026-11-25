@@ -90,11 +90,47 @@ function validateConfirmPasswordReset(body) {
   return errors;
 }
 
+function validateEmailOtpRequest(body) {
+  const errors = [];
+  if (!body.email || !isValidEmail(body.email)) {
+    errors.push({ field: 'email', issue: 'must be a valid email address' });
+  }
+  if (body.purpose && body.purpose !== 'LOGIN_OTP' && body.purpose !== 'VERIFY_EMAIL') {
+    errors.push({ field: 'purpose', issue: 'must be LOGIN_OTP or VERIFY_EMAIL' });
+  }
+  return errors;
+}
+
+function validateRegisterVerifyOtp(body) {
+  const errors = [];
+  const rawName = body.name ?? body.fullName ?? '';
+  const trimName = String(rawName).trim();
+  if (!trimName) {
+    errors.push({ field: 'name', issue: 'is required' });
+  } else if (trimName.length > MAX_FULL_NAME_LENGTH) {
+    errors.push({ field: 'name', issue: `must be at most ${MAX_FULL_NAME_LENGTH} characters` });
+  }
+  if (!body.email || !isValidEmail(body.email)) {
+    errors.push({ field: 'email', issue: 'must be a valid email address' });
+  }
+  const rawOtp = String(body.otp ?? '').trim();
+  if (!/^\d{6}$/.test(rawOtp)) {
+    errors.push({ field: 'otp', issue: 'must be a 6-digit numeric code' });
+  }
+  if (!isStrongPassword(body.password)) {
+    errors.push({ field: 'password', issue: 'must be at least 8 characters and include a letter and a number' });
+  }
+  return errors;
+}
+
 module.exports = {
   validateRegister,
   validateLogin,
   validateRefresh,
   validateRequestPasswordReset,
   validateConfirmPasswordReset,
+  validateEmailOtpRequest,
+  validateRegisterVerifyOtp,
   isValidEmail,
+  isStrongPassword,
 };

@@ -148,6 +148,22 @@ async function verifyEmailOtp(req, res, next) {
   }
 }
 
+// POST /api/v1/auth/register/verify-otp — Atomic 2-step OTP-verified registration
+async function registerVerifyOtp(req, res, next) {
+  try {
+    const { name, fullName, email, otp, password } = req.body;
+    const tokens = await authService.registerWithVerifiedOtp({
+      name: name ?? fullName,
+      email,
+      otp,
+      password,
+    });
+    sendSuccess(res, tokens, undefined, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getMe,
   register,
@@ -160,6 +176,7 @@ module.exports = {
   googleLogin,
   requestEmailOtp,
   verifyEmailOtp,
+  registerVerifyOtp,
   // Out of scope (FR-AUTH-08 is optional/non-blocking, not requested here) — untouched:
   requestEmailVerification: notImplemented,
   confirmEmailVerification: notImplemented,

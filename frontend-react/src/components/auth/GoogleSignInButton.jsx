@@ -1,14 +1,26 @@
 import { useEffect, useState, useRef } from 'react';
 import { getAuthConfig, loginWithGoogle } from '../../api/auth.api.js';
 
+const DEFAULT_GSI_WIDTH = 376;
+const MIN_GSI_WIDTH = 220;
+const MAX_GSI_WIDTH = 400;
+
+function clampGsiWidth(rawWidth) {
+  if (!Number.isFinite(rawWidth) || rawWidth <= 0) {
+    return DEFAULT_GSI_WIDTH;
+  }
+  return Math.min(MAX_GSI_WIDTH, Math.max(MIN_GSI_WIDTH, Math.floor(rawWidth)));
+}
+
 /**
- * GoogleSignInButton — Google Identity Services Sign-In Component (Migration 036).
+ * GoogleSignInButton — Full-Width Aligned Google Identity Services Sign-In Component.
  *
  * Enforces:
  * - SSR safety (checks typeof window !== 'undefined').
+ * - ResizeObserver container measurement capped cleanly to Google's 400px max width
+ *   so the GSI button aligns edge-to-edge with form inputs and CTA buttons.
  * - Automatic script loading for https://accounts.google.com/gsi/client.
- * - Graceful fallback to disabled state with helper text when GOOGLE_CLIENT_ID is not configured.
- * - Clean dark Zinc styling matching Business Market Monitor design tokens.
+ * - Graceful fallback to disabled state when GOOGLE_CLIENT_ID is not configured.
  */
 export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
   const [googleClientId, setGoogleClientId] = useState(() => {
@@ -18,6 +30,9 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
   });
   const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
+  const [buttonWidth, setButtonWidth] = useState(DEFAULT_GSI_WIDTH);
+
+  const wrapperRef = useRef(null);
   const googleBtnContainerRef = useRef(null);
   const handleCredentialRef = useRef(null);
 
@@ -43,6 +58,31 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
     };
   }, []);
 
+  // Measure container width dynamically with ResizeObserver for edge-to-edge alignment
+  useEffect(() => {
+    if (typeof window === 'undefined' || !wrapperRef.current) return;
+
+    const updateWidth = () => {
+      if (!wrapperRef.current) return;
+      const measured = clampGsiWidth(wrapperRef.current.getBoundingClientRect().width || wrapperRef.current.offsetWidth);
+      setButtonWidth((prev) => (Math.abs(prev - measured) >= 2 ? measured : prev));
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateWidth);
+      return () => window.removeEventListener('resize', updateWidth);
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+    observer.observe(wrapperRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
   // Update latest credential callback ref
   handleCredentialRef.current = async (response) => {
     if (!response?.credential) {
@@ -63,7 +103,7 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
     }
   };
 
-  // Load Google script and render button
+  // Load Google script and render edge-to-edge aligned button
   useEffect(() => {
     if (typeof window === 'undefined' || !googleClientId) return;
 
@@ -77,11 +117,14 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
         });
 
         if (googleBtnContainerRef.current) {
+          const targetWidth = clampGsiWidth(
+            wrapperRef.current?.getBoundingClientRect().width || buttonWidth
+          );
           googleBtnContainerRef.current.innerHTML = '';
           window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
             theme: 'filled_black',
             size: 'large',
-            width: googleBtnContainerRef.current.offsetWidth || 380,
+            width: targetWidth,
             text: 'continue_with',
             shape: 'rectangular',
             logo_alignment: 'left',
@@ -103,7 +146,7 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
     } else {
       initGoogle();
     }
-  }, [googleClientId]);
+  }, [googleClientId, buttonWidth]);
 
   // Google 'G' SVG icon
   const googleIcon = (
@@ -129,34 +172,17 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
 
   if (!googleClientId && !loading) {
     return (
-      <div className="google-auth-container" data-testid="google-auth-container">
+      <div ref={wrapperRef} className="google-auth-container" data-testid="google-auth-container">
         <button
           type="button"
           disabled
           aria-disabled="true"
           className="btn btn--outline btn--full google-signin-btn google-signin-btn--disabled"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            opacity: 0.6,
-            cursor: 'not-allowed',
-          }}
         >
           {googleIcon}
           <span>Continue with Google</span>
         </button>
-        <span
-          className="text-xs text-muted"
-          style={{
-            display: 'block',
-            textAlign: 'center',
-            marginTop: '6px',
-            fontSize: '11px',
-            color: '#71717a',
-          }}
-        >
+        <span className="google-auth-hint">
           Google Sign-In awaiting client configuration
         </span>
       </div>
@@ -164,14 +190,12 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
   }
 
   return (
-    <div className="google-auth-container" data-testid="google-auth-container">
-      {/* Hidden/Mounted Google Identity render container */}
+    <div ref={wrapperRef} className="google-auth-container" data-testid="google-auth-container">
       <div
         ref={googleBtnContainerRef}
         className="google-gsi-button-slot"
-        style={{ width: '100%', minHeight: '40px', display: 'flex', justifyContent: 'center' }}
       >
-        {/* Fallback button before Google script finishes mounting */}
+        {/* Crisp fallback button before Google script finishes mounting */}
         <button
           type="button"
           className="btn btn--outline btn--full google-signin-btn"
@@ -180,15 +204,6 @@ export function GoogleSignInButton({ onSuccess, onError, disabled = false }) {
             if (window.google?.accounts?.id?.prompt) {
               window.google.accounts.id.prompt();
             }
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            background: '#141414',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: '#f4f4f5',
           }}
         >
           {googleIcon}

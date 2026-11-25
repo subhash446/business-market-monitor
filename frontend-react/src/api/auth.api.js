@@ -122,3 +122,15 @@ export async function verifyEmailOtp({ email, otp, name, purpose = 'LOGIN_OTP' }
   const { data } = await post('/auth/email-otp/verify', { email, otp, name, purpose }, { skipAuth: true });
   return data;
 }
+
+/**
+ * Complete 2-step registration by verifying 6-digit email OTP and setting password.
+ *
+ * POST /api/v1/auth/register/verify-otp
+ * @param {{ name: string, email: string, otp: string, password: string }} payload
+ * @returns {Promise<{ accessToken: string, refreshToken: string, expiresIn: number }>}
+ */
+export async function registerWithVerifiedOtp({ name, email, otp, password }) {
+  const { data } = await post('/auth/register/verify-otp', { name, email, otp, password }, { skipAuth: true });
+  return data;
+}
