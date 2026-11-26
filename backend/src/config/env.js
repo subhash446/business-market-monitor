@@ -35,6 +35,19 @@ const env = {
     refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
   },
 
+  email: {
+    provider: (process.env.EMAIL_PROVIDER || '').trim().toLowerCase(),
+    from: process.env.EMAIL_FROM || '',
+    timeoutMs: parseInt(process.env.EMAIL_TIMEOUT_MS, 10) || 15000,
+  },
+
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY,
+    baseUrl: (process.env.BREVO_API_BASE_URL || 'https://api.brevo.com/v3').replace(/\/+$/, ''),
+    fromEmail: process.env.EMAIL_FROM || process.env.BREVO_FROM_EMAIL || '',
+    get timeoutMs() { return env.email.timeoutMs; },
+  },
+
   resend: {
     apiKey: process.env.RESEND_API_KEY,
     fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',

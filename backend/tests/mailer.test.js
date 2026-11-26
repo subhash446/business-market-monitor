@@ -580,5 +580,230 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
       expect(() => buildAlertNotification()).not.toThrow();
     });
   });
+
+  describe('Brevo Transactional Email Provider (src/email/mailer.js)', () => {
+    const originalFetch = global.fetch;
+    const originalEnvEmail = { ...env.email };
+    const originalEnvBrevo = { ...env.brevo };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      env.email = { ...originalEnvEmail, provider: '', from: '' };
+      env.brevo = {
+        ...originalEnvBrevo,
+        apiKey: '',
+        baseUrl: 'https://api.brevo.com/v3',
+        fromEmail: '',
+      };
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      env.email = { ...originalEnvEmail };
+      env.brevo = { ...originalEnvBrevo };
+    });
+
+    test('1. provider selection precedence respects explicit EMAIL_PROVIDER, auto-detects BREVO_API_KEY, and preserves Resend default', () => {
+      // Unset provider + unset BREVO_API_KEY -> resend
+      env.email.provider = '';
+      env.brevo.apiKey = '';
+      expect(mailer.resolveEmailProvider()).toBe('resend');
+
+      // Unset provider + BREVO_API_KEY set -> auto-select brevo
+      env.brevo.apiKey = 'xkeysib-auto-select-123';
+      expect(mailer.resolveEmailProvider()).toBe('brevo');
+
+      // Explicit EMAIL_PROVIDER='resend' overrides BREVO_API_KEY
+      env.email.provider = 'resend';
+      expect(mailer.resolveEmailProvider()).toBe('resend');
+
+      // Explicit EMAIL_PROVIDER='brevo' selects brevo
+      env.email.provider = 'brevo';
+      expect(mailer.resolveEmailProvider()).toBe('brevo');
+
+      // Explicit EMAIL_PROVIDER='console' selects console
+      env.email.provider = 'console';
+      expect(mailer.resolveEmailProvider()).toBe('console');
+    });
+
+    test('2. parseBrevoSender formats "Display Name <email>" and plain email with default name', () => {
+      expect(mailer.parseBrevoSender('Business Market Monitor <alerts@bmm.example.com>')).toEqual({
+        name: 'Business Market Monitor',
+        email: 'alerts@bmm.example.com',
+      });
+
+      expect(mailer.parseBrevoSender('"Custom Procurement Team" <team@factory.in>')).toEqual({
+        name: 'Custom Procurement Team',
+        email: 'team@factory.in',
+      });
+
+      expect(mailer.parseBrevoSender('noreply@bmm.example.com')).toEqual({
+        name: 'Business Market Monitor',
+        email: 'noreply@bmm.example.com',
+      });
+
+      expect(() => mailer.parseBrevoSender('')).toThrow('EMAIL_FROM is not configured');
+      expect(() => mailer.parseBrevoSender('not-an-email')).toThrow('EMAIL_FROM must be a valid email address');
+    });
+
+    test('3. sends via Brevo REST API with parsed sender and returns { provider: "brevo", messageId } on 201', async () => {
+      env.email.provider = 'brevo';
+      env.email.from = 'Business Market Monitor <noreply@bmm.example.com>';
+      env.brevo.apiKey = 'xkeysib-secret-test-key-999';
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        text: jest.fn().mockResolvedValue(JSON.stringify({ messageId: '<20261126.brevo-msg-001@smtp-relay.mailin.fr>' })),
+      });
+
+      const result = await mailer.sendEmail({
+        to: 'buyer@packaging.in',
+        subject: 'Your Business Market Monitor verification code: 482910',
+        html: '<p>Code: <strong>482910</strong></p>',
+        text: 'Code: 482910',
+      });
+
+      expect(result).toEqual({
+        provider: 'brevo',
+        messageId: '<20261126.brevo-msg-001@smtp-relay.mailin.fr>',
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [url, options] = global.fetch.mock.calls[0];
+      expect(url).toBe('https://api.brevo.com/v3/smtp/email');
+      expect(options.method).toBe('POST');
+      expect(options.headers).toEqual({
+        'api-key': 'xkeysib-secret-test-key-999',
+        'content-type': 'application/json',
+        accept: 'application/json',
+      });
+      expect(options.signal).toBeDefined();
+
+      const body = JSON.parse(options.body);
+      expect(body).toEqual({
+        sender: { name: 'Business Market Monitor', email: 'noreply@bmm.example.com' },
+        to: [{ email: 'buyer@packaging.in' }],
+        subject: 'Your Business Market Monitor verification code: 482910',
+        htmlContent: '<p>Code: <strong>482910</strong></p>',
+        textContent: 'Code: 482910',
+      });
+    });
+
+    test('4. automatically selects Brevo when EMAIL_PROVIDER is unset and BREVO_API_KEY is set, using default sender name for plain EMAIL_FROM', async () => {
+      env.email.provider = '';
+      env.email.from = 'otp@bmm.example.com';
+      env.brevo.apiKey = 'xkeysib-auto-key-777';
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        text: jest.fn().mockResolvedValue(JSON.stringify({ messageId: '<msg-plain-sender>' })),
+      });
+
+      const result = await mailer.sendEmail({
+        to: 'owner@factory.com',
+        subject: 'Reset Password',
+        html: '<p>Reset link</p>',
+      });
+
+      expect(result).toEqual({ provider: 'brevo', messageId: '<msg-plain-sender>' });
+      const [, options] = global.fetch.mock.calls[0];
+      const body = JSON.parse(options.body);
+      expect(body.sender).toEqual({ name: 'Business Market Monitor', email: 'otp@bmm.example.com' });
+      expect(body.textContent).toBeUndefined();
+    });
+
+    test('5. throws sanitized error (redacting BREVO_API_KEY) on non-2xx Brevo API response and never logs key', async () => {
+      env.email.provider = 'brevo';
+      env.email.from = 'noreply@bmm.example.com';
+      env.brevo.apiKey = 'xkeysib-top-secret-key-12345';
+
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        text: jest.fn().mockResolvedValue(
+          JSON.stringify({
+            code: 'unauthorized',
+            message: 'Key xkeysib-top-secret-key-12345 is invalid',
+          })
+        ),
+      });
+
+      await expect(
+        mailer.sendEmail({
+          to: 'user@example.com',
+          subject: 'Test',
+          html: '<p>Test</p>',
+        })
+      ).rejects.toThrow('Brevo email delivery failed (401): Key [REDACTED_API_KEY] is invalid');
+
+      const logged = [...logSpy.mock.calls, ...warnSpy.mock.calls, ...errorSpy.mock.calls].flat().map(String);
+      expect(logged.some((line) => line.includes('xkeysib-top-secret-key-12345'))).toBe(false);
+
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    test('6. throws clear timeout error on AbortError and actionable error if BREVO_API_KEY missing', async () => {
+      env.email.provider = 'brevo';
+      env.email.from = 'noreply@bmm.example.com';
+      env.brevo.apiKey = '';
+
+      await expect(
+        mailer.sendEmail({ to: 'user@example.com', subject: 'Test', html: '<p>Test</p>' })
+      ).rejects.toThrow('BREVO_API_KEY is not configured');
+
+      env.brevo.apiKey = 'xkeysib-timeout-key';
+      const abortErr = new Error('The operation was aborted');
+      abortErr.name = 'AbortError';
+      global.fetch = jest.fn().mockRejectedValue(abortErr);
+
+      await expect(
+        mailer.sendEmail({ to: 'user@example.com', subject: 'Test', html: '<p>Test</p>' })
+      ).rejects.toThrow(/Brevo email delivery timed out/);
+    });
+
+    test('7. verifyConnection() verifies Brevo account connectivity and console mode returns cleanly', async () => {
+      env.email.provider = 'brevo';
+      env.email.from = 'noreply@bmm.example.com';
+      env.brevo.apiKey = 'xkeysib-verify-key';
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue('{"email":"noreply@bmm.example.com"}'),
+      });
+
+      await expect(mailer.verifyConnection()).resolves.toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api.brevo.com/v3/account',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({ 'api-key': 'xkeysib-verify-key' }),
+        })
+      );
+
+      // Console provider check
+      env.email.provider = 'console';
+      const logger = require('../src/utils/logger');
+      const loggerSpy = jest.spyOn(logger, 'info').mockImplementation(() => {});
+      const consoleRes = await mailer.sendEmail({
+        to: 'user@company.com',
+        subject: 'Console Notice',
+        html: '<p>Hello</p>',
+      });
+      expect(consoleRes.provider).toBe('console');
+      expect(consoleRes.messageId).toMatch(/^console-/);
+      await expect(mailer.verifyConnection()).resolves.toBe(true);
+      loggerSpy.mockRestore();
+    });
+  });
 });
 
