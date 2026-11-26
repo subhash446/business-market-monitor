@@ -18,25 +18,34 @@ const GMAIL_COMPOSE_URL = `https://mail.google.com/mail/?view=cm&fs=1&to=${encod
 )}&su=${encodeURIComponent(INQUIRY_SUBJECT)}&body=${encodeURIComponent(INQUIRY_BODY)}`;
 
 /**
- * AccessTiers — Transparent, Honest 3-Column SaaS Tier Experience (V3-M5).
+ * AccessTiers — Chapter 03 Transparent SaaS Access Options
  *
- * Rules:
- * - Free tier for Indian SME manufacturers (unlimited materials, alerts, WhatsApp)
+ * - Free tier for Indian SME manufacturers
  * - Growth tier with landed-cost parity & reorder engine
- * - Custom tier for multi-plant ERP operations with direct Gmail web compose CTA
- * - Zero gatekept trials or fake checkout dead-ends
+ * - Multi-plant inquiry via pre-filled Gmail compose URL (no mailto:)
  */
 export function AccessTiers() {
   return (
-    <section id="access" className="lp-section" aria-label="Transparent Access Options">
+    <section
+      id="access"
+      className="lp-section lp-reveal"
+      aria-label="Transparent Access Options"
+    >
       <div className="lp-container">
-        <div className="lp-section-header">
-          <div className="lp-section-tag">Access &amp; Deployment</div>
-          <h2 className="lp-section-title">
-            Simple, Transparent <span className="lp-text-gradient">Access.</span>
-          </h2>
+        {/* Numbered Left-Aligned Editorial Chapter Header */}
+        <div className="lp-chapter-header">
+          <div className="lp-chapter-header__lead">
+            <div className="lp-chapter-eyebrow">
+              <span className="lp-chapter-index">03</span>
+              <span>/ Access &amp; Deployment</span>
+            </div>
+            <h2 className="lp-section-title">
+              Simple, Transparent Access.
+            </h2>
+          </div>
+
           <p className="lp-section-desc">
-            No gatekept free trials or credit card walls. Full commodity telemetry and
+            No gatekept free trials or credit card walls. Core commodity telemetry and
             alerts are freely accessible to Indian SME manufacturers.
           </p>
         </div>
@@ -45,14 +54,14 @@ export function AccessTiers() {
         <PricingPlansSection mode="landing" />
 
         {/* Multi-Plant Transparency Link */}
-        <div className="lp-tiers-transparency" style={{ marginTop: '2.5rem', textAlign: 'center' }}>
-          <p style={{ color: '#a1a1aa', fontSize: '0.875rem' }}>
+        <div className="lp-tiers-transparency">
+          <p className="lp-tiers-transparency__text">
             Operating multiple manufacturing plants with custom ERP ingestion needs?{' '}
             <a
               href={GMAIL_COMPOSE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#60a5fa', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+              className="lp-tiers-link"
             >
               Contact Engineering for Multi-Plant &amp; ERP Sync &rarr;
             </a>

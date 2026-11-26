@@ -2,33 +2,48 @@ import { useState } from 'react';
 import { IMPACT_FLOW, SAMPLE_DATA_TAG } from '../../data/landingSample.js';
 
 /**
- * ImpactFlow — Interactive Multi-Hop Supply Chain Visualizer
+ * ImpactFlow — Chapter 01 Interactive Multi-Hop Supply Chain Visualizer
  *
  * Demonstrates how upstream commodity shocks propagate down to SME factory floor inputs.
- * Hovering or tapping any node highlights its dependencies and dims unrelated nodes to 40% opacity.
+ * Hovering or tapping any node highlights connected edges and surfaces causal edge notes.
  */
 export function ImpactFlow() {
   const [activeNodeId, setActiveNodeId] = useState(null);
 
   const { nodes, edges } = IMPACT_FLOW;
 
-  // Active note detail: defaults to selected node or last target node
   const selectedNode =
     nodes.find((n) => n.id === activeNodeId) ?? nodes[nodes.length - 1];
 
+  // Surface connected causal edge explanation when inspecting a node
+  const connectedEdge =
+    edges.find((edge) => edge.to === selectedNode.id) ??
+    edges.find((edge) => edge.from === selectedNode.id) ??
+    edges[edges.length - 1];
+
   return (
-    <section id="how-it-works" className="lp-section" aria-label="How BMM Impact Chains Work">
+    <section
+      id="how-it-works"
+      className="lp-section lp-reveal"
+      aria-label="How BMM Impact Chains Work"
+    >
       <div className="lp-container">
-        {/* Section Heading */}
-        <div className="lp-section-header">
-          <div className="lp-section-tag">Supply Chain Graph Engine</div>
-          <h2 className="lp-section-title">
-            Anticipate Price Shifts <span className="lp-text-gradient">Upstream.</span>
-          </h2>
+        {/* Numbered Left-Aligned Editorial Chapter Header */}
+        <div className="lp-chapter-header">
+          <div className="lp-chapter-header__lead">
+            <div className="lp-chapter-eyebrow">
+              <span className="lp-chapter-index">01</span>
+              <span>/ Supply Chain Graph Engine</span>
+            </div>
+            <h2 className="lp-section-title">
+              Anticipate Price Shifts Upstream.
+            </h2>
+          </div>
+
           <p className="lp-section-desc">
             Raw material price hikes rarely occur in isolation. BMM maps structural
             feedstock dependencies and calculates empirical lag correlations so you see
-            cost pressures 10–14 days before your supplier calls.
+            cost pressures 10&ndash;14 days before your supplier calls.
           </p>
         </div>
 
@@ -47,10 +62,15 @@ export function ImpactFlow() {
               {nodes.map((node, idx) => {
                 const isHovered = activeNodeId === node.id;
                 const isDimmed = activeNodeId !== null && !isHovered;
+                const edge = edges[idx];
+                const edgeActive =
+                  edge &&
+                  activeNodeId !== null &&
+                  (edge.from === activeNodeId || edge.to === activeNodeId);
+                const edgeDimmed = activeNodeId !== null && !edgeActive;
 
                 return (
                   <div key={node.id} className="lp-flow-step-wrap">
-                    {/* Node Card */}
                     <button
                       type="button"
                       className={`lp-flow-node ${isHovered ? 'lp-flow-node--active' : ''} ${
@@ -72,20 +92,23 @@ export function ImpactFlow() {
                       <div className="lp-flow-node__sublabel">{node.sublabel}</div>
                     </button>
 
-                    {/* Edge Connector to Next Node */}
-                    {idx < nodes.length - 1 && (
+                    {edge && (
                       <div
                         className={`lp-flow-edge ${
-                          edges[idx]?.nature === 'dashed'
+                          edge.nature === 'dashed'
                             ? 'lp-flow-edge--dashed'
                             : 'lp-flow-edge--solid'
+                        } ${edgeActive ? 'lp-flow-edge--active' : ''} ${
+                          edgeDimmed ? 'lp-flow-edge--dimmed' : ''
                         }`}
                       >
-                        <div className="lp-flow-edge__line" />
+                        <div className="lp-flow-edge__track" aria-hidden="true">
+                          <span className="lp-flow-edge__line" />
+                          <span className="lp-flow-edge__arrow">→</span>
+                        </div>
                         <span className="lp-flow-edge__pill font-mono">
-                          {edges[idx]?.label}
+                          {edge.label}
                         </span>
-                        <div className="lp-flow-edge__arrow" aria-hidden="true">→</div>
                       </div>
                     )}
                   </div>
@@ -93,7 +116,7 @@ export function ImpactFlow() {
               })}
             </div>
 
-            {/* Context Note Box for Active Node */}
+            {/* Context Note Box for Active Node + Connected Edge Mechanism */}
             <div className="lp-flow-detail-box">
               <div className="lp-flow-detail-box__top">
                 <span className="lp-flow-detail-box__label">
@@ -104,6 +127,12 @@ export function ImpactFlow() {
                 </span>
               </div>
               <p className="lp-flow-detail-box__note">{selectedNode.note}</p>
+              {connectedEdge?.description && (
+                <div className="lp-flow-detail-box__edge-note">
+                  <span className="font-mono">{connectedEdge.type}</span> &middot;{' '}
+                  {connectedEdge.description}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -3,26 +3,37 @@ import { DigestPreview } from './DigestPreview.jsx';
 import { SlopeChart } from './SlopeChart.jsx';
 
 /**
- * SilentSlope Section — Benchmark vs Supplier Sourcing Analysis
+ * SilentSlope Section — Chapter 02 Supplier Pricing Asymmetry & Digest
  *
  * Explains the "Rockets & Feathers" pricing asymmetry where quotes rise fast
- * but fall slow, coupled with the daily mobile digest preview.
+ * but fall slow, paired with WhatsApp & Email morning brief previews.
  */
 export function SilentSlope() {
   const { verdictChip, stats, summary } = SILENT_SLOPE;
 
   return (
-    <section id="supplier-benchmark" className="lp-section" aria-label="Supplier Pricing Asymmetry">
+    <section
+      id="supplier-benchmark"
+      className="lp-section lp-reveal"
+      aria-label="Supplier Pricing Asymmetry"
+    >
       <div className="lp-container">
-        <div className="lp-section-header">
-          <div className="lp-section-tag">Supplier Quote Benchmarking</div>
-          <h2 className="lp-section-title">
-            Unmask the <span className="lp-text-gradient">"Silent Slope"</span> in Quotes.
-          </h2>
+        {/* Numbered Left-Aligned Editorial Chapter Header */}
+        <div className="lp-chapter-header">
+          <div className="lp-chapter-header__lead">
+            <div className="lp-chapter-eyebrow">
+              <span className="lp-chapter-index">02</span>
+              <span>/ Supplier Quote Benchmarking</span>
+            </div>
+            <h2 className="lp-section-title">
+              Unmask the &ldquo;Silent Slope&rdquo; in Quotes.
+            </h2>
+          </div>
+
           <p className="lp-section-desc">
-            When upstream benchmarks surge, vendors cite oil and mandi shortages to hike
+            When upstream benchmarks surge, vendors cite crude and mandi shortages to hike
             rates within days. But when commodity costs drop, quotes linger high for
-            weeks. BMM provides grounded benchmark telemetry to negotiate lower prices.
+            weeks. BMM gives procurement teams benchmark proof before negotiating.
           </p>
         </div>
 
@@ -40,12 +51,10 @@ export function SilentSlope() {
                 </h3>
               </div>
 
-              {/* Dual-line SVG Chart */}
               <div className="lp-slope-card__chart">
                 <SlopeChart />
               </div>
 
-              {/* Speed Stats Comparison Grid */}
               <div className="lp-speed-stats-grid">
                 <div className="lp-speed-stat-card lp-speed-stat-card--up">
                   <span className="lp-speed-stat-card__val font-mono">{stats.up}</span>
@@ -60,7 +69,6 @@ export function SilentSlope() {
                 </div>
               </div>
 
-              {/* Analysis Summary */}
               <p className="lp-slope-summary">{summary}</p>
             </div>
           </div>

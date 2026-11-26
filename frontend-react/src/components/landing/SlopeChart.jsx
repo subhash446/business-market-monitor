@@ -1,41 +1,127 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { SILENT_SLOPE } from '../../data/landingSample.js';
-import { buildLinePath } from '../../lib/chartGeometry.js';
+import { nearestIndex, scaleLinear } from '../../lib/chartGeometry.js';
 
 const WIDTH = 520;
-const HEIGHT = 200;
-const PAD = { top: 20, right: 16, bottom: 28, left: 16 };
+const HEIGHT = 210;
+const PAD = { top: 22, right: 16, bottom: 28, left: 16 };
+const DIVERGE_START_IDX = 5; // Week 6 peak where benchmark cools and supplier quote stays high
+
+function pointsToLinePath(values, xScale, yScale) {
+  if (!values.length) return '';
+  return values
+    .map((val, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(2)} ${yScale(val).toFixed(2)}`)
+    .join(' ');
+}
 
 /**
- * SlopeChart — Dual-line comparison showing Rockets & Feathers asymmetry
+ * SlopeChart — Interactive Dual-Line Rockets & Feathers Visualizer
+ *
+ * Uses a single shared domain scale across benchmark and supplier curves,
+ * shades the trapped-margin spread wedge (Week 6–24), and supports pointer scrubbing.
  */
 export function SlopeChart() {
   const weeks = SILENT_SLOPE.weeks;
+  const n = weeks.length;
+  const [hoverIdx, setHoverIdx] = useState(null);
 
   const benchmarkPoints = useMemo(() => weeks.map((w) => w.benchmark), [weeks]);
   const supplierPoints = useMemo(() => weeks.map((w) => w.supplier), [weeks]);
 
-  // Custom paths with identical domain bounds
-  const benchmarkPath = useMemo(() => {
-    return buildLinePath(benchmarkPoints, WIDTH, HEIGHT, PAD);
-  }, [benchmarkPoints]);
+  const { xScale, yScale, benchmarkPath, supplierPath, spreadWedgePath } = useMemo(() => {
+    const allVals = [...benchmarkPoints, ...supplierPoints];
+    const yMin = allVals.length ? Math.min(...allVals) : 90;
+    const yMax = allVals.length ? Math.max(...allVals) : 130;
 
-  const supplierPath = useMemo(() => {
-    return buildLinePath(supplierPoints, WIDTH, HEIGHT, PAD);
-  }, [supplierPoints]);
+    const xS = scaleLinear({
+      domain: [0, Math.max(1, n - 1)],
+      range: [PAD.left, WIDTH - PAD.right],
+    });
+    const yS = scaleLinear({
+      domain: [yMin, yMax === yMin ? yMax + 1 : yMax],
+      range: [HEIGHT - PAD.bottom, PAD.top],
+    });
+
+    const bPath = pointsToLinePath(benchmarkPoints, xS, yS);
+    const sPath = pointsToLinePath(supplierPoints, xS, yS);
+
+    // Closed polygon tracing supplier curve (top) forward & benchmark curve (bottom) backward
+    let wedge = '';
+    if (n > DIVERGE_START_IDX) {
+      const topPts = [];
+      const bottomPts = [];
+      for (let i = DIVERGE_START_IDX; i < n; i += 1) {
+        topPts.push(`${xS(i).toFixed(2)} ${yS(supplierPoints[i]).toFixed(2)}`);
+      }
+      for (let i = n - 1; i >= DIVERGE_START_IDX; i -= 1) {
+        bottomPts.push(`${xS(i).toFixed(2)} ${yS(benchmarkPoints[i]).toFixed(2)}`);
+      }
+      wedge = `M ${topPts[0]} ${topPts
+        .slice(1)
+        .map((p) => `L ${p}`)
+        .join(' ')} ${bottomPts.map((p) => `L ${p}`).join(' ')} Z`;
+    }
+
+    return {
+      xScale: xS,
+      yScale: yS,
+      benchmarkPath: bPath,
+      supplierPath: sPath,
+      spreadWedgePath: wedge,
+    };
+  }, [benchmarkPoints, supplierPoints, n]);
+
+  const handlePointerMove = useCallback(
+    (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (!rect.width) return;
+      const clientX = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
+      const relX = ((clientX - rect.left) / rect.width) * WIDTH;
+      const idx = nearestIndex(relX - PAD.left, n, WIDTH - PAD.left - PAD.right);
+      setHoverIdx(idx);
+    },
+    [n]
+  );
+
+  const handlePointerLeave = useCallback(() => {
+    setHoverIdx(null);
+  }, []);
+
+  const activeWeek = hoverIdx !== null ? weeks[hoverIdx] : null;
+  const activeX = hoverIdx !== null ? xScale(hoverIdx) : 0;
+  const activeBenchmarkY = activeWeek ? yScale(activeWeek.benchmark) : 0;
+  const activeSupplierY = activeWeek ? yScale(activeWeek.supplier) : 0;
+  const gapPct =
+    activeWeek && activeWeek.benchmark > 0
+      ? ((activeWeek.supplier - activeWeek.benchmark) / activeWeek.benchmark) * 100
+      : 0;
 
   return (
     <div className="lp-slope-chart-wrap">
-      {/* Legend bar */}
-      <div className="lp-slope-legend">
-        <div className="lp-slope-legend-item">
-          <span className="lp-slope-legend-line lp-slope-legend-line--benchmark" />
-          <span>Market Benchmark Index</span>
+      {/* Legend + Live Week Scrub Readout */}
+      <div className="lp-slope-top-bar">
+        <div className="lp-slope-legend">
+          <div className="lp-slope-legend-item">
+            <span className="lp-slope-legend-line lp-slope-legend-line--benchmark" />
+            <span>Market Benchmark Index</span>
+          </div>
+          <div className="lp-slope-legend-item">
+            <span className="lp-slope-legend-line lp-slope-legend-line--supplier" />
+            <span>Supplier A Quote Index</span>
+          </div>
+          <div className="lp-slope-legend-item">
+            <span className="lp-slope-legend-swatch--gap" />
+            <span>Trapped Margin Spread</span>
+          </div>
         </div>
-        <div className="lp-slope-legend-item">
-          <span className="lp-slope-legend-line lp-slope-legend-line--supplier" />
-          <span>Supplier A Quote Index</span>
-        </div>
+
+        <span className="lp-slope-scrub-readout" data-testid="slope-scrub-readout">
+          {activeWeek
+            ? `W${activeWeek.week} · Bench ${activeWeek.benchmark} vs Quote ${activeWeek.supplier} (${
+                gapPct >= 0 ? '+' : ''
+              }${gapPct.toFixed(1)}% spread)`
+            : 'Hover chart to inspect week spread'}
+        </span>
       </div>
 
       <svg
@@ -43,6 +129,8 @@ export function SlopeChart() {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
         aria-label="24-week comparison chart illustrating supplier pricing asymmetry: benchmark rises and falls, but supplier quote remains elevated."
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
       >
         {/* Horizontal grid lines */}
         <line
@@ -69,6 +157,15 @@ export function SlopeChart() {
           stroke="rgba(255, 255, 255, 0.08)"
         />
 
+        {/* Shaded Trapped Margin Wedge (Weeks 6–24) */}
+        {spreadWedgePath && (
+          <path
+            d={spreadWedgePath}
+            fill="rgba(245, 158, 11, 0.13)"
+            data-testid="slope-spread-wedge"
+          />
+        )}
+
         {/* Benchmark line (Cyan) */}
         {benchmarkPath && (
           <path
@@ -81,34 +178,33 @@ export function SlopeChart() {
           />
         )}
 
-        {/* Supplier line (Amber/Coral — stays sticky high) */}
+        {/* Supplier line (Amber — stays sticky high) */}
         {supplierPath && (
           <path
             d={supplierPath}
             fill="none"
             stroke="#f59e0b"
-            strokeWidth="2.5"
+            strokeWidth="2.4"
             strokeLinecap="round"
           />
         )}
 
-        {/* Annotation Marker: Rally Zone */}
+        {/* Annotation Labels */}
         <text
-          x={110}
-          y={PAD.top + 14}
+          x={xScale(3)}
+          y={PAD.top + 12}
           fill="#38bdf8"
-          fontSize="9"
+          fontSize="9.5"
           fontFamily="var(--font-mono)"
           textAnchor="middle"
         >
-          Rally (Week 1–6)
+          Rally (W1&ndash;W6)
         </text>
 
-        {/* Annotation Marker: Asymmetric Spread */}
         <text
-          x={360}
-          y={PAD.top + 35}
-          fill="#f59e0b"
+          x={xScale(15)}
+          y={yScale(106)}
+          fill="#fbbf24"
           fontSize="10"
           fontWeight="600"
           fontFamily="var(--font-mono)"
@@ -117,11 +213,50 @@ export function SlopeChart() {
           Margin Spread Trapped
         </text>
 
-        {/* X-axis labels */}
+        {/* Interactive Scrubbing Crosshair & Snap Points */}
+        {activeWeek && (
+          <g>
+            <line
+              x1={activeX}
+              y1={PAD.top}
+              x2={activeX}
+              y2={HEIGHT - PAD.bottom}
+              stroke="rgba(255, 255, 255, 0.28)"
+              strokeWidth="1"
+              strokeDasharray="2 2"
+            />
+            <line
+              x1={activeX}
+              y1={activeSupplierY}
+              x2={activeX}
+              y2={activeBenchmarkY}
+              stroke="#f59e0b"
+              strokeWidth="1.5"
+            />
+            <circle
+              cx={activeX}
+              cy={activeBenchmarkY}
+              r="4"
+              fill="#38bdf8"
+              stroke="#09090b"
+              strokeWidth="1.5"
+            />
+            <circle
+              cx={activeX}
+              cy={activeSupplierY}
+              r="4"
+              fill="#f59e0b"
+              stroke="#09090b"
+              strokeWidth="1.5"
+            />
+          </g>
+        )}
+
+        {/* X-axis labels (WCAG AA contrast) */}
         <text
           x={PAD.left}
-          y={HEIGHT - 8}
-          fill="#71717a"
+          y={HEIGHT - 7}
+          fill="#9494a0"
           fontSize="10"
           fontFamily="var(--font-mono)"
         >
@@ -129,9 +264,9 @@ export function SlopeChart() {
         </text>
         <text
           x={WIDTH / 2}
-          y={HEIGHT - 8}
+          y={HEIGHT - 7}
           textAnchor="middle"
-          fill="#71717a"
+          fill="#9494a0"
           fontSize="10"
           fontFamily="var(--font-mono)"
         >
@@ -139,9 +274,9 @@ export function SlopeChart() {
         </text>
         <text
           x={WIDTH - PAD.right}
-          y={HEIGHT - 8}
+          y={HEIGHT - 7}
           textAnchor="end"
-          fill="#71717a"
+          fill="#9494a0"
           fontSize="10"
           fontFamily="var(--font-mono)"
         >

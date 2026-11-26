@@ -7,17 +7,16 @@ import {
 } from '../../lib/chartGeometry.js';
 
 const WIDTH = 560;
-const HEIGHT = 220;
-const PAD = { top: 24, right: 20, bottom: 28, left: 20 };
+const HEIGHT = 216;
+const PAD = { top: 24, right: 20, bottom: 26, left: 20 };
 
 /**
- * PriceChart — Pure SVG interactive chart
+ * PriceChart — Pure SVG interactive chart with 30d min/max telemetry bar
  *
  * Accessible:
  * - role="img" with descriptive aria-label
  * - Visually hidden data table for screen readers
- * - 250ms line transition (disabled under prefers-reduced-motion)
- * - Pointer scrubbing with floating crosshair and tooltip
+ * - Pointer scrubbing with crosshair, tooltip, and onScrub parent telemetry sync
  */
 export function PriceChart({ series, onScrub = null }) {
   const gradientId = useId();
@@ -73,7 +72,6 @@ export function PriceChart({ series, onScrub = null }) {
     onScrub?.(null, null);
   }, [onScrub]);
 
-  // Subtle reference grid lines
   const gridYs = [
     PAD.top,
     PAD.top + (HEIGHT - PAD.top - PAD.bottom) * 0.5,
@@ -89,13 +87,12 @@ export function PriceChart({ series, onScrub = null }) {
 
   const fillColor =
     series.tone === 'act'
-      ? 'rgba(245, 158, 11, 0.12)'
+      ? 'rgba(245, 158, 11, 0.14)'
       : series.tone === 'hold'
-      ? 'rgba(52, 211, 153, 0.12)'
-      : 'rgba(56, 189, 248, 0.12)';
+      ? 'rgba(52, 211, 153, 0.14)'
+      : 'rgba(56, 189, 248, 0.14)';
 
-  // Tooltip positioning clamps
-  const tooltipWidth = 100;
+  const tooltipWidth = 104;
   const tooltipX = Math.min(
     Math.max(activeX - tooltipWidth / 2, PAD.left),
     WIDTH - PAD.right - tooltipWidth
@@ -114,12 +111,11 @@ export function PriceChart({ series, onScrub = null }) {
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.28" />
-            <stop offset="90%" stopColor={strokeColor} stopOpacity="0.00" />
+            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.26" />
+            <stop offset="92%" stopColor={strokeColor} stopOpacity="0.00" />
           </linearGradient>
         </defs>
 
-        {/* Horizontal reference grid lines */}
         {gridYs.map((gy, i) => (
           <line
             key={i}
@@ -132,12 +128,10 @@ export function PriceChart({ series, onScrub = null }) {
           />
         ))}
 
-        {/* Filled area under curve */}
         {areaPath && (
           <path d={areaPath} fill={`url(#${gradientId})`} className="lp-chart-area" />
         )}
 
-        {/* Main trend line */}
         {linePath && (
           <path
             d={linePath}
@@ -150,20 +144,18 @@ export function PriceChart({ series, onScrub = null }) {
           />
         )}
 
-        {/* Pointer crosshair line */}
         {hoverIdx !== null && (
           <line
             x1={activeX}
             y1={PAD.top}
             x2={activeX}
             y2={HEIGHT - PAD.bottom}
-            stroke="rgba(255, 255, 255, 0.25)"
+            stroke="rgba(255, 255, 255, 0.28)"
             strokeWidth="1"
             strokeDasharray="2 2"
           />
         )}
 
-        {/* Active data point circle */}
         {n > 0 && (
           <g transform={`translate(${activeX}, ${activeY})`}>
             <circle r="7" fill={fillColor} />
@@ -171,21 +163,20 @@ export function PriceChart({ series, onScrub = null }) {
           </g>
         )}
 
-        {/* SVG Tooltip */}
         {hoverIdx !== null && (
           <g transform={`translate(${tooltipX}, ${tooltipY})`} className="lp-chart-tooltip">
             <rect
               width={tooltipWidth}
               height="36"
               rx="6"
-              fill="#18181b"
-              stroke="rgba(255, 255, 255, 0.15)"
+              fill="#111113"
+              stroke="rgba(255, 255, 255, 0.18)"
               strokeWidth="1"
             />
             <text
               x="10"
               y="15"
-              fill="#a1a1aa"
+              fill="#9494a0"
               fontSize="10"
               fontFamily="var(--font-mono)"
             >
@@ -194,7 +185,7 @@ export function PriceChart({ series, onScrub = null }) {
             <text
               x="10"
               y="29"
-              fill="#f4f4f5"
+              fill="#fafafa"
               fontSize="12"
               fontWeight="600"
               fontFamily="var(--font-mono)"
@@ -205,11 +196,10 @@ export function PriceChart({ series, onScrub = null }) {
           </g>
         )}
 
-        {/* Baseline axis label */}
         <text
           x={PAD.left}
-          y={HEIGHT - 8}
-          fill="#71717a"
+          y={HEIGHT - 7}
+          fill="#9494a0"
           fontSize="10"
           fontFamily="var(--font-mono)"
         >
@@ -217,15 +207,25 @@ export function PriceChart({ series, onScrub = null }) {
         </text>
         <text
           x={WIDTH - PAD.right}
-          y={HEIGHT - 8}
+          y={HEIGHT - 7}
           textAnchor="end"
-          fill="#71717a"
+          fill="#9494a0"
           fontSize="10"
           fontFamily="var(--font-mono)"
         >
           Day 30 (Latest)
         </text>
       </svg>
+
+      {/* 30d Min / Max Range Readout */}
+      {n > 0 && (
+        <div className="lp-chart-range-bar">
+          <span>
+            30d Range: {series.currency}{yMin.toFixed(2)} &ndash; {series.currency}{yMax.toFixed(2)}
+          </span>
+          <span>Hover or drag chart to inspect day</span>
+        </div>
+      )}
 
       {/* Accessible data table for screen readers */}
       <div className="lp-sr-only">

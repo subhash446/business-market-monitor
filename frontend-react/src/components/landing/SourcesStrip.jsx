@@ -1,49 +1,49 @@
 /**
- * SourcesStrip — Verification & Public Data Transparency
+ * SourcesStrip — Open Architectural Verification Ledger
  *
- * Explicitly cites genuine, grounded public sources and system verification.
- * Zero fabricated customer logos or stock testimonials.
+ * Explicitly cites genuine buyer-relevant market streams and delivery rails.
+ * Bounded cleanly by hairline rules (no nested card-inside-card borders).
  */
 export function SourcesStrip() {
   const sources = [
     {
-      label: 'EIA Official Data',
+      label: 'EIA Global Energy',
       desc: 'WTI & Brent Crude Proxies',
       meta: 'Daily API Sync',
     },
     {
-      label: 'Agmarknet (Govt. of India)',
+      label: 'Agmarknet Mandis',
       desc: 'Wholesale Mandi Modal Rates',
       meta: 'Ministry of Agriculture',
     },
     {
       label: 'Supply Chain Graph',
       desc: 'Multi-Hop Dependency Engine',
-      meta: 'Deterministic BFS',
+      meta: 'Empirical Lag Tracing',
     },
     {
-      label: 'WhatsApp Cloud API',
-      desc: 'Instant Threshold Alerts',
-      meta: 'Meta Business Platform',
+      label: 'Live FX Parity',
+      desc: 'USD/INR Landed-Cost Normalization',
+      meta: 'Daily Exchange Sync',
     },
     {
-      label: '775+ Verified Tests',
-      desc: 'Cross-Stack Integration Suite',
-      meta: 'Strict Test Invariants',
+      label: 'WhatsApp & Email Rails',
+      desc: 'Instant Alerts & Morning Digests',
+      meta: '7:00 AM Briefings',
     },
   ];
 
   return (
     <section className="lp-sources-section" aria-label="Grounded Data Sources">
       <div className="lp-container">
-        <div className="lp-sources-bar">
-          <div className="lp-sources-title">
-            <span>Verified Public Data Streams &amp; Test Invariants</span>
+        <div className="lp-sources-ledger">
+          <div className="lp-sources-ledger__eyebrow">
+            Verified Public Market Feeds &amp; Procurement Delivery Rails
           </div>
 
           <div className="lp-sources-grid">
-            {sources.map((item, idx) => (
-              <div key={idx} className="lp-source-item">
+            {sources.map((item) => (
+              <div key={item.label} className="lp-source-item">
                 <span className="lp-source-item__label">{item.label}</span>
                 <span className="lp-source-item__desc">{item.desc}</span>
                 <span className="lp-source-item__meta font-mono">{item.meta}</span>

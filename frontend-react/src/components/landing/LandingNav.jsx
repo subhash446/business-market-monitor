@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
  * LandingNav — Sticky 56px navigation bar
  *
  * Deterministic SSR: scrolled state defaults to false and only hydrates
- * via window scroll listener on client mount.
+ * via window scroll listener on client mount. Zero overflow down to 360px.
  */
 export function LandingNav() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -22,7 +22,7 @@ export function LandingNav() {
   return (
     <header className={`lp-nav ${isScrolled ? 'lp-nav--scrolled' : ''}`}>
       <div className="lp-container lp-nav__inner">
-        {/* Brand logo & unified executive wordmark */}
+        {/* Brand logo & unified wordmark */}
         <Link to="/" className="lp-nav__brand" aria-label="Business Market Monitor Home">
           <svg
             className="lp-nav__logo"
@@ -63,7 +63,9 @@ export function LandingNav() {
             Sign in
           </Link>
           <Link to="/register" className="lp-btn lp-btn--sm lp-btn--primary">
-            Start Monitoring Free
+            <span>
+              Start <span className="lp-nav__cta-mid">Monitoring </span>Free
+            </span>
           </Link>
         </div>
       </div>
