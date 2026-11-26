@@ -1,26 +1,51 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { HERO_SERIES, SAMPLE_DATA_TAG } from '../../data/landingSample.js';
 import { DeltaBadge } from './DeltaBadge.jsx';
 import { PriceChart } from './PriceChart.jsx';
 import { SignalPill } from './SignalPill.jsx';
 
 const SERIES_KEYS = ['pet', 'brent', 'wheat'];
+const AUTO_CYCLE_MS = 6000;
 
 /**
  * HeroWidget — Interactive tabbed commodity telemetry monitor
  *
- * - role="tablist" with ArrowLeft / ArrowRight / Home / End keyboard navigation
- * - Wires PriceChart onScrub callback for live day-by-day price inspection
+ * - Gentle 6000ms auto-cycling across commodities on client (pauses immediately on hover,
+ *   pointer scrub, keyboard focus, manual tab selection, or prefers-reduced-motion)
+ * - Razor-thin 2px progress underline on active tab reflecting cycle rhythm
  * - Exact backend ACTION_RECOMMENDATION enums & "Sample data · illustrative" tag
  */
 export function HeroWidget() {
   const [activeKey, setActiveKey] = useState('pet');
   const [scrubPoint, setScrubPoint] = useState(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasFocusInside, setHasFocusInside] = useState(false);
+  const [manualSelected, setManualSelected] = useState(false);
+
   const activeSeries = HERO_SERIES[activeKey] ?? HERO_SERIES.pet;
+  const isCyclePaused = isHovered || hasFocusInside || scrubPoint !== null || manualSelected;
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isCyclePaused) return;
+    const reducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) return;
+
+    const timer = window.setTimeout(() => {
+      setActiveKey((curr) => {
+        const nextIdx = (SERIES_KEYS.indexOf(curr) + 1) % SERIES_KEYS.length;
+        return SERIES_KEYS[nextIdx];
+      });
+    }, AUTO_CYCLE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [activeKey, isCyclePaused]);
 
   const handleSelectKey = useCallback((nextKey) => {
     setActiveKey(nextKey);
     setScrubPoint(null);
+    setManualSelected(true);
   }, []);
 
   const handleScrub = useCallback((idx, val) => {
@@ -58,7 +83,18 @@ export function HeroWidget() {
   const displayedPrice = scrubPoint ? scrubPoint.val : activeSeries.lastPrice;
 
   return (
-    <div className="lp-widget-card" id="hero-widget">
+    <div
+      className="lp-widget-card"
+      id="hero-widget"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setHasFocusInside(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setHasFocusInside(false);
+        }
+      }}
+    >
       {/* Top Header: Tab bar */}
       <div className="lp-widget-header">
         <div
@@ -83,6 +119,15 @@ export function HeroWidget() {
                 onKeyDown={(e) => handleKeyDown(e, idx)}
               >
                 <span className="lp-tab-btn__name">{item.name}</span>
+                {isActive && (
+                  <span
+                    key={activeKey}
+                    className={`lp-tab-progress ${
+                      isCyclePaused ? 'lp-tab-progress--paused' : ''
+                    } ${manualSelected ? 'lp-tab-progress--locked' : ''}`}
+                    aria-hidden="true"
+                  />
+                )}
               </button>
             );
           })}
@@ -121,7 +166,7 @@ export function HeroWidget() {
           </div>
         </div>
 
-        {/* Interactive SVG Chart */}
+        {/* Interactive Living SVG Chart */}
         <div className="lp-chart-container">
           <PriceChart key={activeKey} series={activeSeries} onScrub={handleScrub} />
         </div>

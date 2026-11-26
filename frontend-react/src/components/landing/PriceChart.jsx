@@ -11,12 +11,11 @@ const HEIGHT = 216;
 const PAD = { top: 24, right: 20, bottom: 26, left: 20 };
 
 /**
- * PriceChart — Pure SVG interactive chart with 30d min/max telemetry bar
+ * PriceChart — Pure SVG interactive chart with ambient signal pulse
  *
- * Accessible:
- * - role="img" with descriptive aria-label
+ * - Continuous travelling pulse packet along price curve + radar ring on latest Day-30 point
+ * - Yields immediately when user scrubs with crosshair & tooltip
  * - Visually hidden data table for screen readers
- * - Pointer scrubbing with crosshair, tooltip, and onScrub parent telemetry sync
  */
 export function PriceChart({ series, onScrub = null }) {
   const gradientId = useId();
@@ -49,7 +48,8 @@ export function PriceChart({ series, onScrub = null }) {
     [yMin, yMax]
   );
 
-  const activeIdx = hoverIdx !== null ? hoverIdx : n - 1;
+  const isScrubbing = hoverIdx !== null;
+  const activeIdx = isScrubbing ? hoverIdx : n - 1;
   const activeVal = points[activeIdx] ?? 0;
   const activeX = n > 0 ? xScale(activeIdx) : 0;
   const activeY = n > 0 ? yScale(activeVal) : 0;
@@ -84,6 +84,13 @@ export function PriceChart({ series, onScrub = null }) {
       : series.tone === 'hold'
       ? 'var(--lp-cost-down, #34d399)'
       : 'var(--lp-primary, #38bdf8)';
+
+  const pulseHighlight =
+    series.tone === 'act'
+      ? '#fef3c7'
+      : series.tone === 'hold'
+      ? '#d1fae5'
+      : '#e0f2fe';
 
   const fillColor =
     series.tone === 'act'
@@ -132,19 +139,34 @@ export function PriceChart({ series, onScrub = null }) {
           <path d={areaPath} fill={`url(#${gradientId})`} className="lp-chart-area" />
         )}
 
+        {/* Base trend line */}
         {linePath && (
           <path
             d={linePath}
             fill="none"
             stroke={strokeColor}
-            strokeWidth="2.2"
+            strokeWidth="2.1"
             strokeLinecap="round"
             strokeLinejoin="round"
             className="lp-chart-line"
           />
         )}
 
-        {hoverIdx !== null && (
+        {/* Ambient travelling signal highlight (pauses cleanly while scrubbing) */}
+        {linePath && !isScrubbing && (
+          <path
+            d={linePath}
+            pathLength="100"
+            fill="none"
+            stroke={pulseHighlight}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="lp-chart-pulse-line"
+          />
+        )}
+
+        {isScrubbing && (
           <line
             x1={activeX}
             y1={PAD.top}
@@ -158,12 +180,21 @@ export function PriceChart({ series, onScrub = null }) {
 
         {n > 0 && (
           <g transform={`translate(${activeX}, ${activeY})`}>
+            {!isScrubbing && (
+              <circle
+                r="4"
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth="1.5"
+                className="lp-endpoint-radar"
+              />
+            )}
             <circle r="7" fill={fillColor} />
             <circle r="4" fill={strokeColor} stroke="#09090b" strokeWidth="1.5" />
           </g>
         )}
 
-        {hoverIdx !== null && (
+        {isScrubbing && (
           <g transform={`translate(${tooltipX}, ${tooltipY})`} className="lp-chart-tooltip">
             <rect
               width={tooltipWidth}
@@ -217,7 +248,6 @@ export function PriceChart({ series, onScrub = null }) {
         </text>
       </svg>
 
-      {/* 30d Min / Max Range Readout */}
       {n > 0 && (
         <div className="lp-chart-range-bar">
           <span>

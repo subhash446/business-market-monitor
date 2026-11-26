@@ -11,6 +11,7 @@
 import { useEffect, useRef } from 'react';
 import '../styles/landing.css';
 import { LandingNav } from '../components/landing/LandingNav.jsx';
+import { LandingTicker } from '../components/landing/LandingTicker.jsx';
 import { Hero } from '../components/landing/Hero.jsx';
 import { SourcesStrip } from '../components/landing/SourcesStrip.jsx';
 import { ImpactFlow } from '../components/landing/ImpactFlow.jsx';
@@ -76,6 +77,7 @@ export function LandingPage() {
         Skip to main content
       </a>
       <LandingNav />
+      <LandingTicker />
       <main id="main-content">
         <Hero />
         <SourcesStrip />

@@ -6,6 +6,7 @@ const WIDTH = 520;
 const HEIGHT = 210;
 const PAD = { top: 22, right: 16, bottom: 28, left: 16 };
 const DIVERGE_START_IDX = 5; // Week 6 peak where benchmark cools and supplier quote stays high
+const PEAK_GAP_IDX = 11; // Week 12 (Benchmark Plunge)
 
 function pointsToLinePath(values, xScale, yScale) {
   if (!values.length) return '';
@@ -17,8 +18,9 @@ function pointsToLinePath(values, xScale, yScale) {
 /**
  * SlopeChart — Interactive Dual-Line Rockets & Feathers Visualizer
  *
- * Uses a single shared domain scale across benchmark and supplier curves,
- * shades the trapped-margin spread wedge (Week 6–24), and supports pointer scrubbing.
+ * - Unified domain scale across benchmark and supplier curves
+ * - Subtle breathing opacity shimmer on trapped-margin spread wedge + Week-12 pulse ring when idle
+ * - Yields immediately to crisp static crosshair tracking on pointer scrub
  */
 export function SlopeChart() {
   const weeks = SILENT_SLOPE.weeks;
@@ -45,7 +47,6 @@ export function SlopeChart() {
     const bPath = pointsToLinePath(benchmarkPoints, xS, yS);
     const sPath = pointsToLinePath(supplierPoints, xS, yS);
 
-    // Closed polygon tracing supplier curve (top) forward & benchmark curve (bottom) backward
     let wedge = '';
     if (n > DIVERGE_START_IDX) {
       const topPts = [];
@@ -96,9 +97,13 @@ export function SlopeChart() {
       ? ((activeWeek.supplier - activeWeek.benchmark) / activeWeek.benchmark) * 100
       : 0;
 
+  const peakWeek = weeks[PEAK_GAP_IDX];
+  const peakX = peakWeek ? xScale(PEAK_GAP_IDX) : 0;
+  const peakBenchY = peakWeek ? yScale(peakWeek.benchmark) : 0;
+  const peakSuppY = peakWeek ? yScale(peakWeek.supplier) : 0;
+
   return (
     <div className="lp-slope-chart-wrap">
-      {/* Legend + Live Week Scrub Readout */}
       <div className="lp-slope-top-bar">
         <div className="lp-slope-legend">
           <div className="lp-slope-legend-item">
@@ -157,11 +162,12 @@ export function SlopeChart() {
           stroke="rgba(255, 255, 255, 0.08)"
         />
 
-        {/* Shaded Trapped Margin Wedge (Weeks 6–24) */}
+        {/* Shaded Trapped Margin Wedge (gentle breathing shimmer when idle) */}
         {spreadWedgePath && (
           <path
             d={spreadWedgePath}
-            fill="rgba(245, 158, 11, 0.13)"
+            fill="#f59e0b"
+            className={`lp-slope-wedge ${activeWeek ? 'lp-slope-wedge--static' : 'lp-slope-wedge--breathing'}`}
             data-testid="slope-spread-wedge"
           />
         )}
@@ -202,7 +208,7 @@ export function SlopeChart() {
         </text>
 
         <text
-          x={xScale(15)}
+          x={xScale(16)}
           y={yScale(106)}
           fill="#fbbf24"
           fontSize="10"
@@ -212,6 +218,39 @@ export function SlopeChart() {
         >
           Margin Spread Trapped
         </text>
+
+        {/* Idle Peak Week-12 Spread Pulse Marker */}
+        {!activeWeek && peakWeek && (
+          <g>
+            <line
+              x1={peakX}
+              y1={peakSuppY}
+              x2={peakX}
+              y2={peakBenchY}
+              stroke="rgba(245, 158, 11, 0.45)"
+              strokeWidth="1.25"
+              strokeDasharray="2 2"
+            />
+            <g transform={`translate(${peakX}, ${peakSuppY})`}>
+              <circle
+                r="4"
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth="1.5"
+                className="lp-slope-peak-ring"
+              />
+              <circle r="3.5" fill="#f59e0b" stroke="#09090b" strokeWidth="1.2" />
+            </g>
+            <circle
+              cx={peakX}
+              cy={peakBenchY}
+              r="3.5"
+              fill="#38bdf8"
+              stroke="#09090b"
+              strokeWidth="1.2"
+            />
+          </g>
+        )}
 
         {/* Interactive Scrubbing Crosshair & Snap Points */}
         {activeWeek && (
@@ -252,7 +291,7 @@ export function SlopeChart() {
           </g>
         )}
 
-        {/* X-axis labels (WCAG AA contrast) */}
+        {/* X-axis labels */}
         <text
           x={PAD.left}
           y={HEIGHT - 7}

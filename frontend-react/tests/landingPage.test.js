@@ -145,6 +145,19 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(css.includes('prefers-reduced-motion: reduce'), 'Must enforce prefers-reduced-motion safety');
       assert.ok(css.includes('@media (max-width: 479px)'), 'Must include 360px mobile nav overflow prevention');
       assert.ok(css.includes('@media (max-width: 440px)'), 'Must stack stats grid cleanly on narrow mobile viewports');
+
+      // Living telemetry animations, marquee isolation, and symmetric 3-column grid
+      assert.ok(css.includes('@keyframes lp-marquee'), 'Must define marquee keyframe animation');
+      assert.ok(css.includes('@keyframes lp-line-pulse'), 'Must define travelling SVG pulse keyframe');
+      assert.ok(css.includes('@keyframes lp-radar-pulse'), 'Must define live endpoint radar keyframe');
+      assert.ok(css.includes('@keyframes lp-tab-progress'), 'Must define active tab cycle underline animation');
+      assert.ok(css.includes('@keyframes lp-edge-pulse'), 'Must define ImpactFlow connector pulse keyframe');
+      assert.ok(css.includes('@keyframes lp-dash-flow'), 'Must define ImpactFlow dashed flow keyframe');
+      assert.ok(css.includes('@keyframes lp-wedge-breathe'), 'Must define SlopeChart margin wedge breathing keyframe');
+      assert.ok(
+        css.includes('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr)'),
+        'ImpactFlow desktop chain must guarantee symmetric equal widths across all 3 cards'
+      );
     });
 
     test('landing components contain zero unguarded dynamic time/random calls or phantom Tailwind classes', () => {
@@ -190,13 +203,47 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       }
     });
 
-    test('HeroWidget renders accessible tabs, sample tag, exact backend signal, and 30d range bar', async () => {
+    test('LandingTicker renders procurement market tape with duplicated accessible track', async () => {
+      const { LandingTicker } = await viteServer.ssrLoadModule('/src/components/landing/LandingTicker.jsx');
+      const html = renderToStaticMarkup(
+        React.createElement(MemoryRouter, null, React.createElement(LandingTicker))
+      );
+
+      assert.ok(html.includes('id="market-ticker"'), 'LandingTicker must render #market-ticker region');
+      assert.ok(html.includes('PET RESIN'), 'Must include PET RESIN feed');
+      assert.ok(html.includes('₹114.50/kg (+6.4%)'), 'Must display PET RESIN delta telemetry');
+      assert.ok(html.includes('BRENT CRUDE'), 'Must include BRENT CRUDE feed');
+      assert.ok(html.includes('WHEAT INDORE'), 'Must include WHEAT INDORE feed');
+      assert.ok(html.includes('NAPHTHA &amp; FREIGHT') || html.includes('NAPHTHA & FREIGHT'));
+      assert.ok(html.includes('SUPPLIER QUOTE GAP'));
+      assert.ok(html.includes('ILLUSTRATIVE MARKET FEED'), 'Must anchor honesty feed badge');
+      assert.ok(html.includes('aria-hidden="true"'), 'Duplicate marquee group must be aria-hidden for screen readers');
+    });
+
+    test('Hero renders complete deterministic Sentence #1 live telemetry readout in SSR', async () => {
+      const { Hero } = await viteServer.ssrLoadModule('/src/components/landing/Hero.jsx');
+      const html = renderToStaticMarkup(
+        React.createElement(MemoryRouter, null, React.createElement(Hero))
+      );
+
+      assert.ok(html.includes('hero-live-terminal'), 'Hero must render live-typing terminal bar');
+      assert.ok(html.includes('LIVE SIGNAL'), 'Hero live readout must include LIVE SIGNAL prefix');
+      assert.ok(
+        html.includes('PET Resin supplier quote ₹123.90 sits +8.2% above benchmark — accelerate purchase.'),
+        'SSR must render full Sentence #1 immediately (never blank)'
+      );
+    });
+
+    test('HeroWidget renders accessible tabs, progress underline, pulse line, radar dot, and 30d range bar', async () => {
       const { HeroWidget } = await viteServer.ssrLoadModule('/src/components/landing/HeroWidget.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(HeroWidget))
       );
 
       assert.ok(html.includes('role="tablist"'), 'HeroWidget must include role="tablist"');
+      assert.ok(html.includes('lp-tab-progress'), 'Active tab must include auto-cycle progress underline');
+      assert.ok(html.includes('lp-chart-pulse-line'), 'PriceChart must include travelling SVG signal pulse');
+      assert.ok(html.includes('lp-endpoint-radar'), 'PriceChart must include Day-30 live radar ring');
       assert.ok(html.includes(SAMPLE_DATA_TAG), 'HeroWidget must display "Sample data · illustrative" tag');
       assert.ok(html.includes('PET Resin'), 'Must render PET Resin tab');
       assert.ok(html.includes('Brent Crude (proxy)'), 'Must render Brent Crude tab');
@@ -234,11 +281,14 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(html.includes('Refinery Cost Driver'));
       assert.ok(html.includes('Observed · 11-day lag · r 0.71'));
       assert.ok(html.includes('lp-flow-edge__track'), 'ImpactFlow must render directional connector tracks');
+      assert.ok(html.includes('lp-flow-edge__svg'), 'ImpactFlow must render inline flowing SVG connectors');
+      assert.ok(html.includes('lp-flow-edge__pulse'), 'ImpactFlow OBSERVED edge must render travelling pulse');
+      assert.ok(html.includes('lp-flow-edge__dash-flow'), 'ImpactFlow STRUCTURAL edge must render flowing dashes');
       assert.ok(html.includes('11-day transmission lag'), 'ImpactFlow must display causal edge mechanism description');
       assert.ok(html.includes(SAMPLE_DATA_TAG));
     });
 
-    test('SilentSlope and SlopeChart render chapter 02, shaded spread wedge, and scrub readout', async () => {
+    test('SilentSlope and SlopeChart render chapter 02, breathing spread wedge, peak pulse ring, and scrub readout', async () => {
       const { SilentSlope } = await viteServer.ssrLoadModule('/src/components/landing/SilentSlope.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(SilentSlope))
@@ -247,6 +297,8 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(html.includes('02'), 'SilentSlope must display editorial chapter index 02');
       assert.ok(html.includes('SILENT SLOPE DETECTED'));
       assert.ok(html.includes('slope-spread-wedge'), 'SlopeChart must render shaded trapped-margin wedge polygon');
+      assert.ok(html.includes('lp-slope-wedge--breathing'), 'SlopeChart idle wedge must animate softly');
+      assert.ok(html.includes('lp-slope-peak-ring'), 'SlopeChart must render idle Week-12 spread pulse ring');
       assert.ok(html.includes('Hover chart to inspect week spread'), 'SlopeChart must render week scrub readout');
       assert.ok(html.includes('Trapped Margin Spread'), 'SlopeChart legend must include Trapped Margin Spread');
     });
@@ -284,6 +336,7 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
 
       // Zero-flash SSR guarantee: never render pending hidden state in SSR
       assert.ok(html.includes('lp-skip-link'), 'Must render skip-to-content accessibility link');
+      assert.ok(html.includes('id="market-ticker"'), 'LandingPage must render continuous market ticker');
       assert.ok(!html.includes('lp-reveal--pending'), 'SSR HTML must NEVER start with hidden pending class');
 
       assert.ok(html.includes('Stop Overpaying for'));

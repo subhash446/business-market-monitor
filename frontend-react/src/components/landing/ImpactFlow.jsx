@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { IMPACT_FLOW, SAMPLE_DATA_TAG } from '../../data/landingSample.js';
 
 /**
  * ImpactFlow — Chapter 01 Interactive Multi-Hop Supply Chain Visualizer
  *
- * Demonstrates how upstream commodity shocks propagate down to SME factory floor inputs.
- * Hovering or tapping any node highlights connected edges and surfaces causal edge notes.
+ * - Equal 3-column CSS Grid tracks on desktop so all 3 node cards align at identical width/height
+ * - Continuous flowing left-to-right SVG pulses across STRUCTURAL dashed & OBSERVED solid connectors
+ * - Hovering or tapping any node spotlights connected edges and displays causal mechanism copy
  */
 export function ImpactFlow() {
   const [activeNodeId, setActiveNodeId] = useState(null);
@@ -15,7 +16,6 @@ export function ImpactFlow() {
   const selectedNode =
     nodes.find((n) => n.id === activeNodeId) ?? nodes[nodes.length - 1];
 
-  // Surface connected causal edge explanation when inspecting a node
   const connectedEdge =
     edges.find((edge) => edge.to === selectedNode.id) ??
     edges.find((edge) => edge.from === selectedNode.id) ??
@@ -57,7 +57,7 @@ export function ImpactFlow() {
           </div>
 
           <div className="lp-flow-body">
-            {/* Interactive Node Chain */}
+            {/* Interactive Symmetric Node Chain */}
             <div className="lp-flow-chain">
               {nodes.map((node, idx) => {
                 const isHovered = activeNodeId === node.id;
@@ -68,9 +68,10 @@ export function ImpactFlow() {
                   activeNodeId !== null &&
                   (edge.from === activeNodeId || edge.to === activeNodeId);
                 const edgeDimmed = activeNodeId !== null && !edgeActive;
+                const isDashed = edge?.nature === 'dashed';
 
                 return (
-                  <div key={node.id} className="lp-flow-step-wrap">
+                  <Fragment key={node.id}>
                     <button
                       type="button"
                       className={`lp-flow-node ${isHovered ? 'lp-flow-node--active' : ''} ${
@@ -95,23 +96,52 @@ export function ImpactFlow() {
                     {edge && (
                       <div
                         className={`lp-flow-edge ${
-                          edge.nature === 'dashed'
-                            ? 'lp-flow-edge--dashed'
-                            : 'lp-flow-edge--solid'
+                          isDashed ? 'lp-flow-edge--dashed' : 'lp-flow-edge--solid'
                         } ${edgeActive ? 'lp-flow-edge--active' : ''} ${
                           edgeDimmed ? 'lp-flow-edge--dimmed' : ''
                         }`}
                       >
                         <div className="lp-flow-edge__track" aria-hidden="true">
-                          <span className="lp-flow-edge__line" />
-                          <span className="lp-flow-edge__arrow">→</span>
+                          <svg
+                            className="lp-flow-edge__svg"
+                            viewBox="0 0 156 16"
+                            preserveAspectRatio="none"
+                          >
+                            <line
+                              x1="0"
+                              y1="8"
+                              x2="146"
+                              y2="8"
+                              stroke={isDashed ? 'rgba(255, 255, 255, 0.22)' : 'rgba(56, 189, 248, 0.32)'}
+                              strokeWidth="1.5"
+                              strokeDasharray={isDashed ? '4 4' : undefined}
+                            />
+                            <line
+                              x1="0"
+                              y1="8"
+                              x2="146"
+                              y2="8"
+                              pathLength={isDashed ? undefined : '100'}
+                              stroke={isDashed ? '#93c5fd' : '#38bdf8'}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeDasharray={isDashed ? '4 4' : '22 78'}
+                              className={isDashed ? 'lp-flow-edge__dash-flow' : 'lp-flow-edge__pulse'}
+                            />
+                            <polygon
+                              points="144,4 154,8 144,12"
+                              fill={isDashed ? '#93c5fd' : '#38bdf8'}
+                            />
+                          </svg>
                         </div>
+
                         <span className="lp-flow-edge__pill font-mono">
                           {edge.label}
                         </span>
+                        <span className="lp-flow-edge__mobile-arrow" aria-hidden="true">↓</span>
                       </div>
                     )}
-                  </div>
+                  </Fragment>
                 );
               })}
             </div>
