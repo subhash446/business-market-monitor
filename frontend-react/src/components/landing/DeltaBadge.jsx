@@ -1,8 +1,10 @@
+import { RollingMetric } from './RollingMetric.jsx';
+
 /**
  * DeltaBadge Component
  *
  * Enforces Procurement Color Logic for Raw Material Buyers:
- * - Rising cost is bad (Amber #f59e0b, severe #f87171)
+ * - Rising cost is bad (Amber #f59e0b, severe red)
  * - Falling cost is good (Emerald #34d399)
  */
 
@@ -19,15 +21,19 @@ export function DeltaBadge({ deltaPct, period = '30d', className = '' }) {
     ? 'lp-delta-badge--down'
     : 'lp-delta-badge--neutral';
 
-  const sign = isUp ? '+' : '';
-  const formatted = `${sign}${deltaPct.toFixed(1)}%`;
-
   return (
     <span className={`lp-delta-badge ${modifier} ${className}`}>
       <span className="lp-delta-badge__arrow" aria-hidden="true">
         {isUp ? '▲' : isDown ? '▼' : '■'}
       </span>
-      <span className="lp-delta-badge__value">{formatted}</span>
+      <RollingMetric
+        value={deltaPct}
+        decimals={1}
+        showPlusSign={isUp}
+        suffix="%"
+        durationMs={260}
+        className="lp-delta-badge__value"
+      />
       {period && <span className="lp-delta-badge__period">{period}</span>}
     </span>
   );

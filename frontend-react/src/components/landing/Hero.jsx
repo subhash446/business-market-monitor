@@ -18,10 +18,11 @@ const LIVE_SIGNALS = [
 ];
 
 /**
- * Hero Section — Immediately visible above-the-fold presence.
+ * Hero Section — Immediately visible above-the-fold architectural telemetry stage.
  *
- * - Keeps <h1> static for zero CLS and strict SEO/test invariants.
- * - Renders Sentence #1 in full on SSR & initial paint, cycling via guarded client timer.
+ * - Ultra-crisp dot grid + ambient horizon sweep backdrop
+ * - Keeps <h1> static for zero CLS and strict SEO/test invariants
+ * - Renders Sentence #1 in full on SSR & initial paint, cycling via guarded client timer
  */
 export function Hero() {
   const [signalIdx, setSignalIdx] = useState(0);
@@ -63,7 +64,6 @@ export function Hero() {
         return;
       }
 
-      // phase === 'type'
       if (count < targetLen) {
         count += 1;
         setCharCount(count);
@@ -85,7 +85,13 @@ export function Hero() {
   const visibleText = currentSignal.text.slice(0, charCount);
 
   return (
-    <section className="lp-hero-section" aria-label="Introduction">
+    <section id="hero-top" className="lp-hero-section" aria-label="Introduction">
+      {/* Architectural Telemetry Grid + Continuous Ambient Horizon Sweep */}
+      <div className="lp-hero-backdrop" aria-hidden="true">
+        <div className="lp-hero-grid-dots" />
+        <div className="lp-horizon-sweep" />
+      </div>
+
       <div className="lp-container lp-hero-grid">
         {/* Left Column: Value Proposition & Direct CTAs */}
         <div className="lp-hero-copy">

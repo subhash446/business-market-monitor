@@ -22,10 +22,11 @@ function pointsToLinePath(values, xScale, yScale) {
  * - Subtle breathing opacity shimmer on trapped-margin spread wedge + Week-12 pulse ring when idle
  * - Yields immediately to crisp static crosshair tracking on pointer scrub
  */
-export function SlopeChart() {
+export function SlopeChart({ spendIntensity = 0.21 }) {
   const weeks = SILENT_SLOPE.weeks;
   const n = weeks.length;
   const [hoverIdx, setHoverIdx] = useState(null);
+  const clampedIntensity = Math.max(0, Math.min(1, Number(spendIntensity) || 0));
 
   const benchmarkPoints = useMemo(() => weeks.map((w) => w.benchmark), [weeks]);
   const supplierPoints = useMemo(() => weeks.map((w) => w.supplier), [weeks]);
@@ -162,11 +163,15 @@ export function SlopeChart() {
           stroke="rgba(255, 255, 255, 0.08)"
         />
 
-        {/* Shaded Trapped Margin Wedge (gentle breathing shimmer when idle) */}
+        {/* Shaded Trapped Margin Wedge (intensity responds to spend simulator) */}
         {spreadWedgePath && (
           <path
             d={spreadWedgePath}
             fill="#f59e0b"
+            style={{
+              '--wedge-base': (0.07 + clampedIntensity * 0.11).toFixed(3),
+              '--wedge-peak': (0.14 + clampedIntensity * 0.16).toFixed(3),
+            }}
             className={`lp-slope-wedge ${activeWeek ? 'lp-slope-wedge--static' : 'lp-slope-wedge--breathing'}`}
             data-testid="slope-spread-wedge"
           />

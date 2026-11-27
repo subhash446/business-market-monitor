@@ -154,6 +154,14 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(css.includes('@keyframes lp-edge-pulse'), 'Must define ImpactFlow connector pulse keyframe');
       assert.ok(css.includes('@keyframes lp-dash-flow'), 'Must define ImpactFlow dashed flow keyframe');
       assert.ok(css.includes('@keyframes lp-wedge-breathe'), 'Must define SlopeChart margin wedge breathing keyframe');
+      assert.ok(css.includes('@keyframes lp-horizon-sweep'), 'Must define ambient hero horizon sweep animation');
+      assert.ok(css.includes('@keyframes lp-shock-travel'), 'Must define ImpactFlow crude shockwave particle travel animation');
+      assert.ok(css.includes('@keyframes lp-shock-ring'), 'Must define ImpactFlow node shockwave ring animation');
+      assert.ok(css.includes('@keyframes lp-digest-drop'), 'Must define DigestPreview staggered drop-in animation');
+      assert.ok(css.includes('@keyframes lp-shimmer-sweep'), 'Must define DigestPreview delivery shimmer animation');
+      assert.ok(css.includes('.lp-spotlight-card'), 'Must define spatial cursor metallic border spotlight classes');
+      assert.ok(css.includes('.lp-tilt-surface'), 'Must define tactile 3D tilt perspective rule');
+      assert.ok(css.includes('.lp-scroll-hud'), 'Must define desktop right-edge scroll telemetry HUD');
       assert.ok(
         css.includes('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr)'),
         'ImpactFlow desktop chain must guarantee symmetric equal widths across all 3 cards'
@@ -220,12 +228,44 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(html.includes('aria-hidden="true"'), 'Duplicate marquee group must be aria-hidden for screen readers');
     });
 
-    test('Hero renders complete deterministic Sentence #1 live telemetry readout in SSR', async () => {
+    test('RollingMetric renders exact static formatted values during SSR', async () => {
+      const { RollingMetric } = await viteServer.ssrLoadModule('/src/components/landing/RollingMetric.jsx');
+      const priceHtml = renderToStaticMarkup(
+        React.createElement(RollingMetric, { value: 114.5, prefix: '₹', decimals: 2 })
+      );
+      const deltaHtml = renderToStaticMarkup(
+        React.createElement(RollingMetric, { value: 8.2, showPlusSign: true, suffix: '%', decimals: 1 })
+      );
+      const leakHtml = renderToStaticMarkup(
+        React.createElement(RollingMetric, { value: 28.8, prefix: '₹', suffix: 'L / yr', decimals: 1 })
+      );
+
+      assert.ok(priceHtml.includes('₹114.50'), 'RollingMetric SSR must render ₹114.50');
+      assert.ok(deltaHtml.includes('+8.2%'), 'RollingMetric SSR must render +8.2%');
+      assert.ok(leakHtml.includes('₹28.8L / yr'), 'RollingMetric SSR must render ₹28.8L / yr');
+    });
+
+    test('LandingScrollHud renders deterministic chapter codes and track during SSR', async () => {
+      const { LandingScrollHud } = await viteServer.ssrLoadModule('/src/components/landing/LandingScrollHud.jsx');
+      const html = renderToStaticMarkup(React.createElement(LandingScrollHud));
+
+      assert.ok(html.includes('id="landing-scroll-hud"'), 'Must render landing-scroll-hud aside');
+      assert.ok(html.includes('00 · LIVE'));
+      assert.ok(html.includes('01 · GRAPH'));
+      assert.ok(html.includes('02 · LEAK'));
+      assert.ok(html.includes('03 · ACCESS'));
+      assert.ok(html.includes('lp-hud-fill'), 'Must render continuous scroll progress bar');
+    });
+
+    test('Hero renders architectural backdrop, horizon sweep, and Sentence #1 live telemetry readout in SSR', async () => {
       const { Hero } = await viteServer.ssrLoadModule('/src/components/landing/Hero.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(Hero))
       );
 
+      assert.ok(html.includes('lp-hero-backdrop'), 'Hero must render spatial backdrop wrapper');
+      assert.ok(html.includes('lp-hero-grid-dots'), 'Hero must render crisp architectural dot grid');
+      assert.ok(html.includes('lp-horizon-sweep'), 'Hero must render ambient gliding horizon sweep');
       assert.ok(html.includes('hero-live-terminal'), 'Hero must render live-typing terminal bar');
       assert.ok(html.includes('LIVE SIGNAL'), 'Hero live readout must include LIVE SIGNAL prefix');
       assert.ok(
@@ -234,12 +274,16 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       );
     });
 
-    test('HeroWidget renders accessible tabs, progress underline, pulse line, radar dot, and 30d range bar', async () => {
+    test('HeroWidget renders spotlight, 3D tilt, Live Engine Event Tape, rolling metrics, pulse line, and radar dot', async () => {
       const { HeroWidget } = await viteServer.ssrLoadModule('/src/components/landing/HeroWidget.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(HeroWidget))
       );
 
+      assert.ok(html.includes('lp-spotlight-card'), 'HeroWidget must opt into cursor metallic spotlight');
+      assert.ok(html.includes('lp-tilt-surface'), 'HeroWidget must opt into clamped 3D surface tilt');
+      assert.ok(html.includes('hero-engine-tape'), 'HeroWidget must render Live Engine Event Tape');
+      assert.ok(html.includes('EIA SYNC'), 'HeroWidget SSR must render Event #1 (EIA SYNC)');
       assert.ok(html.includes('role="tablist"'), 'HeroWidget must include role="tablist"');
       assert.ok(html.includes('lp-tab-progress'), 'Active tab must include auto-cycle progress underline');
       assert.ok(html.includes('lp-chart-pulse-line'), 'PriceChart must include travelling SVG signal pulse');
@@ -249,6 +293,7 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(html.includes('Brent Crude (proxy)'), 'Must render Brent Crude tab');
       assert.ok(html.includes('Wheat (Indore mandi)'), 'Must render Wheat tab');
       assert.ok(html.includes('ACCELERATE PURCHASE'), 'Must render ACCELERATE PURCHASE signal label');
+      assert.ok(html.includes('+8.2% Premium'), 'HeroWidget must render rolling supplier variance premium');
       assert.ok(html.includes('30d Range:'), 'PriceChart must render 30d min/max telemetry range bar');
       assert.ok(html.includes('₹107.40') && html.includes('₹114.50'), 'Must display exact 30d min and max values');
     });
@@ -268,16 +313,23 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(!html.includes('775+'), 'SourcesStrip must remove outdated test-count filler');
     });
 
-    test('ImpactFlow renders numbered chapter 01, connected edges, and causal edge description', async () => {
+    test('ImpactFlow renders numbered chapter 01, shock simulation button, connected edges, and causal copy', async () => {
       const { ImpactFlow } = await viteServer.ssrLoadModule('/src/components/landing/ImpactFlow.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(ImpactFlow))
       );
+      const plainText = html.replace(/<[^>]+>/g, '');
 
       assert.ok(html.includes('01'), 'ImpactFlow must display editorial chapter index 01');
+      assert.ok(html.includes('simulate-shock-btn'), 'ImpactFlow must expose interactive shock simulation button');
+      assert.ok(html.includes('Simulate +5% Crude Shock'), 'Shock button must default to Simulate +5% Crude Shock');
+      assert.ok(html.includes('lp-spotlight-card'), 'ImpactFlow card must support cursor metallic spotlight');
       assert.ok(html.includes('Brent Crude Oil'));
       assert.ok(html.includes('Naphtha &amp; Freight') || html.includes('Naphtha & Freight'));
       assert.ok(html.includes('PET Resin'));
+      assert.ok(plainText.includes('$82.40/bbl (+3.2%)'), 'Baseline Brent Crude metric must remain intact');
+      assert.ok(plainText.includes('+4.1% 30d shift'), 'Baseline Naphtha shift metric must remain intact');
+      assert.ok(plainText.includes('₹114.50/kg (+6.4%)'), 'Baseline PET Resin metric must remain intact');
       assert.ok(html.includes('Refinery Cost Driver'));
       assert.ok(html.includes('Observed · 11-day lag · r 0.71'));
       assert.ok(html.includes('lp-flow-edge__track'), 'ImpactFlow must render directional connector tracks');
@@ -288,7 +340,7 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(html.includes(SAMPLE_DATA_TAG));
     });
 
-    test('SilentSlope and SlopeChart render chapter 02, breathing spread wedge, peak pulse ring, and scrub readout', async () => {
+    test('SilentSlope and SlopeChart render chapter 02, spend-synced wedge, leak simulator, and scrub readout', async () => {
       const { SilentSlope } = await viteServer.ssrLoadModule('/src/components/landing/SilentSlope.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(SilentSlope))
@@ -296,19 +348,31 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
 
       assert.ok(html.includes('02'), 'SilentSlope must display editorial chapter index 02');
       assert.ok(html.includes('SILENT SLOPE DETECTED'));
+      assert.ok(html.includes('lp-spotlight-card'), 'SilentSlope card must opt into metallic cursor spotlight');
+      assert.ok(html.includes('leak-simulator'), 'SilentSlope must render interactive margin-leak simulator');
+      assert.ok(html.includes('monthly-spend-slider'), 'Must render monthly spend range slider');
+      assert.ok(html.includes('Monthly Raw-Material Spend'));
+      assert.ok(html.includes('₹50L / mo'), 'Spend slider default must render ₹50L / mo');
+      assert.ok(html.includes('₹28.8L / yr'), 'Default ₹50L/mo spend must render ₹28.8L / yr annual leak');
+      assert.ok(html.includes('4.8% avg asymmetric pass-through lag'));
       assert.ok(html.includes('slope-spread-wedge'), 'SlopeChart must render shaded trapped-margin wedge polygon');
+      assert.ok(html.includes('--wedge-base'), 'SlopeChart wedge must bind dynamic spend intensity custom properties');
       assert.ok(html.includes('lp-slope-wedge--breathing'), 'SlopeChart idle wedge must animate softly');
       assert.ok(html.includes('lp-slope-peak-ring'), 'SlopeChart must render idle Week-12 spread pulse ring');
       assert.ok(html.includes('Hover chart to inspect week spread'), 'SlopeChart must render week scrub readout');
       assert.ok(html.includes('Trapped Margin Spread'), 'SlopeChart legend must include Trapped Margin Spread');
     });
 
-    test('DigestPreview renders authentic WhatsApp ticks by default and Email header without fake domain', async () => {
+    test('DigestPreview renders 3D tilt, staggered drop-in, WhatsApp ticks, and Email header without fake domain', async () => {
       const { DigestPreview } = await viteServer.ssrLoadModule('/src/components/landing/DigestPreview.jsx');
 
       const waHtml = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(DigestPreview))
       );
+      assert.ok(waHtml.includes('lp-tilt-surface'), 'DigestPreview phone frame must enable tactile 3D tilt');
+      assert.ok(waHtml.includes('lp-digest-animate'), 'DigestPreview card must enable staggered drop-in');
+      assert.ok(waHtml.includes('lp-delivery-shimmer'), 'DigestPreview delivery status must include subtle shimmer');
+      assert.ok(waHtml.includes('--item-idx:0'), 'Material items must carry stagger index CSS variables');
       assert.ok(waHtml.includes('Tue 17 Nov · 7:00 AM'), 'Must include exact fixed date string');
       assert.ok(waHtml.includes('WhatsApp Digest'));
       assert.ok(waHtml.includes('Email Digest'));
@@ -328,7 +392,7 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       assert.ok(!emailHtml.includes('@businessmarketmonitor'), 'Must not invent unowned custom email domain');
     });
 
-    test('LandingPage renders full page cleanly, preserves SSR reveal visibility, PricingPlansSection, and honesty boundaries', async () => {
+    test('LandingPage renders full page cleanly, preserves SSR reveal visibility, HUD, PricingPlansSection, and honesty boundaries', async () => {
       const { LandingPage } = await viteServer.ssrLoadModule('/src/pages/LandingPage.jsx');
       const html = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(LandingPage))
@@ -337,6 +401,10 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       // Zero-flash SSR guarantee: never render pending hidden state in SSR
       assert.ok(html.includes('lp-skip-link'), 'Must render skip-to-content accessibility link');
       assert.ok(html.includes('id="market-ticker"'), 'LandingPage must render continuous market ticker');
+      assert.ok(html.includes('id="landing-scroll-hud"'), 'LandingPage must render Scroll Telemetry HUD');
+      assert.ok(html.includes('hero-engine-tape'), 'LandingPage must render HeroWidget Live Engine Event Tape');
+      assert.ok(html.includes('simulate-shock-btn'), 'LandingPage must render ImpactFlow Shock Simulator');
+      assert.ok(html.includes('leak-simulator'), 'LandingPage must render SilentSlope Spend Simulator');
       assert.ok(!html.includes('lp-reveal--pending'), 'SSR HTML must NEVER start with hidden pending class');
 
       assert.ok(html.includes('Stop Overpaying for'));

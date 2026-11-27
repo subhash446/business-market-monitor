@@ -1,17 +1,18 @@
 /**
  * LandingPage Component
- * Business Market Monitor — Public Landing Page
+ * Business Market Monitor — Interactive Industrial-Fintech Command Experience
  *
  * - Hero + HeroWidget + SourcesStrip remain 100% visible on initial paint
- * - Below-the-fold `.lp-reveal` chapters hydrate identically with SSR,
- *   attaching subtle scroll transitions strictly inside guarded client useEffect
- * - Deterministic SSR: zero dynamic clock, random, or unguarded DOM calls during render
+ * - Client-only rAF-throttled cursor border spotlight across .lp-spotlight-card & .pricing-card
+ * - Zero-flash Hydration-Safe below-the-fold scroll reveal
+ * - Desktop right-edge Scroll Telemetry HUD (>= 1200px)
  */
 
 import { useEffect, useRef } from 'react';
 import '../styles/landing.css';
 import { LandingNav } from '../components/landing/LandingNav.jsx';
 import { LandingTicker } from '../components/landing/LandingTicker.jsx';
+import { LandingScrollHud } from '../components/landing/LandingScrollHud.jsx';
 import { Hero } from '../components/landing/Hero.jsx';
 import { SourcesStrip } from '../components/landing/SourcesStrip.jsx';
 import { ImpactFlow } from '../components/landing/ImpactFlow.jsx';
@@ -22,6 +23,7 @@ import { LandingFooter } from '../components/landing/LandingFooter.jsx';
 export function LandingPage() {
   const pageRef = useRef(null);
 
+  // Below-the-fold IntersectionObserver reveal (SSR renders 100% visible)
   useEffect(() => {
     if (
       typeof window === 'undefined' ||
@@ -71,6 +73,75 @@ export function LandingPage() {
     };
   }, []);
 
+  // rAF-throttled metallic cursor border & sheen spotlight across dark cards
+  useEffect(() => {
+    if (typeof window === 'undefined' || !pageRef.current) return;
+
+    const prefersReduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const finePointer =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: fine)').matches;
+    if (prefersReduced || !finePointer) return;
+
+    const container = pageRef.current;
+    let rafId = null;
+    let lastClientX = 0;
+    let lastClientY = 0;
+
+    function updateSpotlights() {
+      rafId = null;
+      const cards = container.querySelectorAll('.lp-spotlight-card, .pricing-card');
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const pad = 80;
+        const near =
+          lastClientX >= rect.left - pad &&
+          lastClientX <= rect.right + pad &&
+          lastClientY >= rect.top - pad &&
+          lastClientY <= rect.bottom + pad;
+
+        if (!near) {
+          card.style.setProperty('--spot-opacity', '0');
+          return;
+        }
+
+        const x = lastClientX - rect.left;
+        const y = lastClientY - rect.top;
+        card.style.setProperty('--mx', `${x.toFixed(1)}px`);
+        card.style.setProperty('--my', `${y.toFixed(1)}px`);
+        card.style.setProperty('--spot-opacity', '1');
+      });
+    }
+
+    function onPointerMove(e) {
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(updateSpotlights);
+      }
+    }
+
+    function onPointerLeave() {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      const cards = container.querySelectorAll('.lp-spotlight-card, .pricing-card');
+      cards.forEach((card) => card.style.setProperty('--spot-opacity', '0'));
+    }
+
+    container.addEventListener('pointermove', onPointerMove, { passive: true });
+    container.addEventListener('pointerleave', onPointerLeave, { passive: true });
+
+    return () => {
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerleave', onPointerLeave);
+    };
+  }, []);
+
   return (
     <div ref={pageRef} className="lp-page">
       <a href="#main-content" className="lp-skip-link">
@@ -78,6 +149,7 @@ export function LandingPage() {
       </a>
       <LandingNav />
       <LandingTicker />
+      <LandingScrollHud />
       <main id="main-content">
         <Hero />
         <SourcesStrip />
