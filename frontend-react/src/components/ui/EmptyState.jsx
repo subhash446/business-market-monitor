@@ -1,16 +1,6 @@
 /**
  * EmptyState — empty content placeholder component
  * Business Market Monitor — React frontend
- *
- * React equivalent of frontend/js/components/emptyState.js
- * Preserves identical CSS class names and DOM structure.
- * Uses JSX instead of imperative DOM building.
- *
- * Props:
- *   icon    — Font Awesome class string e.g. 'fa-solid fa-inbox'
- *   title   — heading text (required)
- *   message — body text (optional)
- *   action  — { label: string, onClick: fn } — optional CTA button
  */
 export function EmptyState({ icon, title, message, action }) {
   return (
@@ -32,6 +22,9 @@ export function EmptyState({ icon, title, message, action }) {
           <button
             type="button"
             className="btn btn--primary btn--sm"
+            disabled={Boolean(action.disabled)}
+            aria-disabled={action.disabled ? 'true' : undefined}
+            title={action.title}
             onClick={action.onClick}
           >
             {action.label}

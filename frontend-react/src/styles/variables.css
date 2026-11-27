@@ -6,69 +6,76 @@
  * ALL visual values in this project derive from these tokens.
  * Do NOT use hard-coded values in other CSS files.
  *
- * Stage 2A: Zinc dark palette, adaptive rgba borders, Inter/JetBrains Mono,
- *           letter-spacing tokens, extended type scale, semantic status bg tokens.
+ * Stage A Command Center Alignment: Obsidian-Zinc depth scale matching
+ * public landing (/) and auth (/login) surfaces, WCAG AA contrast inks,
+ * Inter + JetBrains Mono typography, and elevated toast stacking layer.
  */
 
 :root {
 
   /* ================================================================
-   * BACKGROUND SCALE — Zinc dark (neutral-dark, not blue-tinted)
+   * BACKGROUND SCALE — Obsidian-Zinc hierarchy
    * ================================================================ */
-  --color-bg-base:     #09090b;   /* Zinc-950 — true near-black page bg   */
-  --color-bg-surface:  #18181b;   /* Zinc-900 — cards, panels, sidebar    */
-  --color-bg-elevated: #27272a;   /* Zinc-800 — modals, dropdowns, insets */
-  --color-bg-hover:    #3f3f46;   /* Zinc-700 — hover / active rows       */
-  --color-bg-subtle:   #141414;   /* Between base+surface for inset areas */
+  --color-bg-base:      #09090b;   /* Zinc-950 — true near-black page ground */
+  --color-bg-subtle:    #0e0e11;   /* Recessed inset wells & modal inputs    */
+  --color-bg-card:      #111113;   /* Obsidian — primary card surface        */
+  --color-surface:      #111113;   /* Semantic card surface alias            */
+  --color-bg-surface:   #111113;   /* Primary cards, sidebar, panels         */
+  --color-bg-secondary: #141417;   /* Modal sheet & secondary elevated card  */
+  --color-bg-elevated:  #18181b;   /* Zinc-900 — raised controls, table hdrs */
+  --color-bg-hover:     #27272a;   /* Zinc-800 — crisp tactile hover rows    */
 
   /* ================================================================
    * BORDERS — adaptive rgba for depth perception across surfaces
    * ================================================================ */
   --color-border:        rgba(255, 255, 255, 0.08);  /* Hairline default   */
-  --color-border-strong: rgba(255, 255, 255, 0.15);  /* Active / focused   */
-  --color-border-muted:  rgba(255, 255, 255, 0.04);  /* Inset / recessed   */
+  --color-border-strong: rgba(255, 255, 255, 0.16);  /* Active / focused   */
+  --color-border-muted:  rgba(255, 255, 255, 0.05);  /* Inset / recessed   */
 
   /* ================================================================
-   * TEXT SCALE
+   * TEXT SCALE — WCAG AA verified against #09090b / #111113 / #18181b
    * ================================================================ */
-  --color-text-primary:   #f4f4f5;  /* Zinc-100 — main content text        */
-  --color-text-secondary: #a1a1aa;  /* Zinc-400 — labels, captions, hints  */
-  --color-text-disabled:  #52525b;  /* Zinc-600 — disabled elements        */
-  --color-text-inverse:   #09090b;  /* Text on primary buttons             */
+  --color-text-primary:   #f4f4f5;  /* Zinc-100 — main content ink        */
+  --color-text-secondary: #a1a1aa;  /* Zinc-400 — labels, descriptions    */
+  --color-text-muted:     #9494a0;  /* Neutral muted ink (>= 5.8:1 AA)    */
+  --color-text-disabled:  #52525b;  /* Zinc-600 — disabled / placeholders */
+  --color-text-inverse:   #09090b;  /* Ink on bright semantic buttons     */
 
   /* ================================================================
    * BRAND / ACCENT
    * ================================================================ */
-  --color-primary:            #3b82f6;                 /* Blue-500 — primary actions, links  */
-  --color-primary-hover:      #2563eb;                 /* Blue-600 — hover                   */
-  --color-primary-light:      #60a5fa;                 /* Blue-400 — icons on dark surfaces  */
-  --color-primary-subtle:     rgba(59, 130, 246, 0.12);/* Active nav bg, selected items      */
-  --color-primary-foreground: #ffffff;                 /* Text on primary buttons            */
+  --color-primary:              #3b82f6;                  /* Blue-500 — focus rings, accents     */
+  --color-primary-button:       #2563eb;                  /* Blue-600 — AA white-on-blue fills   */
+  --color-primary-button-hover: #1d4ed8;                  /* Blue-700 — high-contrast hover fill */
+  --color-primary-hover:        #2563eb;                  /* Blue-600 — hover fill / interactive */
+  --color-primary-light:        #60a5fa;                  /* Blue-400 — AA links/icons on dark   */
+  --color-primary-subtle:       rgba(59, 130, 246, 0.12); /* Active nav pill & selected items    */
+  --color-primary-foreground:   #ffffff;                  /* Text on primary filled buttons      */
+  --color-accent:               #38bdf8;                  /* Sky-400 — telemetry highlights      */
 
   /* ================================================================
-   * STATUS COLOURS — foreground + badge (12%) + banner (8%) variants
+   * STATUS COLOURS — WCAG AA foreground + badge (12%) + banner (8%)
    * ================================================================ */
-  --color-success:        #22c55e;
-  --color-success-subtle: rgba(34, 197, 94, 0.12);   /* badges, status dots  */
-  --color-success-bg:     rgba(34, 197, 94, 0.08);   /* callout / banner bg  */
+  --color-success:        #4ade80;
+  --color-success-subtle: rgba(74, 222, 128, 0.12);   /* badges, status dots  */
+  --color-success-bg:     rgba(74, 222, 128, 0.08);   /* callout / banner bg  */
 
-  --color-warning:        #f59e0b;
-  --color-warning-subtle: rgba(245, 158, 11, 0.12);
-  --color-warning-bg:     rgba(245, 158, 11, 0.08);
+  --color-warning:        #fbbf24;
+  --color-warning-subtle: rgba(251, 191, 36, 0.12);
+  --color-warning-bg:     rgba(251, 191, 36, 0.08);
 
-  --color-danger:         #ef4444;
-  --color-danger-subtle:  rgba(239, 68, 68, 0.12);
-  --color-danger-bg:      rgba(239, 68, 68, 0.08);
+  --color-danger:              #f87171;
+  --color-danger-button:       #dc2626;               /* AA white-on-red button fill */
+  --color-danger-button-hover: #b91c1c;
+  --color-danger-subtle:       rgba(248, 113, 113, 0.12);
+  --color-danger-bg:           rgba(248, 113, 113, 0.08);
 
-  --color-info:           #6366f1;
-  --color-info-subtle:    rgba(99, 102, 241, 0.12);
-  --color-info-bg:        rgba(99, 102, 241, 0.08);
+  --color-info:           #60a5fa;
+  --color-info-subtle:    rgba(96, 165, 250, 0.12);
+  --color-info-bg:        rgba(96, 165, 250, 0.08);
 
   /* ================================================================
    * TYPOGRAPHY
-   * Inter loaded via Google Fonts in index.html (preconnect + link).
-   * JetBrains Mono replaces Fira Code as primary mono — better
-   * legibility for price/numeric data at small sizes.
    * ================================================================ */
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
                'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -133,12 +140,12 @@
   --radius-full: 9999px;
 
   /* ================================================================
-   * SHADOWS — slightly stronger for the darker Zinc base
+   * SHADOWS
    * ================================================================ */
-  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.50);
-  --shadow-md:    0 4px 8px  rgba(0, 0, 0, 0.60);
-  --shadow-lg:    0 10px 20px rgba(0, 0, 0, 0.70);
-  --shadow-xl:    0 20px 30px rgba(0, 0, 0, 0.80);
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.55);
+  --shadow-md:    0 4px 10px rgba(0, 0, 0, 0.62);
+  --shadow-lg:    0 12px 24px rgba(0, 0, 0, 0.72);
+  --shadow-xl:    0 24px 40px rgba(0, 0, 0, 0.82);
   --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.45);
 
   /* Card depth: directional drop shadow */
@@ -161,7 +168,7 @@
   --z-header:   200;
   --z-overlay:  300;
   --z-modal:    400;
-  --z-toast:    500;
+  --z-toast:    1100;
 
   /* ================================================================
    * LAYOUT DIMENSIONS
@@ -176,8 +183,8 @@
    * CHART COLOUR PALETTE (5-colour comparison series — Doc 3 §15.9)
    * ================================================================ */
   --chart-color-1: #3b82f6;  /* Blue   */
-  --chart-color-2: #22c55e;  /* Green  */
-  --chart-color-3: #f59e0b;  /* Amber  */
+  --chart-color-2: #4ade80;  /* Green  */
+  --chart-color-3: #fbbf24;  /* Amber  */
   --chart-color-4: #a855f7;  /* Purple */
-  --chart-color-5: #06b6d4;  /* Cyan   */
+  --chart-color-5: #38bdf8;  /* Sky    */
 }

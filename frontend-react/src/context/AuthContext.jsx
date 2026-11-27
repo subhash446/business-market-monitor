@@ -40,10 +40,9 @@
  *   This keeps AuthContext free of direct API calls.
  */
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getAccessToken,
   getCurrentUser,
   getCachedBusiness,
   setCachedBusiness,
@@ -51,7 +50,6 @@ import {
   setTokens,
   clearTokens,
   isAuthenticated as checkIsAuthenticated,
-  hasBusinessProfile as checkHasBusinessProfile,
 } from '../auth/auth.js';
 import { setSessionExpiredHandler } from '../api/client.js';
 
@@ -90,9 +88,8 @@ export function AuthProvider({ children }) {
   // This runs once before the first render so there is no flicker.
   const [user, setUser]         = useState(() => getCurrentUser());
   const [business, setBizState] = useState(() => getCachedBusiness());
-  // loading stays true until the mount effect wires the session-expired handler.
-  // It's false immediately since we resolved state synchronously above.
-  const [loading, setLoading]   = useState(false);
+  // Session resolved synchronously from localStorage/sessionStorage above.
+  const loading = false;
 
   // Keep a stable ref to navigate so logout() registered as a callback
   // always uses the latest navigate function without re-registering the handler.

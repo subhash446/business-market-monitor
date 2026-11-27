@@ -83,6 +83,7 @@
 .m-0    { margin: 0 !important; }
 .mt-0   { margin-top: 0 !important; }
 .mb-0   { margin-bottom: 0 !important; }
+.mt-1   { margin-top: var(--space-1) !important; }
 .mt-2   { margin-top: var(--space-2) !important; }
 .mt-3   { margin-top: var(--space-3) !important; }
 .mt-4   { margin-top: var(--space-4) !important; }
@@ -93,6 +94,10 @@
 .mb-4   { margin-bottom: var(--space-4) !important; }
 .mb-6   { margin-bottom: var(--space-6) !important; }
 .mb-8   { margin-bottom: var(--space-8) !important; }
+.mr-1   { margin-right: var(--space-1) !important; }
+.mr-2   { margin-right: var(--space-2) !important; }
+.ml-1   { margin-left: var(--space-1) !important; }
+.ml-2   { margin-left: var(--space-2) !important; }
 .ml-auto { margin-left: auto !important; }
 .mr-auto { margin-right: auto !important; }
 .mx-auto { margin-left: auto !important; margin-right: auto !important; }
@@ -131,6 +136,7 @@
 
 .text-primary   { color: var(--color-text-primary) !important; }
 .text-secondary { color: var(--color-text-secondary) !important; }
+.text-muted     { color: var(--color-text-muted) !important; }
 .text-disabled  { color: var(--color-text-disabled) !important; }
 .text-accent    { color: var(--color-primary) !important; }
 .text-success   { color: var(--color-success) !important; }

@@ -2,77 +2,69 @@
  * Sidebar — application navigation sidebar
  * Business Market Monitor — React frontend
  *
- * React equivalent of frontend/components/nav.html + frontend/js/components/nav.js
- *
- * The Vanilla JS approach fetched nav.html via HTTP and injected it via innerHTML
- * (the sole approved innerHTML exception in the original codebase). In React, the
- * sidebar is pure JSX — no fetch, no innerHTML, no XSS surface.
- *
- * Preserves:
+ * Pure JSX sidebar preserving:
  *   - Identical CSS class names (.sidebar, .sidebar__brand, .nav-link, etc.)
- *   - Same SVG logo from nav.html
- *   - Same nav link set and icons
- *   - Active link detection (useLocation + pathname matching)
- *   - User initials avatar from email
- *   - Business name + industry display from AuthContext
- *   - Mobile hamburger open/close (controlled by AppLayout via isOpen prop)
- *   - Logout with confirmation dialog (replaces confirmAction + window.location.replace)
- *   - Settings button opening BusinessSettingsModal
- *   - sidebar--ready fade-in class on mount
- *
- * Props:
- *   isOpen  — boolean: mobile sidebar open state (controlled by AppLayout)
- *   onClose — () => void: close the mobile sidebar
+ *   - Brand wordmark ("Business Market Monitor") & custom bar-chart emblem
+ *   - Workspace business name, industry, and active RBAC role pill
+ *   - Active route indicator pill & mobile drawer close handling
+ *   - Safe null/SSR fallback when rendered outside full AuthProvider context
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth.js';
+import { AuthContext } from '../../context/AuthContext.jsx';
 import { getInitialsFromEmail } from '../../utils/format.js';
 import { post } from '../../api/client.js';
-import { clearTokens } from '../../auth/auth.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.jsx';
-import { BusinessSettingsModal } from '../ui/BusinessSettingsModal.jsx';
 
-/** Nav links — matches nav.html exactly */
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard', icon: 'fa-solid fa-house',      id: 'nav-link-dashboard' },
-  { to: '/materials', label: 'Materials', icon: 'fa-solid fa-cubes',       id: 'nav-link-materials' },
-  { to: '/news',      label: 'News',      icon: 'fa-solid fa-newspaper',   id: 'nav-link-news'      },
-  { to: '/alerts',    label: 'Alerts',    icon: 'fa-solid fa-bell',         id: 'nav-link-alerts'    },
-  { to: '/trends',    label: 'Trends',    icon: 'fa-solid fa-chart-line',   id: 'nav-link-trends'    },
+  { to: '/materials', label: 'Materials', icon: 'fa-solid fa-cubes',      id: 'nav-link-materials' },
+  { to: '/news',      label: 'News',      icon: 'fa-solid fa-newspaper',  id: 'nav-link-news'      },
+  { to: '/alerts',    label: 'Alerts',    icon: 'fa-solid fa-bell',       id: 'nav-link-alerts'    },
+  { to: '/trends',    label: 'Trends',    icon: 'fa-solid fa-chart-line', id: 'nav-link-trends'    },
 ];
 
-export function Sidebar({ isOpen, onClose }) {
-  const { user, business, logout, setBusiness } = useAuth();
+function getRoleDisplay(role) {
+  if (role === 'OWNER') return { label: 'OWNER', mod: 'owner' };
+  if (role === 'PURCHASE_MANAGER') return { label: 'PURCHASE MANAGER', mod: 'manager' };
+  if (role === 'VIEWER') return { label: 'VIEWER', mod: 'viewer' };
+  return null;
+}
+
+export function Sidebar({ isOpen = false, onClose = () => {} }) {
+  const auth = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [ready,          setReady]          = useState(false);
-  const [confirmLogout,  setConfirmLogout]  = useState(false);
-  const [settingsOpen,   setSettingsOpen]   = useState(false);
+  const user = auth?.user ?? null;
+  const business = auth?.business ?? null;
+  const logout = auth?.logout;
 
-  // Add sidebar--ready class after mount (fade-in, matching nav.js behavior)
+  const [ready, setReady] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
   useEffect(() => {
-    const raf = requestAnimationFrame(() => setReady(true));
-    return () => cancelAnimationFrame(raf);
+    const raf = window.requestAnimationFrame(() => setReady(true));
+    return () => window.cancelAnimationFrame(raf);
   }, []);
 
-  /* ------------------------------------------------------------------
-   * Logout — confirmation → fire-and-forget POST /auth/logout → clear + navigate
-   * (matches _wireLogout in nav.js)
-   * ------------------------------------------------------------------ */
   async function handleLogoutConfirmed() {
     try {
       await post('/auth/logout');
     } catch {
-      // Ignore — logout is client-side regardless (same as original)
+      // Ignore — logout clears client tokens regardless
     }
-    logout();  // clears tokens + navigates to /login via AuthContext
+    if (typeof logout === 'function') {
+      logout();
+    } else {
+      navigate('/login', { replace: true });
+    }
   }
 
-  const initials     = getInitialsFromEmail(user?.email ?? '');
+  const initials = getInitialsFromEmail(user?.email ?? '');
   const businessName = business?.name ?? 'My Business';
   const industryName = business?.industry?.name ?? business?.industryName ?? '';
+  const roleBadge = getRoleDisplay(business?.businessRole || user?.businessRole || null);
 
   return (
     <>
@@ -81,7 +73,7 @@ export function Sidebar({ isOpen, onClose }) {
         id="sidebar"
         aria-label="Main navigation"
       >
-        {/* ── Brand / Logo ─────────────────────────────── */}
+        {/* Brand / Wordmark */}
         <div className="sidebar__brand">
           <NavLink
             to="/dashboard"
@@ -90,20 +82,19 @@ export function Sidebar({ isOpen, onClose }) {
             onClick={onClose}
           >
             <span className="sidebar__logo" aria-hidden="true">
-              {/* SVG logo from nav.html — preserved exactly */}
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <rect width="32" height="32" rx="8" fill="#3b82f6"/>
-                <path d="M8 22 L8 14 L13 14 L13 22"  stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 22 L14 10 L19 10 L19 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20 22 L20 17 L25 17 L25 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="6" y1="22" x2="27" y2="22" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                <rect width="32" height="32" rx="8" fill="#2563eb" />
+                <path d="M8 22 L8 14 L13 14 L13 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M14 22 L14 10 L19 10 L19 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M20 22 L20 17 L25 17 L25 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="6" y1="22" x2="27" y2="22" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="sidebar__app-name">Market Monitor</span>
+            <span className="sidebar__app-name">Business Market Monitor</span>
           </NavLink>
         </div>
 
-        {/* ── User / Business Info ──────────────────────── */}
+        {/* User / Business Info */}
         <div className="sidebar__user">
           <div className="sidebar__avatar" aria-hidden="true">
             <span id="nav-user-initials">{initials}</span>
@@ -112,16 +103,26 @@ export function Sidebar({ isOpen, onClose }) {
             <span className="sidebar__business-name" id="nav-business-name">
               {businessName}
             </span>
-            <span className="sidebar__industry-name" id="nav-industry-name">
-              {industryName}
-            </span>
+            {industryName && (
+              <span className="sidebar__industry-name" id="nav-industry-name">
+                {industryName}
+              </span>
+            )}
+            {roleBadge && (
+              <span
+                className={`sidebar__role-pill sidebar__role-pill--${roleBadge.mod}`}
+                id="nav-workspace-role"
+              >
+                {roleBadge.label}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* ── Navigation Links ──────────────────────────── */}
+        {/* Navigation Links */}
         <nav className="sidebar__nav" aria-label="Main menu">
           <ul role="list">
-            {NAV_LINKS.map(link => (
+            {NAV_LINKS.map((link) => (
               <li key={link.to}>
                 <NavLink
                   to={link.to}
@@ -129,7 +130,6 @@ export function Sidebar({ isOpen, onClose }) {
                   className={({ isActive }) =>
                     `nav-link${isActive ? ' nav-link--active' : ''}`
                   }
-                  aria-current={undefined}  // NavLink handles via className; aria-current set below
                   onClick={onClose}
                 >
                   {({ isActive }) => (
@@ -138,7 +138,6 @@ export function Sidebar({ isOpen, onClose }) {
                         <i className={link.icon} />
                       </span>
                       <span className="nav-link__label">{link.label}</span>
-                      {/* aria-current on the <a> itself */}
                       {isActive && <span className="sr-only">(current page)</span>}
                     </>
                   )}
@@ -148,15 +147,17 @@ export function Sidebar({ isOpen, onClose }) {
           </ul>
         </nav>
 
-        {/* ── Footer Actions ────────────────────────────── */}
+        {/* Footer Actions */}
         <div className="sidebar__footer">
-          {/* Business Settings */}
           <button
             type="button"
             className="sidebar__action-btn"
             id="nav-settings-btn"
             aria-label="Business settings"
-            onClick={() => { onClose(); navigate('/settings'); }}
+            onClick={() => {
+              onClose();
+              navigate('/settings');
+            }}
           >
             <span className="sidebar__action-icon" aria-hidden="true">
               <i className="fa-solid fa-gear" />
@@ -164,13 +165,15 @@ export function Sidebar({ isOpen, onClose }) {
             <span>Settings</span>
           </button>
 
-          {/* Log Out */}
           <button
             type="button"
             className="sidebar__action-btn sidebar__action-btn--danger"
             id="nav-logout-btn"
             aria-label="Log out of your account"
-            onClick={() => { onClose(); setConfirmLogout(true); }}
+            onClick={() => {
+              onClose();
+              setConfirmLogout(true);
+            }}
           >
             <span className="sidebar__action-icon" aria-hidden="true">
               <i className="fa-solid fa-right-from-bracket" />
@@ -180,7 +183,6 @@ export function Sidebar({ isOpen, onClose }) {
         </div>
       </aside>
 
-      {/* ── Logout Confirmation Dialog ───────────────────── */}
       <ConfirmDialog
         isOpen={confirmLogout}
         onClose={() => setConfirmLogout(false)}
@@ -190,13 +192,6 @@ export function Sidebar({ isOpen, onClose }) {
         confirmLabel="Log Out"
         cancelLabel="Cancel"
         danger={false}
-      />
-
-      {/* ── Business Settings Modal ──────────────────────── */}
-      <BusinessSettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onSaved={setBusiness}
       />
     </>
   );

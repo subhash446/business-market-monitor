@@ -2,30 +2,7 @@
  * ConfirmDialog — confirmation dialog component
  * Business Market Monitor — React frontend
  *
- * React equivalent of frontend/js/components/confirm.js
- * Wraps Modal.jsx, preserving identical button styles and behavior.
- *
- * Props:
- *   isOpen        — boolean
- *   onClose       — called on cancel / close button / Escape
- *   onConfirm     — called when confirm button is clicked
- *   title         — dialog heading
- *   message       — body message text
- *   confirmLabel  — confirm button text (default 'Confirm')
- *   cancelLabel   — cancel button text (default 'Cancel')
- *   danger        — boolean: use btn--danger for confirm button (default false)
- *
- * Usage:
- *   const [open, setOpen] = useState(false);
- *   <ConfirmDialog
- *     isOpen={open}
- *     title="Delete Rule"
- *     message="This cannot be undone."
- *     danger
- *     confirmLabel="Delete"
- *     onConfirm={() => { handleDelete(); setOpen(false); }}
- *     onClose={() => setOpen(false)}
- *   />
+ * Wraps Modal.jsx with responsive native .modal__footer stacking on mobile (< 480px).
  */
 
 import { Modal } from './Modal.jsx';
@@ -37,16 +14,17 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Confirm',
-  cancelLabel  = 'Cancel',
-  danger       = false,
+  cancelLabel = 'Cancel',
+  danger = false,
+  id = 'bmm-confirm-dialog',
 }) {
   function handleConfirm() {
     if (typeof onConfirm === 'function') onConfirm();
-    onClose();
+    if (typeof onClose === 'function') onClose();
   }
 
   const footer = (
-    <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+    <>
       <button
         type="button"
         className="btn btn--ghost"
@@ -61,7 +39,7 @@ export function ConfirmDialog({
       >
         {confirmLabel}
       </button>
-    </div>
+    </>
   );
 
   return (
@@ -70,18 +48,10 @@ export function ConfirmDialog({
       onClose={onClose}
       title={title}
       size="sm"
-      id="bmm-confirm-dialog"
+      id={id}
       footer={footer}
     >
-      <p
-        style={{
-          color:      'var(--color-text-secondary)',
-          lineHeight: 'var(--leading-relaxed)',
-          fontSize:   'var(--text-sm)',
-        }}
-      >
-        {message}
-      </p>
+      <p className="confirm-dialog__message">{message}</p>
     </Modal>
   );
 }
