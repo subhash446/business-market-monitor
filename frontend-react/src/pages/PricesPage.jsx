@@ -114,12 +114,51 @@ export function PricesPage() {
   }, [materialId]);
 
   useEffect(() => {
-    loadPage();
-  }, [loadPage]);
+    if (!materialId) return undefined;
+    let cancelled = false;
+    Promise.all([
+      getMaterials(),
+      getLatestPrice(materialId),
+      getPriceSourceInfo(materialId),
+    ])
+      .then(([materials, latest, srcInfo]) => {
+        if (cancelled) return;
+        const trackedMaterials = (materials || []).filter((m) => m.isTracked);
+        setAllMaterials(trackedMaterials);
+        const found = materials.find((m) => String(m.id) === String(materialId));
+
+        if (!found) {
+          setLoadStatus(LOAD.NOT_FOUND);
+          return;
+        }
+
+        setMaterial(found);
+        setBulkMaterialId((prev) => prev || String(found.id));
+        setLatestPrice(latest);
+        setSourceInfo(srcInfo);
+        setRecordedAt(toIsoDateString(new Date()));
+        setLoadStatus(LOAD.SUCCESS);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        let msg = 'Something went wrong. Please try again.';
+        if (!err?.status) msg = 'Could not connect to the server. Check your connection.';
+        setLoadErrMsg(msg);
+        setLoadStatus(LOAD.ERROR);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [materialId]);
 
   /* ── Enable tracking if currently untracked ────────────────── */
   async function handleEnableTracking() {
     if (!material) return;
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      return;
+    }
     try {
       await updateMaterialTracking(material.id, true);
       setMaterial((prev) => ({ ...prev, isTracked: true }));
@@ -436,12 +475,21 @@ export function PricesPage() {
       {/* ── Main page content ── */}
       {loadStatus === LOAD.SUCCESS && material && (
         <div id="price-page-content">
+          {isViewer && (
+            <div id="prices-viewer-banner" className="alert-banner alert-banner--info" role="status">
+              <i className="fa-solid fa-eye" aria-hidden="true" />
+              <span className="alert-banner__message">
+                View-only mode: contact a workspace Owner or Purchase Manager to record or bulk-upload prices.
+              </span>
+            </div>
+          )}
+
           {/* Material header: name + unit badge */}
           <div className="material-header-card" aria-label="Selected material">
             <h2 className="material-header-card__name" id="price-material-name">
               {material.name}
             </h2>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div className="prices-badge-row">
               <span className="badge badge--info material-header-card__unit" id="price-unit-badge">
                 {material.unit}
               </span>
@@ -455,10 +503,7 @@ export function PricesPage() {
 
           {/* Current price panel */}
           <div className="card price-current-panel" id="current-price-panel" aria-live="polite">
-            <div
-              className="card__header"
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+            <div className="card__header prices-card-header">
               <h2 className="card__title">Current Price</h2>
               {latestPrice && latestPrice.dataClass && (
                 <div>
@@ -482,29 +527,18 @@ export function PricesPage() {
               ) : (
                 <>
                   <div className="price-current-panel__value font-mono" id="current-price-value">
-                    <span style={{ fontSize: '0.65em', marginRight: '0.25rem', opacity: 0.85 }}>
+                    <span className="price-current-panel__currency">
                       {priceDisplay.currencyCode}
                     </span>
                     {priceDisplay.formattedValue}
                     {priceDisplay.unitSuffix && (
-                      <span
-                        style={{
-                          fontSize: '0.5em',
-                          marginLeft: '0.35rem',
-                          fontWeight: 'normal',
-                          opacity: 0.75,
-                        }}
-                      >
+                      <span className="price-current-panel__unit-suffix">
                         / {priceDisplay.unitSuffix}
                       </span>
                     )}
                   </div>
 
-                  <div
-                    className="price-current-panel__date"
-                    id="current-price-date"
-                    style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}
-                  >
+                  <div className="price-current-panel__date" id="current-price-date">
                     <span>Recorded: {formatDate(latestPrice.recordedAt)}</span>
                     {latestPrice.providerName && (
                       <span className="text-secondary">Source: {latestPrice.providerName}</span>
@@ -516,48 +550,24 @@ export function PricesPage() {
 
                   {/* Proxy Benchmark Notice */}
                   {isProxyPrice && (
-                    <div
-                      style={{
-                        marginTop: '0.85rem',
-                        padding: '0.65rem 0.85rem',
-                        fontSize: '0.8125rem',
-                        backgroundColor: '#fffbeb',
-                        border: '1px solid #fde68a',
-                        borderRadius: '0.375rem',
-                        color: '#92400e',
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      <i
-                        className="fa-solid fa-triangle-exclamation"
-                        style={{ marginRight: '0.5rem', color: '#d97706' }}
-                      />
-                      <strong>Proxy Benchmark Notice: </strong>
-                      {sourceInfo?.disclaimer ||
-                        `This price reflects an international crude oil benchmark (${formatUnitLabel(latestPrice?.currency || sourceInfo?.currency || 'USD', latestPrice?.unitLabel || sourceInfo?.unitLabel || 'bbl')}), not a direct local transaction price for ${material.name}.`}
+                    <div className="alert-banner alert-banner--warning prices-notice-banner" role="note">
+                      <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+                      <span className="alert-banner__message">
+                        <strong>Proxy Benchmark Notice: </strong>
+                        {sourceInfo?.disclaimer ||
+                          `This price reflects an international crude oil benchmark (${formatUnitLabel(latestPrice?.currency || sourceInfo?.currency || 'USD', latestPrice?.unitLabel || sourceInfo?.unitLabel || 'bbl')}), not a direct local transaction price for ${material.name}.`}
+                      </span>
                     </div>
                   )}
 
                   {/* Domestic Market Benchmark Info */}
                   {!isProxyPrice && latestPrice?.source !== 'MANUAL' && sourceInfo?.disclaimer && (
-                    <div
-                      style={{
-                        marginTop: '0.85rem',
-                        padding: '0.65rem 0.85rem',
-                        fontSize: '0.8125rem',
-                        backgroundColor: '#eff6ff',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '0.375rem',
-                        color: '#1e40af',
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      <i
-                        className="fa-solid fa-building-columns"
-                        style={{ marginRight: '0.5rem', color: '#2563eb' }}
-                      />
-                      <strong>Market Benchmark Info: </strong>
-                      {sourceInfo.disclaimer}
+                    <div className="alert-banner alert-banner--info prices-notice-banner" role="note">
+                      <i className="fa-solid fa-building-columns" aria-hidden="true" />
+                      <span className="alert-banner__message">
+                        <strong>Market Benchmark Info: </strong>
+                        {sourceInfo.disclaimer}
+                      </span>
                     </div>
                   )}
                 </>
@@ -567,23 +577,9 @@ export function PricesPage() {
 
           {/* Untracked Material Warning Banner */}
           {!material.isTracked && (
-            <div
-              style={{
-                marginBottom: '1.25rem',
-                padding: '0.85rem 1rem',
-                backgroundColor: '#fffbeb',
-                border: '1px solid #fde68a',
-                borderRadius: '0.375rem',
-                color: '#92400e',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '1rem',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <i className="fa-solid fa-triangle-exclamation" style={{ color: '#d97706' }} aria-hidden="true" />
+            <div className="alert-banner alert-banner--warning prices-untracked-banner" role="alert">
+              <div className="prices-untracked-banner__copy">
+                <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" />
                 <span>
                   <strong>Notice:</strong> This material is currently <strong>not tracked</strong>. You must enable
                   tracking to record prices.
@@ -593,7 +589,8 @@ export function PricesPage() {
                 type="button"
                 className="btn btn--sm btn--primary"
                 onClick={handleEnableTracking}
-                disabled={submitting}
+                disabled={submitting || isViewer}
+                title={isViewer ? 'Viewers have read-only permissions' : undefined}
               >
                 Enable Tracking Now
               </button>
@@ -602,19 +599,25 @@ export function PricesPage() {
 
           {/* Price entry form */}
           <div className="card">
-            <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div className="card__header prices-card-header">
               <h2 className="card__title">Log a Price (Supplier Quote)</h2>
               <button
                 type="button"
                 className="btn btn--sm btn--secondary"
                 id="pe-open-bulk-btn"
+                disabled={isViewer}
+                title={isViewer ? 'Viewers have read-only permissions' : undefined}
                 onClick={() => {
+                  if (isViewer) {
+                    showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+                    return;
+                  }
                   setShowBulkModal(true);
                   setBulkResult(null);
                   setBulkError('');
                 }}
               >
-                <i className="fa-solid fa-file-csv" style={{ marginRight: '6px' }} />
+                <i className="fa-solid fa-file-csv" aria-hidden="true" />
                 Bulk Upload Prices
               </button>
             </div>
@@ -626,13 +629,7 @@ export function PricesPage() {
               )}
 
               <form id="price-entry-form" onSubmit={handleSubmit} noValidate>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '1rem',
-                  }}
-                >
+                <div className="prices-form-grid">
                   {/* Price */}
                   <div className="form-group">
                     <label className="form-label form-label--required" htmlFor="pe-price">
@@ -647,6 +644,7 @@ export function PricesPage() {
                       min="0.01"
                       step="0.01"
                       placeholder="e.g. 1250.00"
+                      disabled={isViewer}
                       aria-required="true"
                       aria-describedby="pe-price-error"
                       value={price}
@@ -671,6 +669,7 @@ export function PricesPage() {
                     <select
                       className="form-control"
                       id="pe-currency"
+                      disabled={isViewer}
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value)}
                     >
@@ -681,13 +680,7 @@ export function PricesPage() {
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '1rem',
-                  }}
-                >
+                <div className="prices-form-grid">
                   {/* Date */}
                   <div className="form-group">
                     <label className="form-label form-label--required" htmlFor="pe-date">
@@ -698,6 +691,7 @@ export function PricesPage() {
                       type="date"
                       id="pe-date"
                       name="recordedAt"
+                      disabled={isViewer}
                       aria-required="true"
                       aria-describedby="pe-date-error"
                       value={recordedAt}
@@ -723,6 +717,7 @@ export function PricesPage() {
                       className="form-control"
                       type="text"
                       id="pe-grade"
+                      disabled={isViewer}
                       placeholder="e.g. Injection Molding Grade A"
                       value={grade}
                       onChange={(e) => setGrade(e.target.value)}
@@ -738,6 +733,7 @@ export function PricesPage() {
                       className="form-control"
                       type="text"
                       id="pe-region"
+                      disabled={isViewer}
                       placeholder="e.g. Gujarat / Mumbai Domestic"
                       value={region}
                       onChange={(e) => setRegion(e.target.value)}
@@ -746,13 +742,19 @@ export function PricesPage() {
                 </div>
 
                 {/* Submit */}
-                <div className="form-actions" style={{ marginTop: '1rem' }}>
+                <div className="form-actions prices-submit-row">
                   <button
                     type="submit"
                     id="pe-submit-btn"
                     className={`btn btn--primary${submitting ? ' btn--loading' : ''}`}
-                    disabled={submitting || !material.isTracked}
-                    title={!material.isTracked ? 'Enable tracking before logging prices' : undefined}
+                    disabled={submitting || !material.isTracked || isViewer}
+                    title={
+                      isViewer
+                        ? 'Viewers have read-only permissions'
+                        : !material.isTracked
+                        ? 'Enable tracking before logging prices'
+                        : undefined
+                    }
                   >
                     Log Supplier Quote
                   </button>
@@ -774,17 +776,41 @@ export function PricesPage() {
         title="Bulk Price Upload (CSV / Spreadsheet)"
         size="lg"
         id="bulk-price-upload-modal"
+        footer={
+          <div className="prices-modal-footer">
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => {
+                setShowBulkModal(false);
+                setBulkResult(null);
+                setBulkError('');
+              }}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              id="bulk-submit-upload-btn"
+              className={`btn btn--primary${bulkSubmitting ? ' btn--loading' : ''}`}
+              disabled={isViewer || bulkSubmitting || parsedRows.filter((r) => r.isValid).length === 0}
+              onClick={handleBulkSubmit}
+            >
+              Upload {parsedRows.filter((r) => r.isValid).length} Valid Row(s)
+            </button>
+          </div>
+        }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="bulk-modal-stack">
           {/* Instructions and Controls */}
           <div>
-            <p className="text-sm text-secondary" style={{ margin: '0 0 0.75rem 0' }}>
+            <p className="text-sm text-secondary bulk-modal-lead">
               Import multiple supplier quotes at once. Paste tabular data from Excel/Google Sheets, upload a CSV file, or load a sample template below.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
+            <div className="bulk-controls-grid">
               {/* Default Material Selector */}
-              <div className="form-group" style={{ margin: 0 }}>
+              <div className="form-group bulk-form-group-flush">
                 <label className="form-label" htmlFor="bulk-mat-select">
                   Target Material (if omitted in CSV)
                 </label>
@@ -803,24 +829,24 @@ export function PricesPage() {
               </div>
 
               {/* Action Buttons: Sample CSV & File Upload */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="bulk-action-btns">
                 <button
                   type="button"
                   className="btn btn--sm btn--secondary"
                   id="bulk-load-sample-btn"
                   onClick={handleLoadSampleCsv}
                 >
-                  <i className="fa-solid fa-file-lines" style={{ marginRight: '5px' }} />
+                  <i className="fa-solid fa-file-lines" aria-hidden="true" />
                   Load Sample CSV
                 </button>
 
-                <label className="btn btn--sm btn--ghost" style={{ cursor: 'pointer', margin: 0 }}>
-                  <i className="fa-solid fa-upload" style={{ marginRight: '5px' }} />
+                <label className="btn btn--sm btn--ghost bulk-file-upload-label">
+                  <i className="fa-solid fa-upload" aria-hidden="true" />
                   Upload .CSV File
                   <input
                     type="file"
                     accept=".csv,.txt,.tsv"
-                    style={{ display: 'none' }}
+                    className="sr-only"
                     onChange={handleFileUpload}
                   />
                 </label>
@@ -829,7 +855,7 @@ export function PricesPage() {
           </div>
 
           {/* Paste Textarea */}
-          <div className="form-group" style={{ margin: 0 }}>
+          <div className="form-group bulk-form-group-flush">
             <label className="form-label" htmlFor="bulk-csv-textarea">
               CSV or Tab-Delimited Data
             </label>
@@ -856,36 +882,28 @@ export function PricesPage() {
 
           {/* Results Summary Card if submitted */}
           {bulkResult && (
-            <div
-              className="bulk-summary-card"
-              style={{
-                padding: '1rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--color-border, #30363d)',
-                backgroundColor: 'var(--color-bg-secondary, #161b22)',
-              }}
-            >
-              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>Upload Results Summary</h4>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <div className="bulk-summary-card">
+              <h4 className="bulk-summary-card__title">Upload Results Summary</h4>
+              <div className="bulk-summary-card__badges">
                 <span className="badge badge--success">
-                  <i className="fa-solid fa-check" style={{ marginRight: '4px' }} />
+                  <i className="fa-solid fa-check" aria-hidden="true" />
                   Inserted: {bulkResult.summary.inserted}
                 </span>
                 <span className="badge badge--warning">
-                  <i className="fa-solid fa-copy" style={{ marginRight: '4px' }} />
+                  <i className="fa-solid fa-copy" aria-hidden="true" />
                   Skipped (Duplicates): {bulkResult.summary.skipped}
                 </span>
                 {bulkResult.summary.failed > 0 && (
                   <span className="badge badge--danger">
-                    <i className="fa-solid fa-xmark" style={{ marginRight: '4px' }} />
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
                     Failed: {bulkResult.summary.failed}
                   </span>
                 )}
               </div>
 
               {/* Row Status Breakdown */}
-              <div style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '0.8125rem' }}>
-                <table className="table table--compact" style={{ width: '100%' }}>
+              <div className="table-wrapper bulk-table-scroll">
+                <table className="table table--compact">
                   <thead>
                     <tr>
                       <th>#</th>
@@ -919,7 +937,7 @@ export function PricesPage() {
           {/* Pre-Flight Preview Table */}
           {parsedRows.length > 0 && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <div className="bulk-preview-header">
                 <span className="text-sm font-semibold">
                   Pre-Flight Preview ({parsedRows.length} rows parsed &bull; {parsedRows.filter((r) => r.isValid).length} ready)
                 </span>
@@ -930,15 +948,8 @@ export function PricesPage() {
                 )}
               </div>
 
-              <div
-                style={{
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                  border: '1px solid var(--color-border, #30363d)',
-                  borderRadius: '0.375rem',
-                }}
-              >
-                <table className="table table--compact" style={{ width: '100%', margin: 0 }}>
+              <div className="table-wrapper bulk-table-scroll">
+                <table className="table table--compact">
                   <thead>
                     <tr>
                       <th>#</th>
@@ -952,12 +963,14 @@ export function PricesPage() {
                   </thead>
                   <tbody>
                     {parsedRows.map((row) => (
-                      <tr key={row.rowNumber} style={{ opacity: row.isValid ? 1 : 0.75 }}>
+                      <tr key={row.rowNumber} className={row.isValid ? undefined : 'bulk-row--invalid'}>
                         <td className="font-mono">{row.rowNumber}</td>
                         <td>{row.materialName}</td>
                         <td className="font-mono">{row.date || '—'}</td>
                         <td className="font-mono font-semibold">
-                          {row.price ? formatPriceDisplay(row.price, row.currency) : (row.rawPrice || '—')}
+                          {Number.isFinite(row.price) && row.price > 0
+                            ? formatPriceDisplay({ price: row.price, currency: row.currency }).text
+                            : (row.rawPrice || '—')}
                         </td>
                         <td>{row.currency}</td>
                         <td className="text-xs text-secondary">
@@ -965,9 +978,9 @@ export function PricesPage() {
                         </td>
                         <td>
                           {row.isValid ? (
-                            <span className="badge badge--success" style={{ fontSize: '0.75rem' }}>Ready</span>
+                            <span className="badge badge--success bulk-status-badge">Ready</span>
                           ) : (
-                            <span className="badge badge--danger" style={{ fontSize: '0.75rem' }} title={row.error}>
+                            <span className="badge badge--danger bulk-status-badge" title={row.error}>
                               {row.error}
                             </span>
                           )}
@@ -979,30 +992,6 @@ export function PricesPage() {
               </div>
             </div>
           )}
-
-          {/* Modal Footer / Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={() => {
-                setShowBulkModal(false);
-                setBulkResult(null);
-                setBulkError('');
-              }}
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              id="bulk-submit-upload-btn"
-              className={`btn btn--primary${bulkSubmitting ? ' btn--loading' : ''}`}
-              disabled={bulkSubmitting || parsedRows.filter((r) => r.isValid).length === 0}
-              onClick={handleBulkSubmit}
-            >
-              Upload {parsedRows.filter((r) => r.isValid).length} Valid Row(s)
-            </button>
-          </div>
         </div>
       </Modal>
     </div>

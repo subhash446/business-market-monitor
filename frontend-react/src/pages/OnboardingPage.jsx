@@ -93,7 +93,25 @@ export function OnboardingPage() {
     }
   }, []);
 
-  useEffect(() => { loadIndustries(); }, [loadIndustries]);
+  useEffect(() => {
+    let cancelled = false;
+    listIndustries()
+      .then((data) => {
+        if (!cancelled) {
+          setIndustries(data ?? []);
+          setIndustriesError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIndustriesError(true);
+          setIndustries([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => () => {
     previewGuard.invalidate();
@@ -260,8 +278,8 @@ export function OnboardingPage() {
       <div className="app-shell">
 
         {/* Page header */}
-        <header className="page-header" role="banner">
-          <div className="page-header__inner">
+        <header className="page-header onboarding-page-header" role="banner">
+          <div className="page-header__inner onboarding-page-header__inner">
             <h1 className="page-header__title">Set Up Your Business</h1>
           </div>
         </header>
@@ -347,7 +365,7 @@ export function OnboardingPage() {
                       <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '6px' }} /> Loading materials catalog...
                     </div>
                   ) : previewError ? (
-                    <p className="text-xs" role="alert" style={{ margin: 0, color: 'var(--color-danger, #dc2626)' }}>
+                    <p className="text-xs onboarding-preview-error" role="alert">
                       Could not load materials preview for this industry. Select the industry card again to retry.
                     </p>
                   ) : previewMaterials.length > 0 ? (

@@ -46,6 +46,13 @@
   gap: var(--space-2);
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-6);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .settings-tab-btn {
@@ -59,17 +66,25 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .settings-tab-btn:hover {
   color: var(--color-text-primary);
 }
 
+.settings-tab-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .settings-tab-btn--active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  color: var(--color-info);
+  border-bottom-color: var(--color-info);
 }
 
 /* Settings Card */
@@ -220,6 +235,185 @@
 
 .settings-role-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
+}
+
+/* ── Profile Digest, Billing & BusinessModal Helpers ─────────────── */
+
+.settings-digest-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  user-select: none;
+}
+
+.settings-check--compact {
+  margin-bottom: 0;
+}
+
+.settings-check__input {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.settings-check__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.settings-digest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-digest-timestamp {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}
+
+.settings-profile-actions {
+  margin-top: var(--space-6);
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.settings-form-group-flush {
+  margin-bottom: 0;
+}
+
+.settings-member-timestamp {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.settings-revoke-btn {
+  color: var(--color-danger);
+}
+
+.settings-billing-hero {
+  margin-bottom: var(--space-6);
+}
+
+.settings-billing-hero__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.settings-billing-hero__badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: 6px;
+}
+
+.settings-billing-active-badge {
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+}
+
+.settings-billing-workspace-name {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.settings-billing-hero__title {
+  margin: 0 0 4px 0;
+  font-size: 1.125rem;
+}
+
+.settings-billing-hero__subtitle {
+  margin: 0;
+}
+
+.settings-billing-hero__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-early-adopter-badge {
+  background-color: var(--color-info-subtle);
+  color: #93c5fd;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  padding: 6px 12px;
+  font-size: var(--text-xs);
+}
+
+.bs-modal-hint {
+  font-size: var(--text-xs);
+  margin-top: 6px;
+  margin-bottom: 0;
+  line-height: 1.45;
+}
+
+.bs-modal-hint--warning {
+  color: var(--color-warning);
+}
+
+.bs-modal-hint--muted {
+  color: var(--color-text-muted);
+}
+
+.bs-modal__footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+@media (max-width: 479px) {
+  .settings-card {
+    padding: var(--space-4);
+  }
+
+  .settings-profile-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-profile-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .bs-modal__footer-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .bs-modal__footer-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-tab-btn,
+  .settings-table tbody tr {
+    transition: none;
+  }
 }

@@ -47,92 +47,98 @@ export function AcceptInvitePage() {
   const loginRedirectUrl = `/login?redirect=${encodeURIComponent(`/accept-invite?token=${token}`)}`;
 
   return (
-    <div className="auth-page">
-      <div className="auth-card" style={{ maxWidth: '480px' }}>
-        <div className="auth-header">
-          <div className="auth-logo">
-            <svg width="40" height="40" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="32" height="32" rx="8" fill="#3b82f6" />
-              <path d="M8 22 L8 14 L13 14 L13 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M14 22 L14 10 L19 10 L19 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M20 22 L20 17 L25 17 L25 22" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <line x1="6" y1="22" x2="27" y2="22" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+    <div className="auth-layout">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
+      <main id="main-content" className="auth-container">
+        <Link to="/" className="auth-brand auth-brand-link" aria-label="Business Market Monitor Home">
+          <div className="auth-logo-mark" aria-hidden="true">
+            <i className="fa-solid fa-chart-column" />
           </div>
-          <h1 className="auth-title">Workspace Invitation</h1>
-          <p className="auth-subtitle">
-            You have been invited to join a collaborative procurement workspace on Business Market Monitor.
-          </p>
+          <span className="auth-brand__name">Business Market Monitor</span>
+        </Link>
+
+        <div className="auth-card">
+          <div className="auth-card__header">
+            <h1 className="auth-card__title">Workspace Invitation</h1>
+            <p className="auth-card__subtitle">
+              You have been invited to join a collaborative procurement workspace on Business Market Monitor.
+            </p>
+          </div>
+
+          {errorMsg && (
+            <div className="form-alert form-alert--error form-alert--visible" role="alert">
+              <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+              <span className="form-alert__message">{errorMsg}</span>
+            </div>
+          )}
+
+          {isAuthenticated ? (
+            <form onSubmit={handleAccept}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="accept-current-user">
+                  Signed In Account
+                </label>
+                <input
+                  type="text"
+                  id="accept-current-user"
+                  className="form-control form-control--readonly"
+                  readOnly
+                  value={user?.email || 'Authenticated User'}
+                />
+                <p className="form-hint">
+                  Note: The invitation must match this email address.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="accept-token-input">
+                  Invitation Security Token
+                </label>
+                <input
+                  type="text"
+                  id="accept-token-input"
+                  className="form-control font-mono"
+                  placeholder="64-character token"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                id="accept-invite-submit-btn"
+                className={`btn btn--primary btn--full mt-4${loading ? ' btn--loading' : ''}`}
+                disabled={loading || !token.trim()}
+              >
+                <i className="fa-solid fa-check mr-2" aria-hidden="true" />
+                Accept Invitation &amp; Join Workspace
+              </button>
+            </form>
+          ) : (
+            <div>
+              <div className="form-alert form-alert--info form-alert--visible" role="status">
+                <i className="fa-solid fa-circle-info" aria-hidden="true" />
+                <span className="form-alert__message">
+                  Please sign in or create an account with the invited email address to accept this invitation.
+                </span>
+              </div>
+
+              <div className="d-flex flex-col gap-3">
+                <Link to={loginRedirectUrl} className="btn btn--primary btn--full">
+                  Sign In to Accept
+                </Link>
+                <Link to="/register" className="btn btn--ghost btn--full">
+                  Create New Account
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
-
-        {errorMsg && (
-          <div className="form-alert form-alert--error form-alert--visible" role="alert" style={{ marginBottom: '16px' }}>
-            <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-            <span className="form-alert__message">{errorMsg}</span>
-          </div>
-        )}
-
-        {isAuthenticated ? (
-          <form onSubmit={handleAccept}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="accept-current-user">
-                Signed In Account
-              </label>
-              <input
-                type="text"
-                id="accept-current-user"
-                className="form-control form-control--readonly"
-                readOnly
-                value={user?.email || 'Authenticated User'}
-              />
-              <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '6px' }}>
-                Note: The invitation must match this email address.
-              </p>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="accept-token-input">
-                Invitation Security Token
-              </label>
-              <input
-                type="text"
-                id="accept-token-input"
-                className="form-control font-mono"
-                placeholder="64-character token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              id="accept-invite-submit-btn"
-              className={`btn btn--primary btn--full${loading ? ' btn--loading' : ''}`}
-              disabled={loading || !token.trim()}
-            >
-              <i className="fa-solid fa-check mr-2" />
-              Accept Invitation &amp; Join Workspace
-            </button>
-          </form>
-        ) : (
-          <div>
-            <div className="form-alert form-alert--info" style={{ marginBottom: '20px' }}>
-              <i className="fa-solid fa-circle-info" />
-              <span>Please sign in or create an account with the invited email address to accept this invitation.</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Link to={loginRedirectUrl} className="btn btn--primary btn--full">
-                Sign In to Accept
-              </Link>
-              <Link to="/register" className="btn btn--ghost btn--full">
-                Create New Account
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 }

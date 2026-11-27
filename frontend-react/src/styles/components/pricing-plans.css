@@ -241,14 +241,14 @@
 }
 
 .pricing-card__btn--primary {
-  background: #3b82f6;
+  background: var(--color-primary-button, #2563eb);
   color: #ffffff;
-  border: 1px solid #3b82f6;
+  border: 1px solid var(--color-primary-button, #2563eb);
 }
 
 .pricing-card__btn--primary:hover {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--color-primary-button-hover, #1d4ed8);
+  border-color: var(--color-primary-button-hover, #1d4ed8);
 }
 
 .pricing-card__btn--outline {
@@ -272,9 +272,55 @@
 /* ==========================================================================
    Early Access Modal
    ========================================================================== */
+.early-access-modal-backdrop {
+  z-index: var(--z-modal, 400);
+}
+
 .early-access-modal {
   max-width: 520px;
   width: 100%;
+}
+
+.early-access-modal__header {
+  padding: var(--space-4) var(--space-5);
+  align-items: flex-start;
+}
+
+.early-access-modal__title {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.early-access-modal__body {
+  padding: var(--space-4) var(--space-5);
+}
+
+.early-access-modal__footer {
+  padding: var(--space-3) var(--space-5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.early-access-modal__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.early-access-icon--success {
+  color: var(--color-success, #4ade80);
+}
+
+.early-access-icon--lg {
+  font-size: 18px;
+}
+
+.early-access-lock-btn--confirmed {
+  color: var(--color-success, #4ade80);
+  border-color: rgba(74, 222, 128, 0.4);
 }
 
 .early-access-badge-row {
@@ -389,4 +435,30 @@
 .early-access-landing-link:hover {
   color: #bfdbfe;
   text-decoration: underline;
+}
+
+@media (max-width: 479px) {
+  .early-access-modal__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .early-access-modal__actions {
+    flex-direction: column-reverse;
+    width: 100%;
+  }
+
+  .early-access-modal__actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-cycle-btn,
+  .pricing-card,
+  .pricing-card__btn,
+  .early-access-landing-link {
+    transition: none;
+  }
 }

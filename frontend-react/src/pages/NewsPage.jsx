@@ -19,8 +19,11 @@ import '../styles/pages/news.css';
 const STATUS = { LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
 
 export function NewsPage() {
-  const { business } = useAuth();
+  const { user, business } = useAuth();
   const { showToast } = useToast();
+
+  const currentRole = business?.businessRole || user?.businessRole || 'OWNER';
+  const isOwner = currentRole === 'OWNER';
 
   const [status, setStatus] = useState(STATUS.LOADING);
   const [items,  setItems]  = useState([]);
@@ -49,22 +52,43 @@ export function NewsPage() {
     }
   }, []);
 
-  useEffect(() => { loadNews(1); }, [loadNews]);
-
-  /* ── Load digest preview when modal opens ────────────────────── */
   useEffect(() => {
-    if (!showDigestModal) return;
-    setDigestLoading(true);
-    getDigestPreview()
-      .then((data) => setDigestPreview(data))
-      .catch(() => {
-        showToast({ type: 'error', message: 'Could not generate digest preview.' });
+    let cancelled = false;
+    getNews({ page: 1, limit: NEWS_LIMIT })
+      .then(({ data, meta: m }) => {
+        if (cancelled) return;
+        setItems(data ?? []);
+        setMeta(m);
+        setStatus(STATUS.SUCCESS);
       })
-      .finally(() => setDigestLoading(false));
-  }, [showDigestModal]); // eslint-disable-line react-hooks/exhaustive-deps
+      .catch(() => {
+        if (!cancelled) setStatus(STATUS.ERROR);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ── Open Digest modal and fetch preview ────────────────────── */
+  async function handleOpenDigestModal() {
+    setShowDigestModal(true);
+    setDigestLoading(true);
+    try {
+      const data = await getDigestPreview();
+      setDigestPreview(data);
+    } catch {
+      showToast({ type: 'error', message: 'Could not generate digest preview.' });
+    } finally {
+      setDigestLoading(false);
+    }
+  }
 
   /* ── Send digest now ────────────────────────────────────────── */
   async function handleSendDigestNow() {
+    if (!isOwner) {
+      showToast({ type: 'error', message: 'Only workspace Owners can dispatch digests.' });
+      return;
+    }
     setSendingDigest(true);
     try {
       const result = await sendDigestNow();
@@ -87,23 +111,26 @@ export function NewsPage() {
 
   /* ── Render ─────────────────────────────────────────────────── */
   return (
-    <div className="page-container">
+    <div className="page-container news-page">
 
       {/* Header bar with industry label and digest modal trigger */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-        <p id="news-industry-label" className="news-industry-label" style={{ margin: 0 }}>
-          {industryName
-            ? `Showing news for: ${industryName}`
-            : 'Showing news for your industry'}
-        </p>
+      <div className="news-toolbar">
+        <div>
+          <h2 className="news-toolbar__title">Industry Intelligence Feed</h2>
+          <p id="news-industry-label" className="news-industry-label page-subtitle">
+            {industryName
+              ? `Showing news for: ${industryName}`
+              : 'Showing news for your industry'}
+          </p>
+        </div>
 
         <button
           type="button"
           className="btn btn--secondary btn--sm"
-          onClick={() => setShowDigestModal(true)}
+          onClick={handleOpenDigestModal}
           id="btn-open-digest-preview"
         >
-          <i className="fa-solid fa-envelope-open-text mr-1" /> View Periodic Digest &amp; Sourcing Summary
+          <i className="fa-solid fa-envelope-open-text mr-1" aria-hidden="true" /> View Periodic Digest &amp; Sourcing Summary
         </button>
       </div>
 
@@ -124,7 +151,7 @@ export function NewsPage() {
           <EmptyState
             icon="fa-solid fa-newspaper"
             title="No news available yet"
-            message="Industry news articles will appear here once your news feed is connected. This feature is pending activation in the current version."
+            message="Relevant industry news articles for your tracked commodities will appear here automatically as market updates are ingested."
           />
         )}
 
@@ -138,7 +165,7 @@ export function NewsPage() {
 
       {/* Pagination */}
       {status === STATUS.SUCCESS && (
-        <div id="news-pagination">
+        <div id="news-pagination" className="news-pagination">
           <Pagination meta={meta} onPageChange={page => loadNews(page)} />
         </div>
       )}
@@ -152,14 +179,14 @@ export function NewsPage() {
           size="lg"
           id="digest-preview-modal"
           footer={
-            <div className="modal__footer-actions" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#8b949e' }}>
-                Cadence: <strong>{digestPreview?.frequency || 'WEEKLY'}</strong> • Channel: <strong>{digestPreview?.digestChannel || 'EMAIL'}</strong>
+            <div className="digest-modal-footer">
+              <div className="digest-modal-footer__meta">
+                Cadence: <strong>{digestPreview?.frequency || 'WEEKLY'}</strong> &bull; Channel: <strong>{digestPreview?.digestChannel || 'EMAIL'}</strong>
                 {digestPreview?.lastDigestSentAt && (
-                  <span> • Last sent: {formatDateTime(digestPreview.lastDigestSentAt)}</span>
+                  <span> &bull; Last sent: {formatDateTime(digestPreview.lastDigestSentAt)}</span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="digest-modal-footer__actions">
                 <button
                   type="button"
                   className="btn btn--ghost"
@@ -167,148 +194,173 @@ export function NewsPage() {
                 >
                   Close
                 </button>
-                <button
-                  type="button"
-                  className={`btn btn--primary${sendingDigest ? ' btn--loading' : ''}`}
-                  onClick={handleSendDigestNow}
-                  disabled={sendingDigest || digestLoading}
-                  id="btn-send-digest-now"
-                >
-                  <i className="fa-solid fa-paper-plane mr-1" /> Send Digest Now
-                </button>
+                {isOwner && (
+                  <button
+                    type="button"
+                    className={`btn btn--primary${sendingDigest ? ' btn--loading' : ''}`}
+                    onClick={handleSendDigestNow}
+                    disabled={sendingDigest || digestLoading}
+                    id="btn-send-digest-now"
+                  >
+                    <i className="fa-solid fa-paper-plane mr-1" aria-hidden="true" /> Send Digest Now
+                  </button>
+                )}
               </div>
             </div>
           }
         >
           {digestLoading ? (
-            <div style={{ padding: '24px 0' }}>
+            <div className="digest-modal-loading">
               <Skeleton type="card" rows={3} />
             </div>
           ) : digestPreview ? (
             <div>
               {/* Tab Selector */}
-              <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #30363d', paddingBottom: '8px', marginBottom: '16px' }}>
+              <div className="digest-modal-tabs" role="tablist" aria-label="Digest preview channels">
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={digestTab === 'email'}
                   className={`btn btn--sm ${digestTab === 'email' ? 'btn--primary' : 'btn--ghost'}`}
                   onClick={() => setDigestTab('email')}
                 >
-                  <i className="fa-solid fa-envelope mr-1" /> Email Preview
+                  <i className="fa-solid fa-envelope mr-1" aria-hidden="true" /> Email Preview
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={digestTab === 'whatsapp'}
                   className={`btn btn--sm ${digestTab === 'whatsapp' ? 'btn--primary' : 'btn--ghost'}`}
                   onClick={() => setDigestTab('whatsapp')}
                 >
-                  <i className="fa-brands fa-whatsapp mr-1" /> WhatsApp Preview
+                  <i className="fa-brands fa-whatsapp mr-1" aria-hidden="true" /> WhatsApp Preview
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={digestTab === 'sourcing'}
                   className={`btn btn--sm ${digestTab === 'sourcing' ? 'btn--primary' : 'btn--ghost'}`}
                   onClick={() => setDigestTab('sourcing')}
                 >
-                  <i className="fa-solid fa-boxes-packing mr-1" /> Sourcing Guidance ({digestPreview.procurementActions?.length || 0})
+                  <i className="fa-solid fa-boxes-packing mr-1" aria-hidden="true" /> Sourcing Guidance ({digestPreview.procurementActions?.length || 0})
                 </button>
               </div>
 
               {/* Tab Content 1: Email View */}
               {digestTab === 'email' && (
-                <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: '8px', padding: '16px' }}>
-                  <div style={{ borderBottom: '1px solid #21262d', paddingBottom: '12px', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#f0f6fc' }}>
+                <div className="digest-email-sheet" role="tabpanel">
+                  <div className="digest-email-sheet__header">
+                    <div className="digest-email-sheet__subject">
                       [{digestPreview.frequency || 'Weekly'} Digest] Market Intelligence for {digestPreview.businessName}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#8b949e', marginTop: '4px' }}>
-                      Industry Focus: <span style={{ color: '#58a6ff' }}>{digestPreview.industryName}</span>
+                    <div className="digest-email-sheet__meta">
+                      Industry Focus: <span className="digest-accent-link">{digestPreview.industryName}</span>
                     </div>
                   </div>
 
                   {/* 7-Day Movers Table */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#e6edf3', marginBottom: '8px' }}>
-                      📊 7-Day Price Movers
-                    </div>
+                  <div className="digest-section">
+                    <h4 className="digest-section__title">
+                      <i className="fa-solid fa-chart-line mr-2 digest-icon-info" aria-hidden="true" />
+                      7-Day Price Movers
+                    </h4>
                     {digestPreview.topMovers && digestPreview.topMovers.length > 0 ? (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', background: '#161b22', borderRadius: '6px', overflow: 'hidden' }}>
-                        <thead>
-                          <tr style={{ background: '#21262d', color: '#8b949e', textAlign: 'left' }}>
-                            <th style={{ padding: '8px 12px' }}>Material</th>
-                            <th style={{ padding: '8px 12px' }}>Latest Price</th>
-                            <th style={{ padding: '8px 12px' }}>7D Change</th>
-                            <th style={{ padding: '8px 12px' }}>Trend</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {digestPreview.topMovers.map((m) => {
-                            const isUp = Number(m.changePercent) > 0;
-                            const isDown = Number(m.changePercent) < 0;
-                            const color = isUp ? '#f85149' : (isDown ? '#3fb950' : '#8b949e');
-                            return (
-                              <tr key={m.materialId} style={{ borderBottom: '1px solid #21262d' }}>
-                                <td style={{ padding: '8px 12px', color: '#f0f6fc' }}>{m.materialName}</td>
-                                <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#c9d1d9' }}>
-                                  {m.currency || 'INR'} {Number(m.latestPrice || 0).toFixed(2)}{m.unit ? ` / ${m.unit}` : ''}
-                                </td>
-                                <td style={{ padding: '8px 12px', fontWeight: 600, color }}>
-                                  {isUp ? '▲ +' : (isDown ? '▼ ' : '')}{Number(m.changePercent || 0).toFixed(2)}%
-                                </td>
-                                <td style={{ padding: '8px 12px', color: '#8b949e', fontSize: '12px' }}>{m.trend}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      <div className="table-wrapper">
+                        <table className="table table--compact">
+                          <thead>
+                            <tr>
+                              <th>Material</th>
+                              <th>Latest Price</th>
+                              <th>7D Change</th>
+                              <th>Trend</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {digestPreview.topMovers.map((m) => {
+                              const isUp = Number(m.changePercent) > 0;
+                              const isDown = Number(m.changePercent) < 0;
+                              const deltaClass = isUp ? 'digest-delta--up' : (isDown ? 'digest-delta--down' : 'digest-delta--flat');
+                              return (
+                                <tr key={m.materialId}>
+                                  <td className="digest-cell-strong">{m.materialName}</td>
+                                  <td className="font-mono">
+                                    {m.currency || 'INR'} {Number(m.latestPrice || 0).toFixed(2)}{m.unit ? ` / ${m.unit}` : ''}
+                                  </td>
+                                  <td className={`font-mono ${deltaClass}`}>
+                                    {isUp ? '+' : ''}{Number(m.changePercent || 0).toFixed(2)}%
+                                  </td>
+                                  <td className="digest-cell-muted">{m.trend}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
-                      <p style={{ color: '#8b949e', fontSize: '13px' }}>No major 7-day price fluctuations recorded.</p>
+                      <p className="digest-empty-note">No major 7-day price fluctuations recorded.</p>
                     )}
                   </div>
 
                   {/* Sourcing Actions summary */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#e6edf3', marginBottom: '8px' }}>
-                      🎯 Sourcing &amp; Inventory Actions
-                    </div>
+                  <div className="digest-section">
+                    <h4 className="digest-section__title">
+                      <i className="fa-solid fa-bullseye mr-2 digest-icon-info" aria-hidden="true" />
+                      Sourcing &amp; Inventory Actions
+                    </h4>
                     {digestPreview.procurementActions && digestPreview.procurementActions.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {digestPreview.procurementActions.slice(0, 3).map((a) => (
-                          <div key={a.materialId} style={{ background: '#161b22', borderLeft: `3px solid ${a.bufferStrategy?.badgeVariant === 'danger' ? '#f85149' : (a.bufferStrategy?.badgeVariant === 'warning' ? '#d29922' : '#58a6ff')}`, padding: '10px 14px', borderRadius: '4px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <strong style={{ color: '#f0f6fc', fontSize: '13px' }}>{a.materialName}</strong>
-                              <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px', background: '#21262d', color: '#58a6ff', fontWeight: 600 }}>
-                                {String(a.actionRecommendation || 'MONITOR_ONLY').replace(/_/g, ' ')}
-                              </span>
+                      <div className="digest-card-stack">
+                        {digestPreview.procurementActions.slice(0, 3).map((a) => {
+                          const variant = a.bufferStrategy?.badgeVariant === 'danger'
+                            ? 'danger'
+                            : (a.bufferStrategy?.badgeVariant === 'warning' ? 'warning' : 'info');
+                          return (
+                            <div key={a.materialId} className={`digest-action-item digest-action-item--${variant}`}>
+                              <div className="digest-action-item__top">
+                                <strong className="digest-action-item__title">{a.materialName}</strong>
+                                <span className={`badge badge--${variant}`}>
+                                  {String(a.actionRecommendation || 'MONITOR_ONLY').replace(/_/g, ' ')}
+                                </span>
+                              </div>
+                              <div className="digest-action-item__rationale">
+                                {a.rationale || a.bufferStrategy?.summary}
+                              </div>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#8b949e', marginTop: '4px' }}>
-                              {a.rationale || a.bufferStrategy?.summary}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
-                      <p style={{ color: '#8b949e', fontSize: '13px' }}>All materials within standard inventory buffer parameters.</p>
+                      <p className="digest-empty-note">All materials within standard inventory buffer parameters.</p>
                     )}
                   </div>
 
                   {/* Top News */}
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#e6edf3', marginBottom: '8px' }}>
-                      🗞️ Curated Industry Articles
-                    </div>
+                    <h4 className="digest-section__title">
+                      <i className="fa-solid fa-newspaper mr-2 digest-icon-info" aria-hidden="true" />
+                      Curated Industry Articles
+                    </h4>
                     {digestPreview.topNews && digestPreview.topNews.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {digestPreview.topNews.map((n) => (
-                          <div key={n.id} style={{ fontSize: '13px' }}>
-                            <a href={n.url || '#'} target="_blank" rel="noopener noreferrer" style={{ color: '#58a6ff', textDecoration: 'none', fontWeight: 500 }}>
-                              {n.title}
-                            </a>
-                            <div style={{ fontSize: '11px', color: '#8b949e', marginTop: '2px' }}>
-                              {n.sourceName} • {formatDate(n.publishedAt)}
+                      <div className="digest-card-stack">
+                        {digestPreview.topNews.map((n) => {
+                          const safeUrl = getSafeExternalUrl(n.url);
+                          return (
+                            <div key={n.id} className="digest-news-entry">
+                              {safeUrl ? (
+                                <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="digest-news-entry__link">
+                                  {n.title}
+                                </a>
+                              ) : (
+                                <span className="digest-news-entry__title">{n.title}</span>
+                              )}
+                              <div className="digest-news-entry__meta">
+                                {n.sourceName} &bull; {formatDate(n.publishedAt)}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
-                      <p style={{ color: '#8b949e', fontSize: '13px' }}>No articles published in the current cycle.</p>
+                      <p className="digest-empty-note">No articles published in the current cycle.</p>
                     )}
                   </div>
                 </div>
@@ -316,94 +368,94 @@ export function NewsPage() {
 
               {/* Tab Content 2: WhatsApp View */}
               {digestTab === 'whatsapp' && (
-                <div style={{ background: '#0b141a', border: '1px solid #2a3942', borderRadius: '8px', padding: '16px' }}>
-                  <div style={{ background: '#005c4b', color: '#e9edef', borderRadius: '8px', padding: '14px 16px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-{`📰 *Business Market Monitor — ${digestPreview.frequency || 'Weekly'} Digest*
-🏢 *${digestPreview.businessName}* (${digestPreview.industryName})
+                <div className="digest-wa-shell" role="tabpanel">
+                  <pre className="digest-wa-bubble font-mono">
+{`*Business Market Monitor — ${digestPreview.frequency || 'Weekly'} Digest*
+*${digestPreview.businessName}* (${digestPreview.industryName})
 
-📊 *7-Day Price Movers:*
+*7-Day Price Movers:*
 ${(digestPreview.topMovers && digestPreview.topMovers.length > 0)
-  ? digestPreview.topMovers.slice(0, 5).map(m => `• *${m.materialName}*: ${m.currency || 'INR'} ${Number(m.latestPrice || 0).toFixed(2)}${m.unit ? `/${m.unit}` : ''} (${Number(m.changePercent) > 0 ? '+' : ''}${Number(m.changePercent || 0).toFixed(1)}%) [${m.trend}]`).join('\n')
-  : '• All tracked materials stable.'}
+  ? digestPreview.topMovers.slice(0, 5).map(m => `- *${m.materialName}*: ${m.currency || 'INR'} ${Number(m.latestPrice || 0).toFixed(2)}${m.unit ? `/${m.unit}` : ''} (${Number(m.changePercent) > 0 ? '+' : ''}${Number(m.changePercent || 0).toFixed(1)}%) [${m.trend}]`).join('\n')
+  : '- All tracked materials stable.'}
 
-🎯 *Sourcing Actions:*
+*Sourcing Actions:*
 ${(digestPreview.procurementActions && digestPreview.procurementActions.length > 0)
-  ? digestPreview.procurementActions.slice(0, 3).map(a => `• *${a.materialName}*: ${String(a.actionRecommendation || 'MONITOR_ONLY').replace(/_/g, ' ')} — ${a.rationale || a.bufferStrategy?.summary || 'Standard replenishment buffer.'}`).join('\n')
-  : '• Standard replenishment buffers maintained.'}
+  ? digestPreview.procurementActions.slice(0, 3).map(a => `- *${a.materialName}*: ${String(a.actionRecommendation || 'MONITOR_ONLY').replace(/_/g, ' ')} — ${a.rationale || a.bufferStrategy?.summary || 'Standard replenishment buffer.'}`).join('\n')
+  : '- Standard replenishment buffers maintained.'}
 
-🗞️ *Industry Headlines:*
+*Industry Headlines:*
 ${(digestPreview.topNews && digestPreview.topNews.length > 0)
-  ? digestPreview.topNews.slice(0, 3).map(n => `• *${n.title}* (${n.sourceName})`).join('\n')
-  : '• No fresh articles.'}
+  ? digestPreview.topNews.slice(0, 3).map(n => `- *${n.title}* (${n.sourceName})`).join('\n')
+  : '- No fresh articles.'}
 
 _Open BMM dashboard for live trends, graphs & supplier benchmarks._`}
-                  </div>
+                  </pre>
                 </div>
               )}
 
               {/* Tab Content 3: Sourcing Guidance */}
               {digestTab === 'sourcing' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="digest-sourcing-list" role="tabpanel">
                   {digestPreview.procurementActions && digestPreview.procurementActions.length > 0 ? (
-                    digestPreview.procurementActions.map((rec) => (
-                      <div key={rec.materialId} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: '6px', padding: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '15px', fontWeight: 600, color: '#f0f6fc' }}>
-                            {rec.materialName}
-                          </span>
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            background: rec.actionRecommendation === 'ACCELERATE_PURCHASE' ? '#f8514920' : (rec.actionRecommendation === 'DELAY_PURCHASE' ? '#d2992220' : '#58a6ff20'),
-                            color: rec.actionRecommendation === 'ACCELERATE_PURCHASE' ? '#f85149' : (rec.actionRecommendation === 'DELAY_PURCHASE' ? '#d29922' : '#58a6ff'),
-                          }}>
-                            {String(rec.actionRecommendation || 'MONITOR_ONLY').replace(/_/g, ' ')}
-                          </span>
+                    digestPreview.procurementActions.map((rec) => {
+                      const recVariant = rec.actionRecommendation === 'ACCELERATE_PURCHASE'
+                        ? 'danger'
+                        : (rec.actionRecommendation === 'DELAY_PURCHASE' ? 'warning' : 'info');
+                      return (
+                        <div key={rec.materialId} className="digest-sourcing-card">
+                          <div className="digest-sourcing-card__header">
+                            <span className="digest-sourcing-card__name">
+                              {rec.materialName}
+                            </span>
+                            <span className={`badge badge--${recVariant}`}>
+                              {String(rec.actionRecommendation || 'MONITOR_ONLY').replace(/_/g, ' ')}
+                            </span>
+                          </div>
+
+                          <p className="digest-sourcing-card__rationale">
+                            {rec.rationale || rec.bufferStrategy?.detailedGuidance}
+                          </p>
+
+                          {/* Benchmark & Quote comparison */}
+                          {rec.quoteComparison && (
+                            <div className="digest-sourcing-card__parity">
+                              {rec.quoteComparison.variancePercent !== null ? (
+                                <span>
+                                  Supplier quote vs market benchmark variance:{' '}
+                                  <strong className={rec.quoteComparison.variancePercent > 0 ? 'digest-delta--up' : 'digest-delta--down'}>
+                                    {rec.quoteComparison.variancePercent > 0 ? '+' : ''}{rec.quoteComparison.variancePercent}%
+                                  </strong>
+                                </span>
+                              ) : rec.quoteComparison.crossCurrencyNote ? (
+                                <span className="digest-parity-warning">
+                                  <i className="fa-solid fa-circle-info mr-1" aria-hidden="true" /> {rec.quoteComparison.crossCurrencyNote}
+                                </span>
+                              ) : (
+                                <span>Single price data stream available.</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Diversification advice */}
+                          {rec.diversification && (
+                            <div className="digest-sourcing-card__div">
+                              <strong className="digest-sourcing-card__div-title">
+                                Supply Diversification ({rec.diversification.category}):
+                              </strong>{' '}
+                              {rec.diversification.sourcingStrategy}
+                            </div>
+                          )}
                         </div>
-
-                        <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#c9d1d9' }}>
-                          {rec.rationale || rec.bufferStrategy?.detailedGuidance}
-                        </p>
-
-                        {/* Benchmark & Quote comparison */}
-                        {rec.quoteComparison && (
-                          <div style={{ background: '#0d1117', padding: '10px 12px', borderRadius: '4px', fontSize: '12px', color: '#8b949e', marginBottom: '10px' }}>
-                            {rec.quoteComparison.variancePercent !== null ? (
-                              <span>
-                                Supplier quote vs market benchmark variance:{' '}
-                                <strong style={{ color: rec.quoteComparison.variancePercent > 0 ? '#f85149' : '#3fb950' }}>
-                                  {rec.quoteComparison.variancePercent > 0 ? '+' : ''}{rec.quoteComparison.variancePercent}%
-                                </strong>
-                              </span>
-                            ) : rec.quoteComparison.crossCurrencyNote ? (
-                              <span style={{ color: '#d29922' }}>
-                                <i className="fa-solid fa-circle-info mr-1" /> {rec.quoteComparison.crossCurrencyNote}
-                              </span>
-                            ) : (
-                              <span>Single price data stream available.</span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Diversification advice */}
-                        {rec.diversification && (
-                          <div style={{ fontSize: '12px', color: '#8b949e' }}>
-                            <strong style={{ color: '#f0f6fc' }}>Supply Diversification ({rec.diversification.category}):</strong>{' '}
-                            {rec.diversification.sourcingStrategy}
-                          </div>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    <p style={{ color: '#8b949e', fontSize: '13px' }}>No tracked materials available for sourcing analysis.</p>
+                    <p className="digest-empty-note">No tracked materials available for sourcing analysis.</p>
                   )}
                 </div>
               )}
             </div>
           ) : (
-            <p style={{ color: '#8b949e' }}>No preview data available.</p>
+            <p className="digest-empty-note">No preview data available.</p>
           )}
         </Modal>
       )}

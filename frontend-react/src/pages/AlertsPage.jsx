@@ -132,7 +132,22 @@ export function AlertsPage() {
     }
   }, []);
 
-  useEffect(() => { loadPage(); }, [loadPage]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getMaterials(), getAlertRules()])
+      .then(([mats, ruleList]) => {
+        if (cancelled) return;
+        setMaterials(mats ?? []);
+        setRules(ruleList ?? []);
+        setRulesStatus(STATUS.SUCCESS);
+      })
+      .catch(() => {
+        if (!cancelled) setRulesStatus(STATUS.ERROR);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* ── Tab switching — lazy load events on first open ─────────── */
   function handleTabSwitch(tab) {
@@ -204,15 +219,23 @@ export function AlertsPage() {
 
   /* ── Render ─────────────────────────────────────────────────── */
   return (
-    <div className="page-container">
+    <div className="page-container alerts-page">
+      {isViewer && (
+        <div id="alerts-viewer-banner" className="alert-banner alert-banner--info alerts-viewer-banner" role="status">
+          <i className="fa-solid fa-eye" aria-hidden="true" />
+          <span className="alert-banner__message">
+            View-only mode: contact a workspace Owner or Purchase Manager to create, pause, or delete alert rules.
+          </span>
+        </div>
+      )}
 
       {/* ── Tab bar ─────────────────────────────────────────── */}
-      <div className="tab-bar" role="tablist" aria-label="Alerts views">
+      <div className="alerts-tabs" role="tablist" aria-label="Alerts views">
         <button
           type="button"
           id="tab-rules"
           role="tab"
-          className={`tab-btn${activeTab === 'rules' ? ' tab-btn--active' : ''}`}
+          className={`alerts-tab-btn${activeTab === 'rules' ? ' alerts-tab-btn--active' : ''}`}
           aria-selected={activeTab === 'rules' ? 'true' : 'false'}
           aria-controls="panel-rules"
           onClick={() => handleTabSwitch('rules')}
@@ -223,7 +246,7 @@ export function AlertsPage() {
           type="button"
           id="tab-events"
           role="tab"
-          className={`tab-btn${activeTab === 'events' ? ' tab-btn--active' : ''}`}
+          className={`alerts-tab-btn${activeTab === 'events' ? ' alerts-tab-btn--active' : ''}`}
           aria-selected={activeTab === 'events' ? 'true' : 'false'}
           aria-controls="panel-events"
           onClick={() => handleTabSwitch('events')}
@@ -239,10 +262,11 @@ export function AlertsPage() {
         id="panel-rules"
         role="tabpanel"
         aria-labelledby="tab-rules"
-        className={activeTab !== 'rules' ? 'tab-panel--hidden' : ''}
+        className={activeTab !== 'rules' ? 'alerts-tab-panel--hidden' : ''}
       >
         {/* Toolbar — "Create Alert Rule" button */}
-        <div id="rules-toolbar" className="page-toolbar">
+        <div id="rules-toolbar" className="alerts-toolbar">
+          <h2 className="alerts-toolbar__title">Price Alert Rules</h2>
           <button
             type="button"
             id="create-rule-btn"
@@ -278,9 +302,18 @@ export function AlertsPage() {
               rules={rules}
               materials={materials}
               toggleBusy={toggleBusy}
+              readOnly={isViewer}
               onToggle={handleToggleRule}
-              onDelete={rule => setDeleteTarget(rule)}
-              onCreateRule={() => setCreateOpen(true)}
+              onDelete={rule => {
+                if (isViewer) {
+                  showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+                  return;
+                }
+                setDeleteTarget(rule);
+              }}
+              onCreateRule={() => {
+                if (!isViewer) setCreateOpen(true);
+              }}
             />
           )}
         </div>
@@ -293,7 +326,7 @@ export function AlertsPage() {
         id="panel-events"
         role="tabpanel"
         aria-labelledby="tab-events"
-        className={activeTab !== 'events' ? 'tab-panel--hidden' : ''}
+        className={activeTab !== 'events' ? 'alerts-tab-panel--hidden' : ''}
       >
         <div id="events-container">
           {eventsStatus === STATUS.IDLE && null}
@@ -313,7 +346,7 @@ export function AlertsPage() {
         </div>
 
         {eventsStatus === STATUS.SUCCESS && (
-          <div id="events-pagination">
+          <div id="events-pagination" className="alerts-pagination">
             <Pagination meta={eventsMeta} onPageChange={page => loadEvents(page)} />
           </div>
         )}
@@ -325,7 +358,7 @@ export function AlertsPage() {
         onClose={() => setCreateOpen(false)}
         materials={materials}
         onCreated={handleRuleCreated}
-        showToast={showToast}
+        readOnly={isViewer}
       />
 
       {/* ── Delete Confirmation ──────────────────────────────── */}
@@ -347,14 +380,26 @@ export function AlertsPage() {
  * RULES TABLE
  * Columns: Material | Condition | Threshold | Channel | Cooldown | Status | Actions
  * ================================================================ */
-export function RulesTable({ rules, materials, toggleBusy = {}, onToggle = () => {}, onDelete = () => {}, onCreateRule = () => {} }) {
+export function RulesTable({
+  rules,
+  materials,
+  toggleBusy = {},
+  readOnly = false,
+  onToggle = () => {},
+  onDelete = () => {},
+  onCreateRule = () => {},
+}) {
   if (rules.length === 0) {
     return (
       <EmptyState
         icon="fa-solid fa-bell-slash"
         title="No alert rules yet"
-        message="Create an alert rule to get notified when a material price crosses a threshold."
-        action={{ label: 'Create Alert Rule', onClick: onCreateRule }}
+        message={
+          readOnly
+            ? 'No alert rules have been configured for this workspace yet.'
+            : 'Create an alert rule to get notified when a material price crosses a threshold.'
+        }
+        action={readOnly ? undefined : { label: 'Create Alert Rule', onClick: onCreateRule }}
       />
     );
   }
@@ -364,9 +409,9 @@ export function RulesTable({ rules, materials, toggleBusy = {}, onToggle = () =>
       <table className="table">
         <caption className="sr-only">Alert rules</caption>
         <thead>
-          <tr className="table__header-row">
+          <tr>
             {['Material', 'Condition', 'Threshold', 'Channel', 'Cooldown', 'Status', 'Actions'].map(col => (
-              <th key={col} className="table__cell table__cell--header" scope="col">
+              <th key={col} scope="col">
                 {col}
               </th>
             ))}
@@ -379,6 +424,7 @@ export function RulesTable({ rules, materials, toggleBusy = {}, onToggle = () =>
               rule={rule}
               materials={materials}
               busy={!!toggleBusy[rule.id]}
+              readOnly={readOnly}
               onToggle={onToggle}
               onDelete={onDelete}
             />
@@ -390,31 +436,30 @@ export function RulesTable({ rules, materials, toggleBusy = {}, onToggle = () =>
 }
 
 /* ── Single Rule Row ────────────────────────────────────────────── */
-function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
+function RuleRow({ rule, materials, busy, readOnly, onToggle, onDelete }) {
   const matName = getMaterialName(materials, rule.trackedMaterialId);
   const isPct = rule.thresholdType === 'PERCENTAGE';
   return (
     <tr data-rule-id={rule.id}>
-      <td className="table__cell">{matName}</td>
-      <td className="table__cell">
-        <span className={`badge ${isPct ? 'badge--info' : 'badge--neutral'}`} style={{ marginRight: '6px', fontSize: '10px' }}>
+      <td>{matName}</td>
+      <td>
+        <span className={`badge alerts-badge-pill alerts-badge-pill--inline ${isPct ? 'badge--info' : 'badge--neutral'}`}>
           {isPct ? '% Change' : 'Absolute'}
         </span>
         {formatCondition(rule.conditionType, rule.thresholdType)}
       </td>
-      <td className="table__cell font-mono">
+      <td className="font-mono">
         {isPct ? `${formatNumber(rule.thresholdPrice, 1)}%` : formatNumber(rule.thresholdPrice, 2)}
       </td>
-      <td className="table__cell">
+      <td>
         <span
-          className={`badge ${
+          className={`badge alerts-badge-pill ${
             rule.notificationChannel === 'WHATSAPP'
               ? 'badge--success'
               : rule.notificationChannel === 'BOTH'
               ? 'badge--info'
               : 'badge--neutral'
           }`}
-          style={{ fontSize: '10px' }}
         >
           {rule.notificationChannel === 'WHATSAPP'
             ? 'WhatsApp'
@@ -423,25 +468,25 @@ function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
             : 'Email'}
         </span>
         {rule.destinationPhone && (
-          <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+          <span className="alerts-submeta font-mono">
             {rule.destinationPhone}
           </span>
         )}
       </td>
-      <td className="table__cell text-xs text-secondary">
+      <td className="text-xs text-secondary">
         {rule.cooldownHours || 24}h
         {rule.lastTriggeredAt && (
-          <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+          <span className="alerts-submeta">
             Fired: {formatDateTime(rule.lastTriggeredAt)}
           </span>
         )}
       </td>
-      <td className="table__cell">
+      <td>
         <span className={`badge ${rule.isActive ? 'badge--success' : 'badge--neutral'}`}>
           {rule.isActive ? 'Active' : 'Paused'}
         </span>
       </td>
-      <td className="table__cell">
+      <td>
         <div className="alerts-actions">
           {/* Toggle active/paused */}
           <button
@@ -450,8 +495,9 @@ function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
             aria-label={rule.isActive
               ? `Pause alert rule for ${matName}`
               : `Activate alert rule for ${matName}`}
-            disabled={busy}
-            onClick={() => onToggle(rule)}
+            disabled={busy || readOnly}
+            title={readOnly ? 'Viewers have read-only permissions' : undefined}
+            onClick={() => { if (!readOnly) onToggle(rule); }}
           >
             {rule.isActive ? 'Pause' : 'Activate'}
           </button>
@@ -460,8 +506,9 @@ function RuleRow({ rule, materials, busy, onToggle, onDelete }) {
             type="button"
             className="btn btn--sm btn--danger btn--icon"
             aria-label={`Delete alert rule for ${matName}`}
-            disabled={busy}
-            onClick={() => onDelete(rule)}
+            disabled={busy || readOnly}
+            title={readOnly ? 'Viewers have read-only permissions' : undefined}
+            onClick={() => { if (!readOnly) onDelete(rule); }}
           >
             <i className="fa-solid fa-trash" aria-hidden="true" />
           </button>
@@ -491,9 +538,9 @@ export function EventsTable({ events }) {
       <table className="table">
         <caption className="sr-only">Alert event history</caption>
         <thead>
-          <tr className="table__header-row">
+          <tr>
             {['Triggered At', 'Condition', 'Threshold', 'Observed Change', 'Triggered Price', 'Channel', 'Delivery Status'].map(col => (
-              <th key={col} className="table__cell table__cell--header" scope="col">
+              <th key={col} scope="col">
                 {col}
               </th>
             ))}
@@ -505,40 +552,39 @@ export function EventsTable({ events }) {
             const isPct = evt.thresholdTypeSnapshot === 'PERCENTAGE';
             return (
               <tr key={evt.id}>
-                <td className="table__cell">{formatDateTime(evt.triggeredAt)}</td>
-                <td className="table__cell">
-                  <span className={`badge ${isPct ? 'badge--info' : 'badge--neutral'}`} style={{ marginRight: '6px', fontSize: '10px' }}>
+                <td>{formatDateTime(evt.triggeredAt)}</td>
+                <td>
+                  <span className={`badge alerts-badge-pill alerts-badge-pill--inline ${isPct ? 'badge--info' : 'badge--neutral'}`}>
                     {isPct ? '% Change' : 'Absolute'}
                   </span>
                   {formatCondition(evt.conditionTypeSnapshot, evt.thresholdTypeSnapshot)}
                 </td>
-                <td className="table__cell font-mono">
+                <td className="font-mono">
                   {isPct
                     ? `${formatNumber(evt.thresholdPriceSnapshot, 1)}%`
                     : formatNumber(evt.thresholdPriceSnapshot, 2)}
                 </td>
-                <td className="table__cell font-mono">
+                <td className="font-mono">
                   {evt.triggeredChangePercent !== null && evt.triggeredChangePercent !== undefined ? (
-                    <span style={{ color: Number(evt.triggeredChangePercent) >= 0 ? 'var(--color-danger, #ef4444)' : 'var(--color-success, #22c55e)' }}>
+                    <span className={Number(evt.triggeredChangePercent) >= 0 ? 'alerts-pct-up' : 'alerts-pct-down'}>
                       {Number(evt.triggeredChangePercent) >= 0 ? '+' : ''}{formatNumber(evt.triggeredChangePercent, 2)}%
                     </span>
                   ) : '—'}
                 </td>
-                <td className="table__cell font-mono">{formatNumber(evt.triggeredPrice, 2)}</td>
-                <td className="table__cell">
+                <td className="font-mono">{formatNumber(evt.triggeredPrice, 2)}</td>
+                <td>
                   <span
-                    className={`badge ${evt.notificationChannel === 'WHATSAPP' ? 'badge--success' : 'badge--neutral'}`}
-                    style={{ fontSize: '10px' }}
+                    className={`badge alerts-badge-pill ${evt.notificationChannel === 'WHATSAPP' ? 'badge--success' : 'badge--neutral'}`}
                   >
                     {evt.notificationChannel === 'WHATSAPP' ? 'WhatsApp' : 'Email'}
                   </span>
                   {evt.recipientPhoneSnapshot && (
-                    <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>
+                    <span className="alerts-submeta font-mono">
                       {evt.recipientPhoneSnapshot}
                     </span>
                   )}
                 </td>
-                <td className="table__cell">
+                <td>
                   <span className={`badge ${cls}`}>{label}</span>
                 </td>
               </tr>
@@ -555,7 +601,21 @@ export function EventsTable({ events }) {
  * Fields: trackedMaterialId (select), conditionType (radio), thresholdPrice (number)
  * POST /api/v1/alerts/rules { trackedMaterialId, conditionType, thresholdPrice }
  * ================================================================ */
-function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
+function CreateRuleModal({ isOpen, onClose, materials, onCreated, readOnly = false }) {
+  if (!isOpen) return null;
+
+  return (
+    <CreateRuleModalContent
+      isOpen={isOpen}
+      onClose={onClose}
+      materials={materials}
+      onCreated={onCreated}
+      readOnly={readOnly}
+    />
+  );
+}
+
+function CreateRuleModalContent({ isOpen, onClose, materials, onCreated, readOnly = false }) {
   const [matId,                setMatId]                = useState('');
   const [matErr,               setMatErr]               = useState('');
   const [thresholdType,        setThresholdType]        = useState('ABSOLUTE'); // 'ABSOLUTE' | 'PERCENTAGE'
@@ -571,25 +631,15 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
   const [formErr,              setFormErr]              = useState('');
   const [saving,               setSaving]               = useState(false);
 
-  // Reset on open/close
-  useEffect(() => {
-    if (!isOpen) {
-      setMatId(''); setMatErr('');
-      setThresholdType('ABSOLUTE');
-      setCondition(''); setCondErr('');
-      setThreshold(''); setThreshErr('');
-      setCooldownHours('24'); setCooldownErr('');
-      setNotificationChannel('EMAIL');
-      setDestinationPhone(''); setPhoneErr('');
-      setFormErr(''); setSaving(false);
-    }
-  }, [isOpen]);
-
   // Only tracked materials in the select
   const trackedMaterials = materials.filter(m => m.isTracked);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (readOnly) {
+      setFormErr('Viewers have read-only permissions.');
+      return;
+    }
     setMatErr(''); setCondErr(''); setThreshErr(''); setCooldownErr(''); setPhoneErr(''); setFormErr('');
 
     let valid = true;
@@ -660,7 +710,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
   }
 
   const footer = (
-    <div className="modal-form-footer">
+    <div className="modal-form-footer alerts-modal-footer">
       <button
         type="button"
         className="btn btn--ghost"
@@ -673,7 +723,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
         form="create-alert-form"
         id="ar-submit-btn"
         className={`btn btn--primary${saving ? ' btn--loading' : ''}`}
-        disabled={saving}
+        disabled={saving || readOnly}
       >
         Create Rule
       </button>
@@ -708,6 +758,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
             name="trackedMaterialId"
             className={`form-control${matErr ? ' form-control--error' : ''}`}
             value={matId}
+            disabled={readOnly}
             onChange={e => { setMatId(e.target.value); setMatErr(''); }}
             aria-required="true"
             aria-describedby="ar-material-error"
@@ -727,19 +778,19 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
         {/* Threshold Type toggle: Absolute vs % Change */}
         <div className="form-group">
           <label className="form-label form-label--required">Threshold Type</label>
-          <div className="filter-group" style={{ display: 'inline-flex', width: '100%' }}>
+          <div className="alerts-segmented" role="group" aria-label="Threshold type">
             <button
               type="button"
-              className={`filter-btn ${thresholdType === 'ABSOLUTE' ? 'filter-btn--active' : ''}`}
-              style={{ flex: 1, textAlign: 'center' }}
+              className={`alerts-segmented__btn${thresholdType === 'ABSOLUTE' ? ' alerts-segmented__btn--active' : ''}`}
+              disabled={readOnly}
               onClick={() => { setThresholdType('ABSOLUTE'); setThreshErr(''); }}
             >
               Absolute Price
             </button>
             <button
               type="button"
-              className={`filter-btn ${thresholdType === 'PERCENTAGE' ? 'filter-btn--active' : ''}`}
-              style={{ flex: 1, textAlign: 'center' }}
+              className={`alerts-segmented__btn${thresholdType === 'PERCENTAGE' ? ' alerts-segmented__btn--active' : ''}`}
+              disabled={readOnly}
               onClick={() => { setThresholdType('PERCENTAGE'); setThreshErr(''); }}
             >
               Percentage Change (%)
@@ -749,7 +800,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
 
         {/* Condition radio group */}
         <div className="form-group">
-          <fieldset className="radio-fieldset">
+          <fieldset className="radio-fieldset" disabled={readOnly}>
             <legend className="form-label form-label--required">Condition</legend>
             {[
               {
@@ -772,7 +823,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
                   checked={condition === value}
                   onChange={() => { setCondition(value); setCondErr(''); }}
                 />
-                <span> {label}</span>
+                <span>{label}</span>
               </label>
             ))}
           </fieldset>
@@ -798,6 +849,7 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
             max={thresholdType === 'PERCENTAGE' ? '1000' : undefined}
             placeholder={thresholdType === 'PERCENTAGE' ? 'e.g. 5 for 5%' : 'e.g. 1500.00'}
             value={threshold}
+            disabled={readOnly}
             onChange={e => { setThreshold(e.target.value); setThreshErr(''); }}
             aria-required="true"
             aria-describedby="ar-threshold-error"
@@ -824,10 +876,11 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
             step="1"
             placeholder="24"
             value={cooldownHours}
+            disabled={readOnly}
             onChange={e => { setCooldownHours(e.target.value); setCooldownErr(''); }}
             aria-describedby="ar-cooldown-error"
           />
-          <small className="text-xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
+          <small className="form-hint alerts-form-hint">
             Suppresses repeated alert notifications for this rule within this window.
           </small>
           {cooldownErr && (
@@ -840,28 +893,28 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
         {/* Notification Channel selector: Email, WhatsApp, Both */}
         <div className="form-group">
           <label className="form-label form-label--required">Notification Channel</label>
-          <div className="filter-group" style={{ display: 'inline-flex', width: '100%' }}>
+          <div className="alerts-segmented" role="group" aria-label="Notification channel">
             <button
               type="button"
-              className={`filter-btn ${notificationChannel === 'EMAIL' ? 'filter-btn--active' : ''}`}
-              style={{ flex: 1, textAlign: 'center' }}
+              className={`alerts-segmented__btn${notificationChannel === 'EMAIL' ? ' alerts-segmented__btn--active' : ''}`}
+              disabled={readOnly}
               onClick={() => { setNotificationChannel('EMAIL'); setPhoneErr(''); }}
             >
               Email
             </button>
             <button
               type="button"
-              className={`filter-btn ${notificationChannel === 'WHATSAPP' ? 'filter-btn--active' : ''}`}
-              style={{ flex: 1, textAlign: 'center' }}
-              onClick={() => setNotificationChannel('WHATSAPP')}
+              className={`alerts-segmented__btn${notificationChannel === 'WHATSAPP' ? ' alerts-segmented__btn--active' : ''}`}
+              disabled={readOnly}
+              onClick={() => { setNotificationChannel('WHATSAPP'); }}
             >
               WhatsApp
             </button>
             <button
               type="button"
-              className={`filter-btn ${notificationChannel === 'BOTH' ? 'filter-btn--active' : ''}`}
-              style={{ flex: 1, textAlign: 'center' }}
-              onClick={() => setNotificationChannel('BOTH')}
+              className={`alerts-segmented__btn${notificationChannel === 'BOTH' ? ' alerts-segmented__btn--active' : ''}`}
+              disabled={readOnly}
+              onClick={() => { setNotificationChannel('BOTH'); }}
             >
               Both
             </button>
@@ -881,10 +934,11 @@ function CreateRuleModal({ isOpen, onClose, materials, onCreated }) {
               className={`form-control font-mono${phoneErr ? ' form-control--error' : ''}`}
               placeholder="+919876543210"
               value={destinationPhone}
+              disabled={readOnly}
               onChange={e => { setDestinationPhone(e.target.value); setPhoneErr(''); }}
               aria-describedby="ar-phone-desc"
             />
-            <small id="ar-phone-desc" className="text-xs text-muted" style={{ display: 'block', marginTop: '4px' }}>
+            <small id="ar-phone-desc" className="form-hint alerts-form-hint">
               E.164 format with country code. If left blank, your business contact phone will be used.
             </small>
             {phoneErr && (

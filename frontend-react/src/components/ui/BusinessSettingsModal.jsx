@@ -38,6 +38,7 @@ import { formatDateTime } from '../../utils/format.js';
 import { Modal } from './Modal.jsx';
 import { Skeleton } from './Skeleton.jsx';
 import { useToast } from './Toast.jsx';
+import '../../styles/pages/settings.css';
 
 const DIGEST_VALUES = ['DAILY', 'WEEKLY', 'MONTHLY'];
 const DIGEST_CHANNELS = ['EMAIL', 'WHATSAPP', 'BOTH'];
@@ -73,12 +74,28 @@ function initFormFromBusiness(business) {
 }
 
 export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
-  const { business: cachedBusiness, setBusiness } = useAuth();
+  if (!isOpen) return null;
+
+  return (
+    <BusinessSettingsModalContent
+      key="bs-modal-open"
+      isOpen={isOpen}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+function BusinessSettingsModalContent({ isOpen, onClose, onSaved }) {
+  const { user, business: cachedBusiness, setBusiness } = useAuth();
   const { showToast } = useToast();
 
-  // Form state
-  const [form,    setForm]    = useState(EMPTY_FORM);
-  const [loading, setLoading] = useState(false);
+  const currentRole = cachedBusiness?.businessRole || user?.businessRole || 'OWNER';
+  const isViewer = currentRole === 'VIEWER';
+
+  // Form state initialized cleanly without triggering synchronous setState in effects
+  const [form,    setForm]    = useState(() => (cachedBusiness ? initFormFromBusiness(cachedBusiness) : EMPTY_FORM));
+  const [loading, setLoading] = useState(!cachedBusiness);
   const [saving,  setSaving]  = useState(false);
 
   // Field errors
@@ -89,33 +106,31 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
   const nameRef = useRef(null);
 
   /* ------------------------------------------------------------------
-   * Load data on open
+   * Fetch business settings if not cached
    * ------------------------------------------------------------------ */
   useEffect(() => {
-    if (!isOpen) return;
+    if (cachedBusiness) return undefined;
 
-    // Clear errors from previous open
-    setErrors({});
-    setFormError('');
-
-    if (cachedBusiness) {
-      setForm(initFormFromBusiness(cachedBusiness));
-      setLoading(false);
-      return;
-    }
-
-    // No cache → fetch from API
-    setLoading(true);
+    let cancelled = false;
     getBusiness()
       .then(business => {
+        if (cancelled) return;
         setBusiness(business);           // cache in AuthContext + sessionStorage
         setForm(initFormFromBusiness(business));
       })
       .catch(() => {
-        setFormError('Could not load business settings. Please close and try again.');
+        if (!cancelled) {
+          setFormError('Could not load business settings. Please close and try again.');
+        }
       })
-      .finally(() => setLoading(false));
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ------------------------------------------------------------------
    * Input change handler
@@ -141,6 +156,11 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
    * ------------------------------------------------------------------ */
   async function handleSubmit(e) {
     e.preventDefault();
+    if (isViewer) {
+      showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
+      return;
+    }
+
     setErrors({});
     setFormError('');
 
@@ -196,7 +216,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
    * Footer buttons
    * ------------------------------------------------------------------ */
   const footer = (
-    <div className="modal__footer-actions">
+    <div className="modal__footer-actions bs-modal__footer-actions">
       <button
         type="button"
         className="btn btn--ghost"
@@ -208,8 +228,9 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
       <button
         type="submit"
         form="bs-form"
+        id="bs-modal-save-btn"
         className={`btn btn--primary${saving ? ' btn--loading' : ''}`}
-        disabled={saving || loading}
+        disabled={saving || loading || isViewer}
       >
         Save Changes
       </button>
@@ -225,6 +246,15 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
       id="business-settings-modal"
       footer={footer}
     >
+      {isViewer && (
+        <div className="form-alert form-alert--info form-alert--visible" role="status">
+          <i className="fa-solid fa-eye" aria-hidden="true" />
+          <span className="form-alert__message">
+            View-only mode: contact a workspace Owner to update company settings.
+          </span>
+        </div>
+      )}
+
       {/* Form-level error */}
       {formError && (
         <div
@@ -264,6 +294,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
               type="text"
               id="bs-business-name"
               name="name"
+              disabled={isViewer}
               className={`form-control${errors.name ? ' form-control--error' : ''}`}
               placeholder="Your business name"
               autoComplete="organization"
@@ -290,6 +321,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
               type="email"
               id="bs-contact-email"
               name="contactEmail"
+              disabled={isViewer}
               className={`form-control${errors.contactEmail ? ' form-control--error' : ''}`}
               placeholder="business@example.com"
               autoComplete="email"
@@ -314,6 +346,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
               type="tel"
               id="bs-contact-phone"
               name="contactPhone"
+              disabled={isViewer}
               className="form-control"
               placeholder="+1 555 000 0000"
               autoComplete="tel"
@@ -330,6 +363,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
             <textarea
               id="bs-address"
               name="address"
+              disabled={isViewer}
               className="form-control form-control--textarea"
               placeholder="123 Main Street, City, Country"
               rows={3}
@@ -342,19 +376,20 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
 
           {/* News Digest Enabled — checkbox */}
           <div className="form-group">
-            <div className="form-check">
+            <label className="settings-check settings-check--compact" htmlFor="bs-digest-enabled">
               <input
                 type="checkbox"
                 id="bs-digest-enabled"
                 name="newsDigestEnabled"
-                className="form-check__input"
+                disabled={isViewer}
+                className="settings-check__input"
                 checked={form.newsDigestEnabled}
                 onChange={handleChange}
               />
-              <label className="form-check__label" htmlFor="bs-digest-enabled">
-                Enable periodic news & sourcing digest
-              </label>
-            </div>
+              <span className="settings-check__label">
+                Enable periodic news &amp; sourcing digest
+              </span>
+            </label>
           </div>
 
           {/* Digest Frequency — select */}
@@ -366,7 +401,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
               id="bs-digest-frequency"
               name="newsDigestFrequency"
               className="form-control"
-              disabled={!form.newsDigestEnabled}
+              disabled={isViewer || !form.newsDigestEnabled}
               value={form.newsDigestFrequency}
               onChange={handleChange}
             >
@@ -387,7 +422,7 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
               id="bs-digest-channel"
               name="newsDigestChannel"
               className="form-control"
-              disabled={!form.newsDigestEnabled}
+              disabled={isViewer || !form.newsDigestEnabled}
               value={form.newsDigestChannel}
               onChange={handleChange}
             >
@@ -396,13 +431,13 @@ export function BusinessSettingsModal({ isOpen, onClose, onSaved }) {
               <option value="BOTH">Both Email &amp; WhatsApp</option>
             </select>
             {form.newsDigestEnabled && (form.newsDigestChannel === 'WHATSAPP' || form.newsDigestChannel === 'BOTH') && !form.contactPhone.trim() && (
-              <p className="text-warning text-xs mt-1" style={{ color: '#d97706', fontSize: '12px', marginTop: '6px' }}>
-                <i className="fa-solid fa-triangle-exclamation mr-1" /> WhatsApp alerts require a contact phone in E.164 format (e.g. +91 98765 43210).
+              <p className="bs-modal-hint bs-modal-hint--warning">
+                <i className="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true" /> WhatsApp alerts require a contact phone in E.164 format (e.g. +91 98765 43210).
               </p>
             )}
             {form.lastDigestSentAt && (
-              <p className="text-muted text-xs mt-1" style={{ color: '#6b7280', fontSize: '12px', marginTop: '6px' }}>
-                <i className="fa-regular fa-clock mr-1" /> Last digest dispatched: {formatDateTime(form.lastDigestSentAt)}
+              <p className="bs-modal-hint bs-modal-hint--muted">
+                <i className="fa-regular fa-clock mr-1" aria-hidden="true" /> Last digest dispatched: {formatDateTime(form.lastDigestSentAt)}
               </p>
             )}
           </div>

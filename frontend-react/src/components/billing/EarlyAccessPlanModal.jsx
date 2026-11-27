@@ -102,10 +102,9 @@ function EarlyAccessPlanModalContent({
 
   const modalMarkup = (
     <div
-      className="modal-backdrop modal-backdrop--open"
+      className="modal-backdrop modal-backdrop--open early-access-modal-backdrop"
       onClick={handleBackdropClick}
       data-testid="early-access-modal-backdrop"
-      style={{ zIndex: 1050 }}
     >
       <div
         className="modal early-access-modal"
@@ -116,18 +115,18 @@ function EarlyAccessPlanModalContent({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="modal__header modal-header" style={{ padding: 'var(--space-4) var(--space-5)' }}>
+        <div className="modal__header modal-header early-access-modal__header">
           <div>
             <div className="early-access-badge-row">
               <span className="early-access-plan-chip">
                 BMM {planName} · {planPrice}
               </span>
               <span className="early-access-unlocked-chip">
-                <i className="fa-solid fa-unlock-keyhole mr-1" />
+                <i className="fa-solid fa-unlock-keyhole mr-1" aria-hidden="true" />
                 All Features Unlocked
               </span>
             </div>
-            <h2 id={titleId} className="modal__title modal-title" style={{ fontSize: '1.25rem', margin: 0 }}>
+            <h2 id={titleId} className="modal__title modal-title early-access-modal__title">
               Early Access — Paid Plans Launching Soon
             </h2>
           </div>
@@ -142,7 +141,7 @@ function EarlyAccessPlanModalContent({
         </div>
 
         {/* Body */}
-        <div className="modal__body modal-body" style={{ padding: 'var(--space-4) var(--space-5)' }}>
+        <div className="modal__body modal-body early-access-modal__body">
           <p id={descId} className="early-access-copy">
             Thank you for your interest in BMM <strong>{planName}</strong> ({billingCycleLabel}).
             Automated subscription billing is rolling out shortly. As an Early Access workspace, all core
@@ -157,15 +156,15 @@ function EarlyAccessPlanModalContent({
             </div>
             <ul className="early-access-features-box__list">
               <li className="early-access-features-box__item">
-                <i className="fa-solid fa-check text-emerald-400 mr-2" aria-hidden="true" />
+                <i className="fa-solid fa-check early-access-icon--success mr-2" aria-hidden="true" />
                 <span>Zero rate limits on tracked materials &amp; price benchmark alerts</span>
               </li>
               <li className="early-access-features-box__item">
-                <i className="fa-solid fa-check text-emerald-400 mr-2" aria-hidden="true" />
+                <i className="fa-solid fa-check early-access-icon--success mr-2" aria-hidden="true" />
                 <span>Full access to Two-Way WhatsApp Quote Copilot &amp; Landed-Cost Parity</span>
               </li>
               <li className="early-access-features-box__item">
-                <i className="fa-solid fa-check text-emerald-400 mr-2" aria-hidden="true" />
+                <i className="fa-solid fa-check early-access-icon--success mr-2" aria-hidden="true" />
                 <span>Grandfathered discounted rate for 12 months once self-serve billing launches</span>
               </li>
             </ul>
@@ -174,7 +173,7 @@ function EarlyAccessPlanModalContent({
           {/* Confirmed State Callout */}
           {confirmed && (
             <div className="early-access-confirmed-callout" role="status">
-              <i className="fa-solid fa-circle-check text-emerald-400 mt-1" style={{ fontSize: '18px' }} />
+              <i className="fa-solid fa-circle-check early-access-icon--success early-access-icon--lg mt-1" aria-hidden="true" />
               <div>
                 <div className="early-access-confirmed-callout__title">
                   Priority Access Requested ✓
@@ -189,15 +188,7 @@ function EarlyAccessPlanModalContent({
         </div>
 
         {/* Footer */}
-        <div
-          className="modal__footer modal-footer"
-          style={{
-            padding: 'var(--space-3) var(--space-5)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <div className="modal__footer modal-footer early-access-modal__footer">
           <div>
             {mode === 'landing' && (
               <Link
@@ -209,7 +200,7 @@ function EarlyAccessPlanModalContent({
               </Link>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div className="early-access-modal__actions">
             <button
               type="button"
               className="btn btn--secondary btn--sm"
@@ -220,19 +211,18 @@ function EarlyAccessPlanModalContent({
             <button
               type="button"
               id="early-access-lock-pricing-btn"
-              className={`btn btn--sm ${confirmed ? 'btn--ghost' : 'btn--primary'}`}
+              className={`btn btn--sm ${confirmed ? 'btn--ghost early-access-lock-btn--confirmed' : 'btn--primary'}`}
               onClick={handleLockPricing}
               disabled={confirmed}
-              style={confirmed ? { color: '#4ade80', borderColor: 'rgba(34, 197, 94, 0.4)' } : {}}
             >
               {confirmed ? (
                 <>
-                  <i className="fa-solid fa-check mr-1" />
+                  <i className="fa-solid fa-check mr-1" aria-hidden="true" />
                   Priority Access Requested ✓
                 </>
               ) : (
                 <>
-                  <i className="fa-solid fa-shield-halved mr-1" />
+                  <i className="fa-solid fa-shield-halved mr-1" aria-hidden="true" />
                   Lock Early-Adopter Pricing
                 </>
               )}

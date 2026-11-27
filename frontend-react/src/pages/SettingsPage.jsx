@@ -3,9 +3,9 @@
  * Business Market Monitor — React frontend
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
-import { getBusiness, updateBusiness, sendDigestNow, getDigestPreview } from '../api/business.api.js';
+import { getBusiness, updateBusiness, sendDigestNow } from '../api/business.api.js';
 import {
   listTeamMembers,
   inviteTeamMember,
@@ -14,6 +14,7 @@ import {
 } from '../api/team.api.js';
 import { isEmail } from '../utils/validate.js';
 import { formatDateTime, getInitialsFromEmail } from '../utils/format.js';
+import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx';
@@ -60,11 +61,12 @@ export function SettingsPage() {
   const isOwner = currentRole === 'OWNER';
   const isViewer = currentRole === 'VIEWER';
 
-  // Load business profile
+  // Load business profile on mount without synchronous pre-await setState
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     getBusiness()
       .then((biz) => {
+        if (cancelled) return;
         setBusiness(biz);
         setProfileForm({
           name: biz.name || '',
@@ -83,12 +85,19 @@ export function SettingsPage() {
         });
       })
       .catch(() => {
-        showToast({ type: 'error', message: 'Failed to load business profile' });
+        if (!cancelled) {
+          showToast({ type: 'error', message: 'Failed to load business profile' });
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load team members when switching to team tab
+  // Load team members explicitly on Team tab switch or mutation
   const loadMembers = async () => {
     setTeamLoading(true);
     try {
@@ -101,11 +110,12 @@ export function SettingsPage() {
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'team') {
-      loadMembers();
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'team') {
+      void loadMembers();
     }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
 
   // Business profile change
   const handleProfileChange = (e) => {
@@ -263,14 +273,15 @@ export function SettingsPage() {
       )}
 
       {/* Tabs */}
-      <div className="settings-tabs" role="tablist">
+      <div className="settings-tabs" role="tablist" aria-label="Workspace settings sections">
         <button
           type="button"
           role="tab"
           id="tab-profile-btn"
           aria-selected={activeTab === 'profile'}
+          aria-controls="settings-panel-profile"
           className={`settings-tab-btn${activeTab === 'profile' ? ' settings-tab-btn--active' : ''}`}
-          onClick={() => setActiveTab('profile')}
+          onClick={() => handleSelectTab('profile')}
         >
           <i className="fa-solid fa-building" aria-hidden="true" />
           <span>Business Profile &amp; Digest</span>
@@ -280,8 +291,9 @@ export function SettingsPage() {
           role="tab"
           id="tab-team-btn"
           aria-selected={activeTab === 'team'}
+          aria-controls="settings-panel-team"
           className={`settings-tab-btn${activeTab === 'team' ? ' settings-tab-btn--active' : ''}`}
-          onClick={() => setActiveTab('team')}
+          onClick={() => handleSelectTab('team')}
         >
           <i className="fa-solid fa-users" aria-hidden="true" />
           <span>Team &amp; Workspace RBAC</span>
@@ -291,8 +303,9 @@ export function SettingsPage() {
           role="tab"
           id="tab-billing-btn"
           aria-selected={activeTab === 'billing'}
+          aria-controls="settings-panel-billing"
           className={`settings-tab-btn${activeTab === 'billing' ? ' settings-tab-btn--active' : ''}`}
-          onClick={() => setActiveTab('billing')}
+          onClick={() => handleSelectTab('billing')}
         >
           <i className="fa-solid fa-credit-card" aria-hidden="true" />
           <span>Plans &amp; Billing</span>
@@ -301,7 +314,12 @@ export function SettingsPage() {
 
       {/* Tab 1: Profile & Digest */}
       {activeTab === 'profile' && (
-        <div className="settings-card">
+        <div
+          id="settings-panel-profile"
+          role="tabpanel"
+          aria-labelledby="tab-profile-btn"
+          className="settings-card"
+        >
           <h2 className="settings-card__title">Company Information &amp; Intelligence Digest</h2>
           <p className="settings-card__subtitle">
             Configure company details and delivery preferences for automated procurement intelligence.
@@ -396,23 +414,23 @@ export function SettingsPage() {
               </div>
 
               {/* News Digest Section */}
-              <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border)' }}>
-                <div className="form-check" style={{ marginBottom: '16px' }}>
+              <div className="settings-digest-section">
+                <label className="settings-check" htmlFor="settings-digest-enabled">
                   <input
                     type="checkbox"
                     id="settings-digest-enabled"
                     name="newsDigestEnabled"
                     disabled={isViewer}
-                    className="form-check__input"
+                    className="settings-check__input"
                     checked={profileForm.newsDigestEnabled}
                     onChange={handleProfileChange}
                   />
-                  <label className="form-check__label" htmlFor="settings-digest-enabled">
+                  <span className="settings-check__label">
                     <strong>Enable Periodic Procurement &amp; News Digest</strong>
-                  </label>
-                </div>
+                  </span>
+                </label>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                <div className="settings-digest-grid">
                   <div className="form-group">
                     <label className="form-label" htmlFor="settings-digest-freq">
                       Digest Frequency
@@ -451,15 +469,15 @@ export function SettingsPage() {
                 </div>
 
                 {profileForm.lastDigestSentAt && (
-                  <p style={{ fontSize: '12px', color: '#a1a1aa', marginTop: '8px' }}>
-                    <i className="fa-regular fa-clock mr-1" /> Last digest dispatched:{' '}
+                  <p className="settings-digest-timestamp">
+                    <i className="fa-regular fa-clock mr-1" aria-hidden="true" /> Last digest dispatched:{' '}
                     {formatDateTime(profileForm.lastDigestSentAt)}
                   </p>
                 )}
               </div>
 
               {/* Actions */}
-              <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="settings-profile-actions">
                 <button
                   type="submit"
                   id="bs-save-btn"
@@ -477,7 +495,7 @@ export function SettingsPage() {
                     disabled={digestSending}
                     onClick={handleSendDigestTest}
                   >
-                    <i className="fa-solid fa-paper-plane mr-2" />
+                    <i className="fa-solid fa-paper-plane mr-2" aria-hidden="true" />
                     Dispatch Test Digest Now
                   </button>
                 )}
@@ -489,7 +507,12 @@ export function SettingsPage() {
 
       {/* Tab 2: Team RBAC */}
       {activeTab === 'team' && (
-        <div className="settings-card">
+        <div
+          id="settings-panel-team"
+          role="tabpanel"
+          aria-labelledby="tab-team-btn"
+          className="settings-card"
+        >
           <h2 className="settings-card__title">Team Members &amp; Access Control</h2>
           <p className="settings-card__subtitle">
             Invite team members and configure Role-Based Access Control (RBAC) across your procurement workspace.
@@ -498,7 +521,7 @@ export function SettingsPage() {
           {/* Invite Form (Owner only) */}
           {isOwner && (
             <form onSubmit={handleInviteSubmit} className="settings-invite-form">
-              <div className="form-group" style={{ marginBottom: 0 }}>
+              <div className="form-group settings-form-group-flush">
                 <label className="form-label" htmlFor="invite-email-input">
                   Colleague Email Address
                 </label>
@@ -513,7 +536,7 @@ export function SettingsPage() {
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 0 }}>
+              <div className="form-group settings-form-group-flush">
                 <label className="form-label" htmlFor="invite-role-select">
                   Assigned Role
                 </label>
@@ -535,7 +558,7 @@ export function SettingsPage() {
                 className={`btn btn--primary${inviting ? ' btn--loading' : ''}`}
                 disabled={inviting}
               >
-                <i className="fa-solid fa-user-plus mr-1" /> Send Invite
+                <i className="fa-solid fa-user-plus mr-1" aria-hidden="true" /> Send Invite
               </button>
             </form>
           )}
@@ -549,7 +572,7 @@ export function SettingsPage() {
                 className="btn btn--sm btn--primary"
                 onClick={handleCopyLink}
               >
-                <i className="fa-regular fa-copy mr-1" /> Copy Link
+                <i className="fa-regular fa-copy mr-1" aria-hidden="true" /> Copy Link
               </button>
             </div>
           )}
@@ -557,6 +580,12 @@ export function SettingsPage() {
           {/* Members Table */}
           {teamLoading ? (
             <Skeleton type="panel" rows={4} />
+          ) : members.length === 0 ? (
+            <EmptyState
+              icon="fa-solid fa-users"
+              title="No team members yet"
+              message="Workspace members and pending invitations will appear here once invited."
+            />
           ) : (
             <div className="settings-table-wrapper">
               <table className="settings-table" id="team-members-table">
@@ -627,7 +656,7 @@ export function SettingsPage() {
                             {m.status}
                           </span>
                         </td>
-                        <td style={{ color: '#a1a1aa', fontSize: '13px' }}>
+                        <td className="settings-member-timestamp">
                           {m.acceptedAt
                             ? formatDateTime(m.acceptedAt)
                             : m.createdAt
@@ -639,8 +668,7 @@ export function SettingsPage() {
                             {m.status !== 'REVOKED' && !isCurrentUser && (
                               <button
                                 type="button"
-                                className="btn btn--sm btn--ghost"
-                                style={{ color: '#ef4444' }}
+                                className="btn btn--sm btn--ghost settings-revoke-btn"
                                 onClick={() => setRevokeTarget(m)}
                               >
                                 Revoke
@@ -660,46 +688,35 @@ export function SettingsPage() {
 
       {/* Tab 3: Plans & Billing */}
       {activeTab === 'billing' && (
-        <div className="settings-billing-tab" data-testid="settings-billing-tab">
+        <div
+          id="settings-panel-billing"
+          role="tabpanel"
+          aria-labelledby="tab-billing-btn"
+          className="settings-billing-tab"
+          data-testid="settings-billing-tab"
+        >
           {/* Top Status Card */}
-          <div className="settings-card mb-6" style={{ marginBottom: 'var(--space-6)' }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 'var(--space-4)',
-              }}
-            >
+          <div className="settings-card settings-billing-hero">
+            <div className="settings-billing-hero__row">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span className="badge badge--success" style={{ fontSize: '11px', fontWeight: 600 }}>
+                <div className="settings-billing-hero__badges">
+                  <span className="badge badge--success settings-billing-active-badge">
                     ACTIVE WORKSPACE
                   </span>
-                  <span style={{ fontSize: '12.5px', color: '#a1a1aa' }}>
+                  <span className="settings-billing-workspace-name">
                     {cachedBusiness?.name || profileForm.name || 'Workspace'}
                   </span>
                 </div>
-                <h2 className="settings-card__title" style={{ margin: '0 0 4px 0', fontSize: '1.125rem' }}>
+                <h2 className="settings-card__title settings-billing-hero__title">
                   Current Plan: Early Access — All Pro Features Unlocked at ₹0
                 </h2>
-                <p className="settings-card__subtitle" style={{ margin: 0 }}>
+                <p className="settings-card__subtitle settings-billing-hero__subtitle">
                   Automated subscription billing is launching soon. Your team currently has unrestricted access to all multi-material tracking, WhatsApp Copilot, and Landed-Cost features.
                 </p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  className="badge"
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.12)',
-                    color: '#93c5fd',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                  }}
-                >
-                  <i className="fa-solid fa-bolt mr-1" /> Early Adopter Status
+              <div className="settings-billing-hero__status">
+                <span className="badge settings-early-adopter-badge">
+                  <i className="fa-solid fa-bolt mr-1" aria-hidden="true" /> Early Adopter Status
                 </span>
               </div>
             </div>
