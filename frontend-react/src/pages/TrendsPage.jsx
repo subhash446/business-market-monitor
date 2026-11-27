@@ -37,9 +37,10 @@
  */
 
 import {
-  useCallback, useEffect, useMemo, useRef, useState,
+  useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext.jsx';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -61,7 +62,8 @@ import { Pagination }  from '../components/ui/Pagination.jsx';
 import { InsightCard } from '../components/ui/InsightCard.jsx';
 import { LandedCostModal } from '../components/materials/LandedCostModal.jsx';
 import { WhatsAppCopilotModal } from '../components/ui/WhatsAppCopilotModal.jsx';
-import { formatDate, formatNumber } from '../utils/format.js';
+import { formatDate, formatNumber, getSafeExternalUrl } from '../utils/format.js';
+import '../styles/pages/materials.css';
 import '../styles/pages/trends.css';
 
 /* â”€â”€ Register Chart.js components (required for tree-shaking builds) â”€â”€ */
@@ -76,7 +78,7 @@ ChartJS.register(
 );
 
 /* â”€â”€ Chart colour palette (Doc 4 Â§9.1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4'];
+const CHART_COLORS = ['#60a5fa', '#4ade80', '#fbbf24', '#a78bfa', '#38bdf8'];
 
 /* â”€â”€ Load states â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const STATUS = { IDLE: 'idle', LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
@@ -84,6 +86,9 @@ const STATUS = { IDLE: 'idle', LOADING: 'loading', SUCCESS: 'success', ERROR: 'e
 export function TrendsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const auth = useContext(AuthContext);
+  const businessRole = String(auth?.business?.businessRole || auth?.user?.businessRole || '').toUpperCase();
+  const isViewer = businessRole === 'VIEWER';
 
   /* â”€â”€ Materials state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const [materialsStatus, setMaterialsStatus] = useState(STATUS.LOADING);
@@ -325,12 +330,12 @@ export function TrendsPage() {
         scales: {
           x: {
             grid:  { color: 'rgba(255, 255, 255, 0.06)' },
-            ticks: { color: '#a1a1aa', maxTicksLimit: 8,
+            ticks: { color: '#9494a0', maxTicksLimit: 8,
                      callback: (_val, idx) => formatDate(labels[idx]) },
           },
           y: {
             grid:  { color: 'rgba(255, 255, 255, 0.06)' },
-            ticks: { color: '#a1a1aa', callback: (v) => v.toFixed(2) },
+            ticks: { color: '#9494a0', callback: (v) => v.toFixed(2) },
           },
         },
       },
@@ -418,7 +423,7 @@ export function TrendsPage() {
           legend: {
             display:  true,
             position: 'top',
-            labels:   { color: '#e6edf3', usePointStyle: true },
+            labels:   { color: '#f4f4f5', usePointStyle: true },
           },
           tooltip: {
             mode:      'index',
@@ -437,12 +442,12 @@ export function TrendsPage() {
         scales: {
           x: {
             grid:  { color: 'rgba(255, 255, 255, 0.06)' },
-            ticks: { color: '#a1a1aa', maxTicksLimit: 8,
+            ticks: { color: '#9494a0', maxTicksLimit: 8,
                      callback: (_v, idx) => formatDate(sortedDates[idx]) },
           },
           y: {
             grid:  { color: 'rgba(255, 255, 255, 0.06)' },
-            ticks: { color: '#a1a1aa', callback: (v) => v.toFixed(2) },
+            ticks: { color: '#9494a0', callback: (v) => v.toFixed(2) },
           },
         },
       },
@@ -586,6 +591,14 @@ export function TrendsPage() {
 
         {/* Chart area */}
         <div id="ph-chart-area">
+          {histStatus === STATUS.IDLE && (
+            <EmptyState
+              icon="fa-solid fa-chart-area"
+              title="Select a material to inspect price history"
+              message="Choose a tracked material above and click Apply to load benchmarks, supplier quotes, AI outlook, and reorder guidance."
+            />
+          )}
+
           {histStatus === STATUS.LOADING && <Skeleton type="rect" rows={3} />}
 
           {histStatus === STATUS.ERROR && (
@@ -618,14 +631,14 @@ export function TrendsPage() {
                 if (isGoi) {
                   return (
                     <div className="trends-notice trends-notice--info card">
-                      <div className="card__body" style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <i className="fa-solid fa-building-columns" style={{ color: 'var(--color-info)' }} aria-hidden="true" />
-                          <strong style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)' }}>
+                      <div className="card__body trends-notice__body">
+                        <div className="trends-notice__row">
+                          <i className="fa-solid fa-building-columns trends-notice__icon--info" aria-hidden="true" />
+                          <strong className="trends-notice__title">
                             Official Indian Wholesale Mandi Benchmark
                           </strong>
                         </div>
-                        <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                        <p className="trends-notice__copy">
                           Prices shown reflect authentic official Indian wholesale market mandi modal prices (Agmarknet / Ministry of Agriculture) in INR/quintal. These reflect wholesale mandi auctions, not packaged consumer retail prices.
                         </p>
                       </div>
@@ -636,14 +649,14 @@ export function TrendsPage() {
                 if (isCrudeProxy || selectedHistMaterial?.externalSymbol || histItems.some(i => i.dataClass === 'MARKET_INDICATIVE')) {
                   return (
                     <div className="trends-notice trends-notice--warning card">
-                      <div className="card__body" style={{ padding: 'var(--space-3) var(--space-4)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <i className="fa-solid fa-triangle-exclamation" style={{ color: 'var(--color-warning)' }} aria-hidden="true" />
-                          <strong style={{ color: 'var(--color-text-primary)', fontSize: 'var(--text-sm)' }}>
+                      <div className="card__body trends-notice__body">
+                        <div className="trends-notice__row">
+                          <i className="fa-solid fa-triangle-exclamation trends-notice__icon--warning" aria-hidden="true" />
+                          <strong className="trends-notice__title">
                             Market Indicative Proxy Benchmark
                           </strong>
                         </div>
-                        <p style={{ margin: 'var(--space-1) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                        <p className="trends-notice__copy">
                           Prices shown reflect global commodity benchmarks ({selectedHistMaterial?.externalSymbol || 'Crude Oil'} in USD/bbl) acting as upstream indicative proxies, not direct local purchase transactions.
                         </p>
                       </div>
@@ -695,7 +708,7 @@ export function TrendsPage() {
                           <td className="font-mono">{formatNumber(row.price, 2)}</td>
                           <td>{row.currency ? `${row.currency} (${row.unitLabel || selectedHistMaterial?.unit || 'unit'})` : (selectedHistMaterial?.unit || '—')}</td>
                           <td>
-                            <span className={`badge ${row.dataClass === 'OFFICIAL_BENCHMARK' ? 'badge--info' : row.dataClass === 'MARKET_INDICATIVE' ? 'badge--warning' : 'badge--neutral'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                            <span className={`badge trends-table-badge ${row.dataClass === 'OFFICIAL_BENCHMARK' ? 'badge--info' : row.dataClass === 'MARKET_INDICATIVE' ? 'badge--warning' : 'badge--neutral'}`}>
                               {row.dataClass === 'OFFICIAL_BENCHMARK' ? 'Benchmark' : row.dataClass === 'MARKET_INDICATIVE' ? 'Proxy' : 'Quote'}
                             </span>
                           </td>
@@ -719,7 +732,7 @@ export function TrendsPage() {
             independent of the chart load state */}
         {phMaterialId && (
           <div className="trends-insight-section">
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-2)' }}>
+            <div className="trends-impact-bar">
               <Link
                 to={`/materials/${phMaterialId}/impact`}
                 className="btn btn--sm btn--secondary"
@@ -744,11 +757,11 @@ export function TrendsPage() {
               loading={supplierRecLoading}
               error={supplierRecError}
               materialName={selectedHistMaterial?.name}
-              onOpenLandedCost={() => setShowLandedCostModal(true)}
-              onOpenCopilot={() => setShowCopilotModal(true)}
+              onOpenLandedCost={!isViewer ? () => setShowLandedCostModal(true) : undefined}
+              onOpenCopilot={!isViewer ? () => setShowCopilotModal(true) : undefined}
             />
 
-            {showLandedCostModal && selectedHistMaterial && (
+            {!isViewer && showLandedCostModal && selectedHistMaterial && (
               <LandedCostModal
                 material={selectedHistMaterial}
                 isOpen={showLandedCostModal}
@@ -768,7 +781,7 @@ export function TrendsPage() {
               />
             )}
 
-            {showCopilotModal && (
+            {!isViewer && showCopilotModal && (
               <WhatsAppCopilotModal
                 isOpen={showCopilotModal}
                 onClose={() => setShowCopilotModal(false)}
@@ -776,7 +789,7 @@ export function TrendsPage() {
                 initialMaterialId={phMaterialId}
                 onQuoteLogged={() => {
                   if (phMaterialId) {
-                    loadPriceHistory(phMaterialId, phPage);
+                    _loadHistory(histPage || 1);
                     getMaterialSupplierRecommendations(phMaterialId)
                       .then(setSupplierRec)
                       .catch(() => {});
@@ -873,6 +886,14 @@ export function TrendsPage() {
 
         {/* Compare chart area */}
         <div id="cmp-chart-area">
+          {cmpStatus === STATUS.IDLE && (
+            <EmptyState
+              icon="fa-solid fa-code-compare"
+              title="Compare multiple tracked materials"
+              message="Pick up to 5 tracked materials above and click Compare to overlay trajectory lines side by side."
+            />
+          )}
+
           {cmpStatus === STATUS.LOADING && <Skeleton type="rect" rows={3} />}
 
           {cmpStatus === STATUS.ERROR && (
@@ -899,15 +920,15 @@ export function TrendsPage() {
                   role="alert"
                   id="cmp-currency-warning"
                 >
-                  <i className="fa-solid fa-triangle-exclamation" style={{ marginTop: '2px', color: 'var(--color-warning)' }} aria-hidden="true" />
+                  <i className="fa-solid fa-triangle-exclamation trends-notice__icon--warning trends-warning-icon" aria-hidden="true" />
                   <div>
                     <strong>Multi-Currency Comparison Notice:</strong> Selected materials use different currencies ({uniqueCurrencies.join(' vs ')}). Chart values reflect nominal prices in each material's local unit and currency without FX conversion. Focus on relative trajectory and percentage trends rather than direct numeric comparison.
                   </div>
                 </div>
               )}
 
-              <p className="text-xs text-secondary" style={{ margin: '0 0 var(--space-2) 0' }}>
-                <i className="fa-solid fa-circle-info" style={{ marginRight: '4px' }} />
+              <p className="text-xs text-secondary trends-note-line">
+                <i className="fa-solid fa-circle-info mr-1" aria-hidden="true" />
                 Comparing multi-material trends. Series reflect respective benchmark units and currencies.
               </p>
 
@@ -963,8 +984,8 @@ function CompareTable({ comparison }) {
 
   return (
     <>
-      <p className="text-xs text-secondary" style={{ margin: 'var(--space-2) 0', fontStyle: 'italic' }}>
-        <i className="fa-solid fa-circle-info" style={{ marginRight: '4px' }} />
+      <p className="text-xs text-secondary trends-subcaption-italic">
+        <i className="fa-solid fa-circle-info mr-1" aria-hidden="true" />
         Values reflect individual commodity benchmark units and currencies. Compare relative trend trajectories rather than direct absolute prices when units differ.
       </p>
       <table className="table table--compact">
@@ -983,7 +1004,7 @@ function CompareTable({ comparison }) {
                 <th key={mat.materialId} scope="col">
                   {mat.name}
                   {displayUnit && (
-                    <span className="text-xs text-secondary" style={{ display: 'block', fontWeight: 'normal' }}>
+                    <span className="text-xs text-secondary trends-block-regular">
                       ({displayUnit})
                     </span>
                   )}
@@ -1044,7 +1065,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
     return (
       <div className="card price-outlook-card" id="price-outlook-card">
         <div className="card__body">
-          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+          <p className="text-muted trends-muted-copy">
             <i className="fa-solid fa-circle-exclamation mr-1" /> {error}
           </p>
         </div>
@@ -1064,11 +1085,11 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
           </h3>
           <span className="badge badge--neutral">INSUFFICIENT DATA</span>
         </div>
-        <div className="card__body" style={{ padding: 'var(--space-4)' }}>
-          <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+        <div className="card__body trends-card-body-compact">
+          <p className="trends-xs-copy">
             {outlook.reason || 'At least 5 historical price points are required to compute statistical volatility and directional bands.'}
           </p>
-          <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+          <div className="trends-xs-meta-top">
             Current points logged: <strong className="font-mono">{outlook.dataPointCount || 0}</strong> / {outlook.minimumRequired || 5}
           </div>
         </div>
@@ -1099,7 +1120,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
             <i className="fa-solid fa-chart-line" style={{ color: 'var(--color-primary)', marginRight: '8px' }} />
             14d &amp; 30d Directional Price Outlook — {materialName || 'Tracked Material'}
           </h3>
-          <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px' }}>
+          <span className="text-xs text-muted trends-block-sub">
             Series: {outlook.seriesSource === 'SUPPLIER_QUOTE' ? 'Domestic Supplier Quotes' : 'Market Benchmark'} ({outlook.currency}/{outlook.unit})
           </span>
         </div>
@@ -1108,7 +1129,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
             <i className={`fa-solid ${direction === 'UPWARD_PRESSURE' ? 'fa-arrow-trend-up' : direction === 'DOWNWARD_PRESSURE' ? 'fa-arrow-trend-down' : 'fa-arrows-left-right'} mr-1`} />
             {dirLabel}
           </span>
-          <span className={`badge ${tierClass}`} style={{ fontSize: '11px', padding: '3px 8px' }}>
+          <span className={`badge ${tierClass} trends-pill-sm`}>
             {outlook.confidenceTier} ({outlook.confidenceScore}%)
           </span>
         </div>
@@ -1116,7 +1137,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
 
       <div className="price-outlook-body">
         {outlook.isDataStale && (
-          <div className="alert alert--warning" style={{ fontSize: 'var(--text-xs)', marginBottom: 'var(--space-3)' }}>
+          <div className="alert alert--warning trends-alert-compact">
             <i className="fa-solid fa-clock-rotate-left mr-1" />
             Latest price was recorded {outlook.daysSinceLatest} days ago. Statistical confidence is downgraded until fresh prices are logged.
           </div>
@@ -1139,7 +1160,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
               </div>
               <div className="outlook-band-col outlook-band-col--mid">
                 <span className="outlook-sublabel">Expected Mid</span>
-                <span className="outlook-value font-mono" style={{ color: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'inherit' }}>
+                <span className={`outlook-value font-mono ${direction === 'UPWARD_PRESSURE' ? 'outlook-tone--up' : direction === 'DOWNWARD_PRESSURE' ? 'outlook-tone--down' : ''}`}>
                   {outlook.currency} {Number(outlook.band14d?.mid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -1152,10 +1173,9 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
             </div>
             <div className="outlook-progress-bar">
               <div
-                className="outlook-progress-fill"
+                className={`outlook-progress-fill ${direction === 'UPWARD_PRESSURE' ? 'outlook-progress-fill--up' : direction === 'DOWNWARD_PRESSURE' ? 'outlook-progress-fill--down' : 'outlook-progress-fill--neutral'}`}
                 style={{
                   width: `${Math.max(5, Math.min(95, (((outlook.currentPrice - outlook.band14d?.low) / Math.max(0.01, (outlook.band14d?.high || 1) - (outlook.band14d?.low || 0))) * 100)))}%`,
-                  backgroundColor: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'var(--color-primary)',
                 }}
               />
             </div>
@@ -1177,7 +1197,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
               </div>
               <div className="outlook-band-col outlook-band-col--mid">
                 <span className="outlook-sublabel">Expected Mid</span>
-                <span className="outlook-value font-mono" style={{ color: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'inherit' }}>
+                <span className={`outlook-value font-mono ${direction === 'UPWARD_PRESSURE' ? 'outlook-tone--up' : direction === 'DOWNWARD_PRESSURE' ? 'outlook-tone--down' : ''}`}>
                   {outlook.currency} {Number(outlook.band30d?.mid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -1190,10 +1210,9 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
             </div>
             <div className="outlook-progress-bar">
               <div
-                className="outlook-progress-fill"
+                className={`outlook-progress-fill ${direction === 'UPWARD_PRESSURE' ? 'outlook-progress-fill--up' : direction === 'DOWNWARD_PRESSURE' ? 'outlook-progress-fill--down' : 'outlook-progress-fill--neutral'}`}
                 style={{
                   width: `${Math.max(5, Math.min(95, (((outlook.currentPrice - outlook.band30d?.low) / Math.max(0.01, (outlook.band30d?.high || 1) - (outlook.band30d?.low || 0))) * 100)))}%`,
-                  backgroundColor: direction === 'UPWARD_PRESSURE' ? '#f59e0b' : direction === 'DOWNWARD_PRESSURE' ? '#34d399' : 'var(--color-primary)',
                 }}
               />
             </div>
@@ -1205,13 +1224,13 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
         {outlook.confidenceDrivers && outlook.confidenceDrivers.length > 0 && (
           <div className="outlook-subpanel">
             <h4 className="outlook-subpanel__title">
-              <i className="fa-solid fa-satellite-dish mr-2" style={{ color: 'var(--color-primary)' }} />
+              <i className="fa-solid fa-satellite-dish mr-2 trends-icon--primary" aria-hidden="true" />
               Signal Alignment &amp; Drivers
             </h4>
             <ul className="outlook-drivers-list">
               {outlook.confidenceDrivers.map((driver, idx) => (
                 <li key={idx} className="outlook-driver-item">
-                  <i className="fa-solid fa-check mr-2 text-muted" style={{ fontSize: '10px' }} />
+                  <i className="fa-solid fa-check mr-2 text-muted trends-icon-xs" aria-hidden="true" />
                   <span>{driver}</span>
                 </li>
               ))}
@@ -1223,7 +1242,7 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
         {outlook.newsDrivers && outlook.newsDrivers.length > 0 && (
           <div className="outlook-subpanel">
             <h4 className="outlook-subpanel__title">
-              <i className="fa-solid fa-newspaper mr-2" style={{ color: '#a855f7' }} />
+              <i className="fa-solid fa-newspaper mr-2 trends-icon--accent" aria-hidden="true" />
               Recent News Impact Drivers
             </h4>
             <div className="outlook-news-list">
@@ -1231,29 +1250,31 @@ export function PriceOutlookCard({ outlook, loading, error, materialName }) {
                 <div key={driver.id || idx} className="outlook-news-item">
                   <div className="outlook-news-item__top">
                     <span
-                      className={`badge ${
+                      className={`badge trends-badge-mini ${
                         driver.impactDirection === 'COST_UP'   ? 'badge--danger' :
                         driver.impactDirection === 'COST_DOWN' ? 'badge--success' : 'badge--neutral'
                       }`}
-                      style={{ fontSize: '10px', padding: '1px 6px' }}
                     >
                       {driver.impactDirection === 'COST_UP' ? 'COST UP' : driver.impactDirection === 'COST_DOWN' ? 'COST DOWN' : 'NEUTRAL'}
                     </span>
-                    <span className="badge badge--neutral font-mono" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                    <span className="badge badge--neutral font-mono trends-badge-xs">
                       SEV {driver.severityScore}/5
                     </span>
-                    <span className="outlook-news-time text-muted font-mono" style={{ fontSize: '11px', marginLeft: 'auto' }}>
+                    <span className="outlook-news-time text-muted font-mono">
                       {formatRelativeDays(driver.publishedAt, outlook.evaluatedAt)}
                     </span>
                   </div>
                   <div className="outlook-news-title">
-                    {driver.url ? (
-                      <a href={driver.url} target="_blank" rel="noopener noreferrer" className="text-secondary hover:text-primary">
-                        {driver.title}
-                      </a>
-                    ) : (
-                      <span>{driver.title}</span>
-                    )}
+                    {(() => {
+                      const safeDriverUrl = getSafeExternalUrl(driver.url);
+                      return safeDriverUrl ? (
+                        <a href={safeDriverUrl} target="_blank" rel="noopener noreferrer" className="outlook-news-link">
+                          {driver.title}
+                        </a>
+                      ) : (
+                        <span>{driver.title}</span>
+                      );
+                    })()}
                   </div>
                   {driver.impactRationale && (
                     <div className="outlook-news-rationale text-muted">
@@ -1293,7 +1314,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
     return (
       <div className="card supplier-guidance-card" id="supplier-guidance-card">
         <div className="card__body">
-          <p className="text-muted" style={{ margin: 0, fontSize: '13px' }}>
+          <p className="text-muted trends-muted-copy">
             <i className="fa-solid fa-circle-exclamation mr-1" /> {error}
           </p>
         </div>
@@ -1317,19 +1338,18 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
     <div className="card supplier-guidance-card" id="supplier-guidance-card">
       <div className="supplier-guidance-header">
         <h3 className="supplier-guidance-header__title">
-          <i className="fa-solid fa-boxes-packing mr-2" style={{ color: 'var(--color-primary)' }} />
+          <i className="fa-solid fa-boxes-packing mr-2 trends-icon--primary" aria-hidden="true" />
           Supplier Sourcing &amp; Inventory Guidance — {materialName || 'Tracked Material'}
         </h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="supplier-flex-row">
           {onOpenCopilot && (
             <button
               type="button"
               id="whatsapp-copilot-trends-btn"
-              className="btn btn--sm btn--secondary"
-              style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              className="btn btn--sm btn--secondary trends-btn-copilot"
               onClick={onOpenCopilot}
             >
-              <i className="fa-brands fa-whatsapp text-success" style={{ color: '#22c55e' }} />
+              <i className="fa-brands fa-whatsapp trends-icon--success" aria-hidden="true" />
               WhatsApp Copilot
             </button>
           )}
@@ -1344,19 +1364,18 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
         <div className="supplier-subpanel" id="reorder-decision-panel">
           <div className="supplier-subpanel__header">
             <h4 className="supplier-subpanel__title">
-              <i className="fa-solid fa-calculator mr-2" style={{ color: 'var(--color-primary)' }} />
+              <i className="fa-solid fa-calculator mr-2 trends-icon--primary" aria-hidden="true" />
               Smart Reorder &amp; Inventory Decision
             </h4>
             {rec.inventoryDecision?.hasInventoryProfile && (
               <span
-                className={`badge ${
+                className={`badge trends-pill-sm ${
                   rec.inventoryDecision.stockoutRisk === 'CRITICAL'
                     ? 'badge--danger'
                     : rec.inventoryDecision.stockoutRisk === 'LOW'
                     ? 'badge--warning'
                     : 'badge--success'
                 }`}
-                style={{ fontSize: '11px', padding: '3px 8px' }}
               >
                 {rec.inventoryDecision.stockoutRisk === 'CRITICAL'
                   ? 'CRITICAL STOCKOUT RISK'
@@ -1399,7 +1418,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
                       : '0'}
                   </span>
                   {rec.inventoryDecision.isStorageCapped && (
-                    <span style={{ fontSize: '10px', color: 'var(--color-warning)' }}>
+                    <span className="supplier-warn-mini">
                       Capped by max storage limit
                     </span>
                   )}
@@ -1412,7 +1431,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
                       {rec.inventoryDecision.currency || ''} {Number(rec.inventoryDecision.estimatedOrderValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   ) : (
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                    <span className="supplier-sub-note">
                       {rec.inventoryDecision.valuationNote || 'Quote needed for valuation'}
                     </span>
                   )}
@@ -1420,14 +1439,14 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
               </div>
 
               {rec.inventoryDecision.decisionSummary && (
-                <p style={{ margin: 'var(--space-3) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+                <p className="supplier-summary-copy">
                   {rec.inventoryDecision.decisionSummary}
                 </p>
               )}
             </>
           ) : (
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', padding: 'var(--space-2) 0' }}>
-              <p style={{ margin: '0 0 var(--space-2) 0' }}>
+            <div className="supplier-empty-block">
+              <p className="supplier-empty-copy">
                 Inventory parameters (current stock, consumption rate, lead time) are not configured for this material.
               </p>
               <Link to="/materials" className="btn btn--secondary btn--sm">
@@ -1440,14 +1459,14 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
         {/* Buffer strategy overview */}
         <div className="supplier-subpanel">
           <div className="supplier-subpanel__header">
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--color-text-primary)' }}>
+            <span className="supplier-buffer-value">
               Target Inventory Buffer: {rec.bufferStrategy?.targetBufferDays || 15} Days
             </span>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-              Priority: <strong style={{ color: 'var(--color-text-primary)' }}>{rec.bufferStrategy?.priority || 'MEDIUM'}</strong>
+            <span className="supplier-priority-meta">
+              Priority: <strong className="supplier-strong">{rec.bufferStrategy?.priority || 'MEDIUM'}</strong>
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>
+          <p className="trends-xs-copy">
             {rec.bufferStrategy?.detailedGuidance || rec.rationale}
           </p>
         </div>
@@ -1456,7 +1475,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
         {rec.quoteComparison && (
           <div className="supplier-subpanel">
             <h4 className="supplier-subpanel__title">
-              <i className="fa-solid fa-scale-balanced mr-2" style={{ color: '#a855f7' }} />
+              <i className="fa-solid fa-scale-balanced mr-2 trends-icon--accent" aria-hidden="true" />
               Supplier Quote vs Market Benchmark
             </h4>
 
@@ -1479,26 +1498,24 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
                 <div className="supplier-metric-card">
                   <span className="supplier-metric-label">Calculated Variance</span>
                   <span
-                    className="supplier-metric-value"
-                    style={{
-                      color: rec.quoteComparison.variancePercent > 0 ? 'var(--color-danger)' : 'var(--color-success)',
-                    }}
+                    className={`supplier-metric-value ${
+                      rec.quoteComparison.variancePercent > 0 ? 'supplier-metric-value--danger' : 'supplier-metric-value--success'
+                    }`}
                   >
                     {rec.quoteComparison.variancePercent > 0 ? '+' : ''}{rec.quoteComparison.variancePercent}%
                   </span>
                 </div>
               </div>
             ) : rec.quoteComparison.crossCurrencyNote ? (
-              <div className="alert alert--warning" style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div className="alert alert--warning supplier-parity-alert">
+                <div className="supplier-flex-between">
                   <div>
                     <i className="fa-solid fa-circle-info mr-1" /> {rec.quoteComparison.crossCurrencyNote}
                   </div>
                   {onOpenLandedCost && (
                     <button
                       type="button"
-                      className="btn btn--sm btn--primary"
-                      style={{ fontSize: '11px', padding: '3px 8px' }}
+                      className="btn btn--sm btn--primary trends-pill-sm"
                       onClick={onOpenLandedCost}
                     >
                       Configure Landed-Cost Parity
@@ -1507,7 +1524,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)' }}>
+              <div className="supplier-parity-meta">
                 Single price stream active. Ingest or upload domestic quotes to evaluate procurement variance against benchmarks.
               </div>
             )}
@@ -1517,14 +1534,14 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
         {/* Landed-Cost & FX Parity Benchmark (V3-M3) */}
         {rec.fxNormalizedComparison && rec.fxNormalizedComparison.isConfigured && rec.fxNormalizedComparison.estimatedLandedBenchmark != null && (
           <div className="supplier-subpanel landed-parity-subpanel" id="landed-parity-panel">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-2)' }}>
-              <h4 className="supplier-subpanel__title" style={{ margin: 0 }}>
-                <i className="fa-solid fa-calculator mr-2" style={{ color: 'var(--color-primary)' }} />
+            <div className="supplier-subpanel-toolbar">
+              <h4 className="supplier-subpanel__title supplier-subpanel__title--flush">
+                <i className="fa-solid fa-calculator mr-2 trends-icon--primary" aria-hidden="true" />
                 Landed-Cost &amp; FX Parity Benchmark
               </h4>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="supplier-flex-row-compact">
                 {rec.fxNormalizedComparison.fxRate && (
-                  <span className="badge badge--info font-mono" style={{ fontSize: '11px' }}>
+                  <span className="badge badge--info font-mono supplier-fx-badge">
                     USD/INR: ₹{Number(rec.fxNormalizedComparison.fxRate.rate).toFixed(2)}
                     {rec.fxNormalizedComparison.fxRate.isStale && ' (Stale)'}
                   </span>
@@ -1532,8 +1549,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
                 {onOpenLandedCost && (
                   <button
                     type="button"
-                    className="btn btn--sm btn--ghost"
-                    style={{ fontSize: '11px', padding: '2px 8px' }}
+                    className="btn btn--sm btn--ghost trends-btn-edit-model"
                     onClick={onOpenLandedCost}
                   >
                     Edit Model
@@ -1562,12 +1578,11 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
               <div className="supplier-metric-card">
                 <span className="supplier-metric-label">Landed Parity Variance</span>
                 <span
-                  className="supplier-metric-value font-mono"
-                  style={{
-                    color: rec.fxNormalizedComparison.variancePercent != null
-                      ? (rec.fxNormalizedComparison.variancePercent > 0 ? 'var(--color-danger)' : 'var(--color-success)')
-                      : 'var(--color-text-muted)',
-                  }}
+                  className={`supplier-metric-value font-mono ${
+                    rec.fxNormalizedComparison.variancePercent != null
+                      ? (rec.fxNormalizedComparison.variancePercent > 0 ? 'supplier-metric-value--danger' : 'supplier-metric-value--success')
+                      : 'supplier-metric-value--muted'
+                  }`}
                 >
                   {rec.fxNormalizedComparison.variancePercent != null
                     ? `${rec.fxNormalizedComparison.variancePercent > 0 ? '+' : ''}${rec.fxNormalizedComparison.variancePercent}%`
@@ -1577,7 +1592,7 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
             </div>
 
             {rec.fxNormalizedComparison.formulaBreakdown && (
-              <div style={{ marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+              <div className="supplier-disclaimer-mono">
                 Parity Formula: {rec.fxNormalizedComparison.formulaBreakdown}
               </div>
             )}
@@ -1588,19 +1603,19 @@ export function SupplierGuidanceCard({ rec, loading, error, materialName, onOpen
         {rec.diversification && (
           <div className="supplier-subpanel">
             <h4 className="supplier-subpanel__title">
-              <i className="fa-solid fa-shield-halved mr-2" style={{ color: 'var(--color-success)' }} />
+              <i className="fa-solid fa-shield-halved mr-2 trends-icon--success" aria-hidden="true" />
               Supply Chain Resilience ({rec.diversification.category})
             </h4>
-            <p style={{ margin: 'var(--space-2) 0 var(--space-1) 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-              <strong style={{ color: 'var(--color-text-primary)' }}>Primary Hubs:</strong> {rec.diversification.primarySources}
+            <p className="supplier-resilience-copy supplier-resilience-copy--lead">
+              <strong className="supplier-strong">Primary Hubs:</strong> {rec.diversification.primarySources}
             </p>
-            <p style={{ margin: '0 0 var(--space-3) 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-              <strong style={{ color: 'var(--color-text-primary)' }}>Sourcing Strategy:</strong> {rec.diversification.sourcingStrategy}
+            <p className="supplier-resilience-copy">
+              <strong className="supplier-strong">Sourcing Strategy:</strong> {rec.diversification.sourcingStrategy}
             </p>
 
             {rec.diversification.checklist && rec.diversification.checklist.length > 0 && (
               <div>
-                <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wider)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)', fontWeight: 'var(--weight-semibold)' }}>
+                <div className="supplier-checklist-heading">
                   Procurement Checklist
                 </div>
                 <ul className="supplier-checklist">

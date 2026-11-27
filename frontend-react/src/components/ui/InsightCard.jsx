@@ -31,8 +31,14 @@
  * AI generation is never triggered from here.
  */
 
-import { useState } from 'react';
-import { formatRelativeTime, formatDate, formatPrice, getSafeExternalUrl } from '../../utils/format.js';
+import { useEffect, useState } from 'react';
+import {
+  formatDateTime,
+  formatRelativeTime,
+  formatDate,
+  formatPrice,
+  getSafeExternalUrl,
+} from '../../utils/format.js';
 import {
   classifyEvidencePriceBadge,
   classifyInsightBenchmarkDisclosure,
@@ -98,6 +104,33 @@ export function InsightCard({
   const [evidenceData, setEvidenceData] = useState(null);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
   const [evidenceError, setEvidenceError] = useState(null);
+  const [clientRelTime, setClientRelTime] = useState(null);
+
+  useEffect(() => {
+    const generatedAt = insight?.generated_at;
+    if (!generatedAt || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const schedule = typeof window.requestAnimationFrame === 'function'
+      ? (fn) => ({ type: 'raf', id: window.requestAnimationFrame(fn) })
+      : (fn) => ({ type: 'timer', id: window.setTimeout(fn, 0) });
+
+    const handle = schedule(() => {
+      setClientRelTime({
+        forIso: generatedAt,
+        label: formatRelativeTime(generatedAt),
+      });
+    });
+
+    return () => {
+      if (handle.type === 'raf' && typeof window.cancelAnimationFrame === 'function') {
+        window.cancelAnimationFrame(handle.id);
+      } else {
+        window.clearTimeout(handle.id);
+      }
+    };
+  }, [insight?.generated_at]);
 
   const outlook    = insight ? (OUTLOOK_CONFIG[insight.outlook]    ?? OUTLOOK_CONFIG.NEUTRAL)    : null;
   const confidence = insight ? (CONFIDENCE_CONFIG[insight.confidence] ?? CONFIDENCE_CONFIG.LOW) : null;
@@ -461,7 +494,10 @@ export function InsightCard({
             {/* Footer — timestamp + model attribution */}
             <div className="insight-card__footer">
               <span className="insight-card__generated-at" title={insight.generated_at}>
-                Generated {formatRelativeTime(insight.generated_at)}
+                Generated{' '}
+                {clientRelTime && clientRelTime.forIso === insight.generated_at
+                  ? clientRelTime.label
+                  : formatDateTime(insight.generated_at)}
               </span>
               <span className="insight-card__model">
                 via {insight.model_used}

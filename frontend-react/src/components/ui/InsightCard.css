@@ -49,9 +49,9 @@
   font-weight: var(--weight-bold);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-primary);
-  background-color: var(--color-primary-subtle);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--color-info);
+  background-color: var(--color-info-subtle);
+  border: 1px solid rgba(96, 165, 250, 0.28);
   border-radius: var(--radius-full);
   padding: 1px 6px;
   flex-shrink: 0;
@@ -85,25 +85,25 @@
 .insight-badge--bullish {
   background-color: var(--color-success-subtle);
   color: var(--color-success);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(74, 222, 128, 0.25);
 }
 
 .insight-badge--bearish {
   background-color: var(--color-danger-subtle);
   color: var(--color-danger);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(248, 113, 113, 0.25);
 }
 
 .insight-badge--neutral {
   background-color: var(--color-primary-subtle);
-  color: var(--color-primary);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: var(--color-info);
+  border: 1px solid rgba(96, 165, 250, 0.25);
 }
 
 .insight-badge--volatile {
   background-color: var(--color-warning-subtle);
   color: var(--color-warning);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  border: 1px solid rgba(251, 191, 36, 0.25);
 }
 
 /* ── Confidence label ─────────────────────────────────────────────── */
@@ -174,19 +174,7 @@
   margin: 0;
 }
 
-/* ── Evidence row ─────────────────────────────────────────────────── */
-
-.insight-card__evidence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background-color: var(--color-bg-elevated);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-}
+/* ── Evidence metadata atoms ──────────────────────────────────────── */
 
 .insight-evidence__label {
   font-weight: var(--weight-semibold);
@@ -272,7 +260,7 @@
 
 .insight-card__empty-icon {
   font-size: 1.75rem;
-  color: var(--color-text-disabled);
+  color: var(--color-text-muted);
 }
 
 .insight-card__empty-title {
@@ -284,7 +272,7 @@
 
 .insight-card__empty-message {
   font-size: var(--text-xs);
-  color: var(--color-text-disabled);
+  color: var(--color-text-muted);
   max-width: 36ch;
   line-height: 1.6;
   margin: 0;
@@ -305,12 +293,6 @@
   background-color: var(--color-bg-elevated);
 }
 
-/* ── TrendsPage integration — section wrapper ─────────────────────── */
-
-.trends-insight-section {
-  margin-top: var(--space-6);
-}
-
 /* ── Phase 3: Proxy Notice Banner ─────────────────────────────────── */
 
 .insight-proxy-notice {
@@ -319,7 +301,7 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background-color: var(--color-warning-subtle);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgba(251, 191, 36, 0.28);
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
   color: var(--color-warning);
@@ -340,13 +322,13 @@
 }
 
 .insight-proxy-notice--domestic {
-  background-color: var(--color-primary-subtle);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: var(--color-primary);
+  background-color: var(--color-info-subtle);
+  border-color: rgba(96, 165, 250, 0.28);
+  color: var(--color-info);
 }
 
 .insight-proxy-notice--domestic .insight-proxy-notice__content strong {
-  color: var(--color-primary);
+  color: var(--color-info);
 }
 
 /* ── Phase 3: Evidence Container & Interactive Drawer ────────────── */
@@ -365,6 +347,7 @@
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
@@ -440,7 +423,7 @@
 
 .insight-evidence__empty-text {
   font-size: var(--text-xs);
-  color: var(--color-text-disabled);
+  color: var(--color-text-muted);
   margin: 0;
   font-style: italic;
 }
@@ -452,6 +435,7 @@
 
 .insight-evidence__table {
   width: 100%;
+  min-width: 480px;
   border-collapse: collapse;
   font-size: var(--text-xs);
   text-align: left;
@@ -534,10 +518,15 @@
 }
 
 .insight-evidence__news-item {
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   background-color: var(--color-bg-base);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  border-left: 3px solid var(--color-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.insight-evidence__news-item:hover {
+  border-color: var(--color-border-hover);
 }
 
 .insight-evidence__news-main {
@@ -568,13 +557,19 @@
 .insight-evidence__news-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   font-size: 0.7rem;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .insight-evidence__source {
   font-weight: var(--weight-semibold);
+}
+
+.insight-evidence__date {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .insight-card__insufficient .insight-card__empty-icon {
@@ -620,25 +615,25 @@
 .insight-action--accelerate {
   background-color: var(--color-danger-subtle);
   color: var(--color-danger);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(248, 113, 113, 0.3);
 }
 
 .insight-action--delay {
   background-color: var(--color-success-subtle);
   color: var(--color-success);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(74, 222, 128, 0.3);
 }
 
 .insight-action--buffer {
   background-color: var(--color-warning-subtle);
   color: var(--color-warning);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 .insight-action--monitor {
-  background-color: var(--color-primary-subtle);
-  color: var(--color-primary);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background-color: var(--color-info-subtle);
+  color: var(--color-info);
+  border: 1px solid rgba(96, 165, 250, 0.3);
 }
 
 .insight-horizon-pill {
@@ -647,7 +642,7 @@
   gap: 4px;
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-  background-color: var(--color-bg-card);
+  background-color: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
@@ -661,7 +656,7 @@
   font-weight: var(--weight-semibold);
   color: var(--color-warning);
   background-color: var(--color-warning-subtle);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  border: 1px solid rgba(251, 191, 36, 0.35);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
 }
@@ -681,9 +676,9 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-2);
-  background-color: rgba(245, 158, 11, 0.05);
-  border-left: 3px solid var(--color-warning);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-warning-subtle);
+  border: 1px solid rgba(251, 191, 36, 0.25);
   border-radius: var(--radius-sm);
   margin-top: var(--space-1);
 }
@@ -700,4 +695,10 @@
   line-height: var(--leading-normal);
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insight-skeleton__line {
+    animation: none;
+  }
 }

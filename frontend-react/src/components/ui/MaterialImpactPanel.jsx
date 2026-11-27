@@ -79,13 +79,13 @@ export function MaterialImpactPanel({
             {material?.is_custom ? (
               <span className="impact-badge impact-badge--warning">Custom Material</span>
             ) : material ? (
-              <span className="impact-badge impact-badge--info">Standard Material</span>
+              <span className="impact-badge impact-badge--meta">Standard Material</span>
             ) : null}
             {material?.is_tracked && (
               <span className="impact-badge impact-badge--success">Tracked</span>
             )}
             {data && (
-              <span className="impact-badge impact-badge--neutral">
+              <span className="impact-badge impact-badge--meta">
                 {data.industry_id != null ? `Industry #${data.industry_id}` : 'No industry linked'}
               </span>
             )}
@@ -95,7 +95,7 @@ export function MaterialImpactPanel({
               {material?.name ? `${material.name} — Impact Chains` : `Material #${materialId ?? ''} — Impact Chains`}
             </h1>
             {material?.unit_abbreviation && (
-              <span className="impact-badge impact-badge--neutral">
+              <span className="impact-badge impact-badge--meta">
                 Unit: {material.unit_abbreviation}
               </span>
             )}
@@ -266,7 +266,7 @@ export function MaterialImpactPanel({
                   const steps = Array.isArray(chain.steps) ? chain.steps : [];
                   const terminalMeta = getEntityTypeMetadata(chain.terminal_entity?.entity_type);
                   return (
-                    <article key={chain.chain_id} className="impact-chain-card">
+                    <article key={chain.chain_id} className="impact-chain-card" tabIndex={0}>
                       <div className="impact-chain-card__header">
                         <span className="impact-chain-card__path">{chain.path_label}</span>
                         <div className="impact-chain-card__badges">
@@ -405,7 +405,7 @@ export function MaterialImpactPanel({
             )}
 
             <div>
-              <h3 className="impact-entity-group__title" style={{ marginBottom: 'var(--space-2)' }}>
+              <h3 className="impact-entity-group__title impact-news-section__title">
                 Observed Relevant News Articles ({relevantNews.length})
               </h3>
               {relevantNews.length > 0 ? (

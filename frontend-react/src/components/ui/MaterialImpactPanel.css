@@ -142,7 +142,16 @@
   font-weight: var(--weight-semibold);
   border: 1px solid transparent;
   line-height: 1.4;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.impact-badge--meta {
+  background-color: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-medium);
 }
 
 .impact-badge--neutral {
@@ -190,11 +199,11 @@
 }
 
 .impact-section--structural {
-  border-left: 3px solid var(--color-warning);
+  border-top: 2px solid rgba(251, 191, 36, 0.55);
 }
 
 .impact-section--observed {
-  border-left: 3px solid var(--color-info);
+  border-top: 2px solid rgba(96, 165, 250, 0.55);
 }
 
 .impact-section__header {
@@ -360,6 +369,29 @@
   gap: var(--space-3);
   min-width: 0;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.impact-chain-card:hover,
+.impact-chain-card:focus-within {
+  border-color: rgba(96, 165, 250, 0.42);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  outline: none;
+}
+
+.impact-chain-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.impact-chain-card:hover .impact-step,
+.impact-chain-card:focus-within .impact-step {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.impact-chain-card:hover .impact-step__arrow,
+.impact-chain-card:focus-within .impact-step__arrow {
+  color: var(--color-info);
 }
 
 .impact-chain-card__header {
@@ -410,8 +442,12 @@
 }
 
 .impact-step:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(96, 165, 250, 0.4);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.impact-step:hover .impact-step__nodes {
+  border-color: rgba(96, 165, 250, 0.35);
 }
 
 .impact-step__top {
@@ -505,6 +541,10 @@
   font-family: var(--font-mono);
 }
 
+.impact-news-section__title {
+  margin-bottom: var(--space-2);
+}
+
 .impact-section__actions {
   display: flex;
   flex-wrap: wrap;
@@ -519,6 +559,14 @@
     padding: var(--space-4);
   }
 
+  .impact-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .impact-chain-card {
+    padding: var(--space-3);
+  }
+
   .impact-steps {
     flex-direction: column;
   }
@@ -526,5 +574,15 @@
   .impact-step {
     flex: 1 1 auto;
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .impact-depth-btn,
+  .impact-kpi,
+  .impact-chain-card,
+  .impact-step,
+  .impact-news-item {
+    transition: none;
   }
 }

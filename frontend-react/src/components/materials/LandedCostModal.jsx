@@ -42,6 +42,37 @@ export function LandedCostModal({
   benchmarkUnit = 'bbl',
   domesticQuotePrice = null,
   initialFxRate = null,
+  readOnly = false,
+}) {
+  if (!isOpen || !material) return null;
+
+  const modalKey = material.id ?? material.trackedMaterialId ?? material.name ?? 'landed';
+  return (
+    <LandedCostModalContent
+      key={modalKey}
+      material={material}
+      onClose={onClose}
+      onSaveSuccess={onSaveSuccess}
+      benchmarkPrice={benchmarkPrice}
+      benchmarkCurrency={benchmarkCurrency}
+      benchmarkUnit={benchmarkUnit}
+      domesticQuotePrice={domesticQuotePrice}
+      initialFxRate={initialFxRate}
+      readOnly={readOnly}
+    />
+  );
+}
+
+function LandedCostModalContent({
+  material,
+  onClose,
+  onSaveSuccess,
+  benchmarkPrice,
+  benchmarkCurrency,
+  benchmarkUnit,
+  domesticQuotePrice,
+  initialFxRate,
+  readOnly,
 }) {
   const titleId = useId();
 
@@ -61,9 +92,7 @@ export function LandedCostModal({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Fetch latest FX rate on modal open if not already supplied
   useEffect(() => {
-    if (!isOpen) return;
     let isMounted = true;
 
     async function loadFx() {
@@ -73,55 +102,41 @@ export function LandedCostModal({
           setFxRate(Number(res.rate));
           if (res.source) setFxSource(res.source);
         }
-      } catch (_) {
+      } catch {
         // Fall back gracefully to existing rate
       }
     }
 
     loadFx();
-    return () => { isMounted = false; };
-  }, [isOpen]);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
-  useEffect(() => {
-    if (material) {
-      setUnitFactor(material.landedUnitFactor != null ? String(material.landedUnitFactor) : material.landedCost?.unitFactor != null ? String(material.landedCost.unitFactor) : '');
-      setDutyFreightPct(material.landedDutyFreightPct != null ? String(material.landedDutyFreightPct) : material.landedCost?.dutyFreightPct != null ? String(material.landedCost.dutyFreightPct) : '0');
-      setFixedSpreadInr(material.landedFixedSpreadInr != null ? String(material.landedFixedSpreadInr) : material.landedCost?.fixedSpreadInr != null ? String(material.landedCost.fixedSpreadInr) : '0');
-      setFormError('');
-      setActivePreset(null);
-    }
-  }, [material]);
-
-  // Handle ESC key dismiss
   useEffect(() => {
     function handleKeyDown(e) {
-      if (e.key === 'Escape' && isOpen && typeof onClose === 'function') {
+      if (e.key === 'Escape' && typeof onClose === 'function') {
         onClose();
       }
     }
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
+    window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [onClose]);
 
-  // Lock body scroll when open
   useEffect(() => {
-    if (!isOpen || typeof document === 'undefined' || !document.body) return;
+    if (typeof document === 'undefined' || !document.body) return undefined;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prevOverflow || '';
     };
-  }, [isOpen]);
-
-  if (!isOpen || !material) return null;
+  }, []);
 
   const targetMaterialId = material.id ?? material.trackedMaterialId;
   const matUnit = material.unit || material.unit_abbreviation || 'kg';
 
-  // Apply a starter preset
   function handleSelectPreset(preset) {
+    if (readOnly) return;
     setActivePreset(preset.id);
     setUnitFactor(preset.factor);
     setDutyFreightPct(preset.duty);
@@ -129,7 +144,6 @@ export function LandedCostModal({
     setFormError('');
   }
 
-  // Live calculation preview
   const numFactor = unitFactor.trim() !== '' ? Number(unitFactor) : null;
   const numDuty = dutyFreightPct.trim() !== '' ? Number(dutyFreightPct) : 0;
   const numSpread = fixedSpreadInr.trim() !== '' ? Number(fixedSpreadInr) : 0;
@@ -138,8 +152,16 @@ export function LandedCostModal({
   let liveVariance = null;
   let liveFormula = '';
 
-  const hasValidInputs = numFactor != null && !isNaN(numFactor) && numFactor > 0 && !isNaN(numDuty) && numDuty >= 0 && !isNaN(numSpread) && numSpread >= 0;
-  const activeBenchPrice = benchmarkPrice != null && Number(benchmarkPrice) > 0 ? Number(benchmarkPrice) : null;
+  const hasValidInputs =
+    numFactor != null &&
+    !isNaN(numFactor) &&
+    numFactor > 0 &&
+    !isNaN(numDuty) &&
+    numDuty >= 0 &&
+    !isNaN(numSpread) &&
+    numSpread >= 0;
+  const activeBenchPrice =
+    benchmarkPrice != null && Number(benchmarkPrice) > 0 ? Number(benchmarkPrice) : null;
 
   if (hasValidInputs && activeBenchPrice != null && fxRate > 0) {
     const baseInr = activeBenchPrice * fxRate * numFactor;
@@ -156,6 +178,10 @@ export function LandedCostModal({
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (readOnly) {
+      setFormError('Viewers have read-only permissions.');
+      return;
+    }
     setFormError('');
 
     if (!targetMaterialId) {
@@ -206,6 +232,10 @@ export function LandedCostModal({
   }
 
   async function handleClearModel() {
+    if (readOnly) {
+      setFormError('Viewers have read-only permissions.');
+      return;
+    }
     setFormError('');
     setSaving(true);
     try {
@@ -240,76 +270,73 @@ export function LandedCostModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        style={{ maxWidth: '640px', width: '100%', margin: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal__header modal-header">
+        <div className="modal__header materials-modal__header">
           <div>
-            <h3 id={titleId} className="modal__title modal-title font-semibold" style={{ display: 'flex', alignItems: 'center' }}>
-              <i className="fa-solid fa-calculator" style={{ color: 'var(--color-primary)', marginRight: '8px' }} />
+            <h3 id={titleId} className="modal__title materials-modal__title">
+              <i className="fa-solid fa-calculator materials-modal__icon" aria-hidden="true" />
               <span>Landed-Cost &amp; FX Parity Model — {material.name}</span>
             </h3>
-            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px' }}>
+            <span className="materials-modal__subtitle">
               Convert global USD benchmarks into actionable landed domestic INR/{matUnit} benchmark parity.
             </span>
           </div>
           <button
             type="button"
-            className="btn btn--ghost btn--icon modal__close"
+            className="modal__close"
             onClick={onClose}
             aria-label="Close dialog"
             disabled={saving}
           >
-            <i className="fa-solid fa-xmark" />
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="modal__body modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-            {formError && (
-              <div className="alert alert--danger" style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-xs)' }}>
-                <i className="fa-solid fa-triangle-exclamation mr-1" /> {formError}
+          <div className="modal__body materials-modal__body">
+            {readOnly && (
+              <div className="alert-banner alert-banner--warning" role="status">
+                <i className="fa-solid fa-eye" aria-hidden="true" />
+                <span className="alert-banner__message">
+                  Read-only viewer role: parity model adjustments are disabled.
+                </span>
               </div>
             )}
 
-            {/* Live FX Rate Pill */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: 'var(--space-2) var(--space-3)',
-                backgroundColor: 'var(--color-bg-subtle, #1e293b)',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: 'var(--space-4)',
-                border: '1px solid var(--color-border)',
-                fontSize: 'var(--text-xs)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="badge badge--info font-mono" style={{ fontSize: '11px' }}>USD/INR</span>
-                <span className="font-mono font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {formError && (
+              <div className="form-alert form-alert--error form-alert--visible materials-modal__alert" role="alert">
+                <i className="fa-solid fa-triangle-exclamation mr-1" aria-hidden="true" />
+                <span className="form-alert__message">{formError}</span>
+              </div>
+            )}
+
+            <div className="materials-modal__fx-bar">
+              <div className="materials-modal__fx-left">
+                <span className="badge badge--info font-mono">USD/INR</span>
+                <span className="font-mono font-semibold materials-modal__fx-value">
                   1 USD = ₹{fxRate.toFixed(2)}
                 </span>
               </div>
-              <span className="text-muted" style={{ fontSize: '11px' }}>
+              <span className="text-muted">
                 Live Reference: {fxSource === 'FRANKFURTER_ECB' ? 'ECB (Frankfurter)' : fxSource}
               </span>
             </div>
 
-            {/* Starter Presets */}
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <label className="form-label" style={{ display: 'block', marginBottom: 'var(--space-2)' }}>
+            <div className="materials-modal__presets-wrap">
+              <label className="form-label mb-2">
                 Quick Starter Presets (1-Click Fill &amp; Editable)
               </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div className="materials-modal__chip-row">
                 {STARTER_PRESETS.map((preset) => (
                   <button
                     key={preset.id}
                     type="button"
-                    className={`btn btn--sm ${activePreset === preset.id ? 'btn--primary' : 'btn--secondary'}`}
+                    disabled={readOnly || saving}
+                    className={`btn btn--sm materials-modal__chip-btn ${
+                      activePreset === preset.id ? 'btn--primary' : 'btn--secondary'
+                    }`}
                     onClick={() => handleSelectPreset(preset)}
-                    style={{ fontSize: '11px', padding: '3px 8px' }}
                   >
                     {preset.label}
                   </button>
@@ -317,14 +344,9 @@ export function LandedCostModal({
               </div>
             </div>
 
-            {/* Config Fields */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-                <label
-                  className="form-label"
-                  htmlFor="unit-factor-input"
-                  style={{ minHeight: '20px', display: 'flex', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}
-                >
+            <div className="materials-modal__grid materials-modal__grid--3">
+              <div className="form-group">
+                <label className="form-label materials-modal__label" htmlFor="unit-factor-input">
                   Unit Factor *
                 </label>
                 <input
@@ -333,6 +355,7 @@ export function LandedCostModal({
                   step="any"
                   min="0.000001"
                   max="100000"
+                  disabled={readOnly || saving}
                   className="form-control font-mono"
                   placeholder="e.g. 0.00735"
                   value={unitFactor}
@@ -342,17 +365,13 @@ export function LandedCostModal({
                   }}
                   required
                 />
-                <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', lineHeight: '1.3' }}>
+                <span className="form-hint">
                   Benchmark units needed per 1 {matUnit} (e.g. 0.00735 bbl/kg).
                 </span>
               </div>
 
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-                <label
-                  className="form-label"
-                  htmlFor="duty-pct-input"
-                  style={{ minHeight: '20px', display: 'flex', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}
-                >
+              <div className="form-group">
+                <label className="form-label materials-modal__label" htmlFor="duty-pct-input">
                   Duty &amp; Freight (%)
                 </label>
                 <input
@@ -361,6 +380,7 @@ export function LandedCostModal({
                   step="any"
                   min="0"
                   max="500"
+                  disabled={readOnly || saving}
                   className="form-control font-mono"
                   placeholder="e.g. 10.0"
                   value={dutyFreightPct}
@@ -369,17 +389,13 @@ export function LandedCostModal({
                     setActivePreset(null);
                   }}
                 />
-                <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', lineHeight: '1.3' }}>
+                <span className="form-hint">
                   Basic customs duty, ocean freight &amp; port cess.
                 </span>
               </div>
 
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
-                <label
-                  className="form-label"
-                  htmlFor="spread-inr-input"
-                  style={{ minHeight: '20px', display: 'flex', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}
-                >
+              <div className="form-group">
+                <label className="form-label materials-modal__label" htmlFor="spread-inr-input">
                   Fixed Spread (₹/{matUnit})
                 </label>
                 <input
@@ -388,6 +404,7 @@ export function LandedCostModal({
                   step="any"
                   min="0"
                   max="1000000"
+                  disabled={readOnly || saving}
                   className="form-control font-mono"
                   placeholder="e.g. 32.00"
                   value={fixedSpreadInr}
@@ -396,27 +413,16 @@ export function LandedCostModal({
                     setActivePreset(null);
                   }}
                 />
-                <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', lineHeight: '1.3' }}>
+                <span className="form-hint">
                   Local processing, converter spread, or domestic delivery.
                 </span>
               </div>
             </div>
 
-            {/* Live Parity Preview */}
             {hasValidInputs && (
-              <div
-                style={{
-                  padding: 'var(--space-3)',
-                  backgroundColor: 'var(--color-bg-surface)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  marginBottom: 'var(--space-3)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span className="text-xs font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary)' }}>
-                    Live Landed Benchmark Preview
-                  </span>
+              <div className="materials-modal__preview-box">
+                <div className="materials-modal__preview-header">
+                  <span className="materials-modal__preview-title">Live Landed Benchmark Preview</span>
                   {activeBenchPrice != null && (
                     <span className="text-xs text-muted font-mono">
                       Ref Benchmark: ${activeBenchPrice.toFixed(2)}/{benchmarkUnit}
@@ -425,32 +431,32 @@ export function LandedCostModal({
                 </div>
 
                 {liveLandedBenchmark != null ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginBottom: '8px' }}>
-                    <div style={{ padding: '8px', backgroundColor: 'var(--color-bg-base)', borderRadius: 'var(--radius-sm)' }}>
-                      <span className="text-xs text-muted" style={{ display: 'block' }}>Landed Parity Benchmark</span>
-                      <strong className="font-mono" style={{ fontSize: '15px', color: 'var(--color-text-primary)' }}>
+                  <div className="materials-modal__metrics-grid">
+                    <div className="materials-modal__metric-tile">
+                      <span className="materials-modal__metric-label">Landed Parity Benchmark</span>
+                      <strong className="font-mono materials-modal__metric-val">
                         ₹{liveLandedBenchmark.toFixed(2)}/{matUnit}
                       </strong>
                     </div>
 
                     {domesticQuotePrice != null && (
-                      <div style={{ padding: '8px', backgroundColor: 'var(--color-bg-base)', borderRadius: 'var(--radius-sm)' }}>
-                        <span className="text-xs text-muted" style={{ display: 'block' }}>Supplier Quote</span>
-                        <strong className="font-mono" style={{ fontSize: '15px' }}>
+                      <div className="materials-modal__metric-tile">
+                        <span className="materials-modal__metric-label">Supplier Quote</span>
+                        <strong className="font-mono materials-modal__metric-val">
                           ₹{Number(domesticQuotePrice).toFixed(2)}/{matUnit}
                         </strong>
                       </div>
                     )}
 
                     {liveVariance != null && (
-                      <div style={{ padding: '8px', backgroundColor: 'var(--color-bg-base)', borderRadius: 'var(--radius-sm)' }}>
-                        <span className="text-xs text-muted" style={{ display: 'block' }}>Parity Variance</span>
+                      <div className="materials-modal__metric-tile">
+                        <span className="materials-modal__metric-label">Parity Variance</span>
                         <strong
-                          className="font-mono"
-                          style={{
-                            fontSize: '15px',
-                            color: liveVariance > 0 ? 'var(--color-danger)' : 'var(--color-success)',
-                          }}
+                          className={`font-mono materials-modal__metric-val ${
+                            liveVariance > 0
+                              ? 'materials-modal__metric-val--danger'
+                              : 'materials-modal__metric-val--success'
+                          }`}
                         >
                           {liveVariance > 0 ? `+${liveVariance}%` : `${liveVariance}%`}
                         </strong>
@@ -458,30 +464,28 @@ export function LandedCostModal({
                     )}
                   </div>
                 ) : (
-                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                  <p className="materials-modal__preview-desc">
                     Log or ingest a benchmark price (e.g. Brent Crude / WTI in USD) to compute live landed benchmark preview.
                   </p>
                 )}
 
                 {liveFormula && (
-                  <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    Formula: {liveFormula}
-                  </div>
+                  <div className="materials-modal__formula">Formula: {liveFormula}</div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="modal__footer modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="modal__footer materials-modal__footer">
             <button
               type="button"
               className="btn btn--ghost text-muted btn--sm"
               onClick={handleClearModel}
-              disabled={saving}
+              disabled={readOnly || saving}
             >
               Clear Model
             </button>
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <div className="materials-modal__footer-actions">
               <button
                 type="button"
                 className="btn btn--secondary btn--sm"
@@ -493,7 +497,7 @@ export function LandedCostModal({
               <button
                 type="submit"
                 className={`btn btn--primary btn--sm${saving ? ' btn--loading' : ''}`}
-                disabled={saving}
+                disabled={readOnly || saving}
               >
                 Save Landed Model
               </button>

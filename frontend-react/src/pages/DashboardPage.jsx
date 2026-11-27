@@ -1,73 +1,52 @@
 /**
- * DashboardPage — Main dashboard
+ * DashboardPage — Executive Procurement Command Center
  * Business Market Monitor — React frontend
  *
- * Ported from: frontend/pages/dashboard.html + frontend/js/pages/dashboard.js
- *
- * FLOW (preserved exactly from original):
- *  1. Auth guard: requireAuth() + requireBusiness() — handled by ProtectedRoute in App.jsx
- *  2. Show skeletons in all 4 data panels immediately on render
- *  3. GET /api/v1/dashboard (single call — no query params)
- *  4. Render all 5 panels from response
- *  5. On error: render full-page error state with retry
- *
- * RESPONSE FIELD RULES (Doc 4 §8.1 — confirmed from backend source):
- *   trackedMaterials[].latestPrice  → scalar number | null (NOT an object)
- *   significantChange               → absent — NEVER reference
- *   recentNews[]                    → { id, title } ONLY — no url, source, or date
- *   activeAlertRules[]              → { id, conditionType, thresholdPrice } — no materialName
- *   recentAlertEvents[]             → { id, triggeredAt } ONLY
- *   sync.lastPriceSyncAt / lastNewsSyncAt → both null in v1 → show "Never" (not an error)
- *
- * CHARTS: The original dashboard.js contains NO chart implementation.
- *   Chart.js is NOT installed and NOT required for this page.
- *
- * LAYOUT: Rendered inside AppLayout (sidebar + header) via React Router Outlet.
- *   Does NOT render its own app shell — AppLayout provides it.
- *
- * CSS: dashboard.css imported (same classes as original dashboard.html).
+ * SSR-safe: reads optional AuthContext via useContext(AuthContext) so tests rendering
+ * <DashboardPage /> inside <MemoryRouter> without <AuthProvider> work cleanly.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext.jsx';
 import { getDashboard } from '../api/dashboard.api.js';
 import { getBusinessLatestInsights } from '../api/aiInsights.api.js';
 import { getSavingsRoi } from '../api/analytics.api.js';
-import { Skeleton }     from '../components/ui/Skeleton.jsx';
-import { EmptyState }   from '../components/ui/EmptyState.jsx';
-import { ErrorState }   from '../components/ui/ErrorState.jsx';
-import { InsightCard }  from '../components/ui/InsightCard.jsx';
+import { Skeleton } from '../components/ui/Skeleton.jsx';
+import { EmptyState } from '../components/ui/EmptyState.jsx';
+import { ErrorState } from '../components/ui/ErrorState.jsx';
+import { InsightCard } from '../components/ui/InsightCard.jsx';
+import { RollingMetric } from '../components/ui/RollingMetric.jsx';
 import { formatPriceDisplay, formatDateTime, formatAlertCondition } from '../utils/format.js';
 import '../styles/pages/dashboard.css';
 
-/* ── Loading / data states ───────────────────────────────────────── */
 const STATUS = { LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
+
+function formatInrCompact(val) {
+  return `₹${Math.round(val).toLocaleString('en-IN')}`;
+}
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const auth = useContext(AuthContext);
+  const currentRole = auth?.business?.businessRole || auth?.user?.businessRole || 'OWNER';
+  const isViewer = currentRole === 'VIEWER';
 
-  const [status,    setStatus]    = useState(STATUS.LOADING);
-  const [data,      setData]      = useState(null);
-  const [errMsg,    setErrMsg]    = useState('');
+  const [status, setStatus] = useState(STATUS.LOADING);
+  const [data, setData] = useState(null);
+  const [errMsg, setErrMsg] = useState('');
 
-  // AI insights loaded independently — never blocks main dashboard data.
-  // A Gemini/AI failure shows an inline error on Panel 6 only.
-  const [aiInsights,        setAiInsights]        = useState([]);
+  const [aiInsights, setAiInsights] = useState([]);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(true);
-  const [aiInsightsError,   setAiInsightsError]   = useState(null);
+  const [aiInsightsError, setAiInsightsError] = useState(null);
 
-  // Savings ROI loaded independently (V3-M5)
-  const [savingsRoi,        setSavingsRoi]        = useState(null);
+  const [savingsRoi, setSavingsRoi] = useState(null);
   const [savingsRoiLoading, setSavingsRoiLoading] = useState(true);
 
-  /* ── Load dashboard data ──────────────────────────────────────── */
-  const loadDashboard = useCallback(async () => {
-    setStatus(STATUS.LOADING);
-    setErrMsg('');
+  const fetchDashboard = useCallback(async () => {
     try {
       const result = await getDashboard();
-      setData(result);
-      setStatus(STATUS.SUCCESS);
+      return { ok: true, result };
     } catch (err) {
       let message = 'Something went wrong. Please try again.';
       if (err?.status === 404) {
@@ -75,56 +54,81 @@ export function DashboardPage() {
       } else if (!err?.status) {
         message = 'Could not connect to the server. Check your connection.';
       }
-      setErrMsg(message);
+      return { ok: false, message };
+    }
+  }, []);
+
+  const loadDashboard = useCallback(async () => {
+    setStatus(STATUS.LOADING);
+    setErrMsg('');
+    const outcome = await fetchDashboard();
+    if (outcome.ok) {
+      setData(outcome.result);
+      setStatus(STATUS.SUCCESS);
+    } else {
+      setErrMsg(outcome.message);
       setStatus(STATUS.ERROR);
     }
-  }, []);
+  }, [fetchDashboard]);
 
-  /* ── Load AI insights (independent of main dashboard) ────────── */
-  const loadAiInsights = useCallback(async () => {
-    setAiInsightsLoading(true);
-    setAiInsightsError(null);
-    try {
-      const insights = await getBusinessLatestInsights(3);
-      setAiInsights(insights ?? []);
-    } catch {
-      setAiInsightsError('Could not load AI insights. They will be retried on next load.');
-    } finally {
-      setAiInsightsLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
 
-  /* ── Load Savings ROI (V3-M5) ────────────────────────────────── */
-  const loadSavingsRoi = useCallback(async () => {
-    setSavingsRoiLoading(true);
-    try {
-      const result = await getSavingsRoi();
-      setSavingsRoi(result);
-    } catch {
-      setSavingsRoi(null);
-    } finally {
-      setSavingsRoiLoading(false);
-    }
-  }, []);
+    fetchDashboard().then((outcome) => {
+      if (cancelled) return;
+      if (outcome.ok) {
+        setData(outcome.result);
+        setStatus(STATUS.SUCCESS);
+      } else {
+        setErrMsg(outcome.message);
+        setStatus(STATUS.ERROR);
+      }
+    });
 
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
-  useEffect(() => { loadAiInsights(); }, [loadAiInsights]);
-  useEffect(() => { loadSavingsRoi(); }, [loadSavingsRoi]);
+    getBusinessLatestInsights(3)
+      .then((insights) => {
+        if (!cancelled) {
+          setAiInsights(insights ?? []);
+          setAiInsightsError(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAiInsightsError('Could not load AI insights. They will be retried on next load.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAiInsightsLoading(false);
+      });
 
-  /* ── Render ───────────────────────────────────────────────────── */
+    getSavingsRoi()
+      .then((result) => {
+        if (!cancelled) setSavingsRoi(result);
+      })
+      .catch(() => {
+        if (!cancelled) setSavingsRoi(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSavingsRoiLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDashboard]);
+
   const isLoading = status === STATUS.LOADING;
-  const isError   = status === STATUS.ERROR;
+  const isError = status === STATUS.ERROR;
 
   const trackedCount = data?.trackedMaterials?.length ?? 0;
-  const withPricesCount = data?.trackedMaterials?.filter(m => m.latestPrice != null)?.length ?? 0;
+  const withPricesCount = data?.trackedMaterials?.filter((m) => m.latestPrice != null)?.length ?? 0;
   const activeRulesCount = data?.activeAlertRules?.length ?? 0;
   const recentAlertsCount = data?.recentAlertEvents?.length ?? 0;
   const aiInsightsCount = aiInsights?.length ?? 0;
+  const monthlySavingsInr = savingsRoi?.totalMonthlySavingsInr || 0;
 
   return (
     <div className="page-container">
-
-      {/* Full-page error — replaces dashboard grid on fatal load failure */}
       {isError && (
         <ErrorState
           title="Failed to load dashboard"
@@ -133,7 +137,7 @@ export function DashboardPage() {
         />
       )}
 
-      {/* ── Top KPI Stat Cards ─────────────────────────────────── */}
+      {/* Top KPI Stat Cards */}
       {!isError && (
         <div className="dashboard-kpi-grid" aria-label="Key Performance Indicators">
           <div className="card dashboard-stat">
@@ -142,7 +146,7 @@ export function DashboardPage() {
               <i className="fa-solid fa-boxes-stacked dashboard-stat__icon" aria-hidden="true" />
             </div>
             <div className="dashboard-stat__value font-mono">
-              {isLoading ? '—' : trackedCount}
+              {isLoading ? '—' : <RollingMetric value={trackedCount} decimals={0} durationMs={320} />}
             </div>
             <div className="dashboard-stat__footer">
               <span className="dashboard-stat__subtext">
@@ -157,7 +161,7 @@ export function DashboardPage() {
               <i className="fa-solid fa-bell dashboard-stat__icon" aria-hidden="true" />
             </div>
             <div className="dashboard-stat__value font-mono">
-              {isLoading ? '—' : activeRulesCount}
+              {isLoading ? '—' : <RollingMetric value={activeRulesCount} decimals={0} durationMs={320} />}
             </div>
             <div className="dashboard-stat__footer">
               <span className="dashboard-stat__subtext">Price threshold monitors</span>
@@ -170,7 +174,7 @@ export function DashboardPage() {
               <i className="fa-solid fa-triangle-exclamation dashboard-stat__icon" aria-hidden="true" />
             </div>
             <div className="dashboard-stat__value font-mono">
-              {isLoading ? '—' : recentAlertsCount}
+              {isLoading ? '—' : <RollingMetric value={recentAlertsCount} decimals={0} durationMs={320} />}
             </div>
             <div className="dashboard-stat__footer">
               <span className="dashboard-stat__subtext">Recent threshold crossings</span>
@@ -180,32 +184,42 @@ export function DashboardPage() {
           <div className="card dashboard-stat">
             <div className="dashboard-stat__header">
               <span className="dashboard-stat__label">AI Insights</span>
-              <i className="fa-solid fa-robot dashboard-stat__icon text-accent" aria-hidden="true" />
+              <i className="fa-solid fa-bolt dashboard-stat__icon dashboard-stat__icon--accent" aria-hidden="true" />
             </div>
             <div className="dashboard-stat__value font-mono">
-              {aiInsightsLoading ? '—' : aiInsightsCount}
+              {aiInsightsLoading ? '—' : <RollingMetric value={aiInsightsCount} decimals={0} durationMs={320} />}
             </div>
             <div className="dashboard-stat__footer">
               <span className="dashboard-stat__subtext">Active market briefings</span>
             </div>
           </div>
 
-          <div className="card dashboard-stat" id="kpi-savings-roi">
+          <div className="card dashboard-stat dashboard-stat--roi" id="kpi-savings-roi">
             <div className="dashboard-stat__header">
               <span className="dashboard-stat__label">Procurement Savings ROI</span>
-              <i className="fa-solid fa-piggy-bank dashboard-stat__icon" aria-hidden="true" style={{ color: '#10b981' }} />
+              <i className="fa-solid fa-arrow-trend-up dashboard-stat__icon dashboard-stat__icon--roi" aria-hidden="true" />
             </div>
-            <div className="dashboard-stat__value font-mono font-bold" style={{ color: '#10b981' }}>
-              {savingsRoiLoading ? '—' : `₹${(savingsRoi?.totalMonthlySavingsInr || 0).toLocaleString('en-IN')}`}
-              <span style={{ fontSize: '13px', fontWeight: 'normal', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>/mo</span>
+            <div className="dashboard-stat__value dashboard-stat__value--roi font-mono">
+              {savingsRoiLoading ? (
+                '—'
+              ) : (
+                <RollingMetric
+                  value={monthlySavingsInr}
+                  formatFn={formatInrCompact}
+                  durationMs={420}
+                  testId="kpi-savings-roi-value"
+                />
+              )}
+              <span className="dashboard-stat__unit">/mo</span>
             </div>
             <div className="dashboard-stat__footer">
               <span className="dashboard-stat__subtext">
                 {savingsRoiLoading ? (
                   'Calculating verified ROI...'
-                ) : (savingsRoi?.totalMonthlySavingsInr || 0) > 0 ? (
+                ) : monthlySavingsInr > 0 ? (
                   <>
-                    <strong>₹{(savingsRoi.annualizedSavingsInr || 0).toLocaleString('en-IN')}</strong>/yr projected ({savingsRoi.materialsScaledCount} scaled)
+                    <strong>₹{(savingsRoi.annualizedSavingsInr || 0).toLocaleString('en-IN')}</strong>
+                    /yr projected ({savingsRoi.materialsScaledCount} scaled)
                   </>
                 ) : (savingsRoi?.materialsWithSavings || 0) > 0 ? (
                   <>
@@ -220,11 +234,10 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Dashboard grid — 5 panels */}
+      {/* Dashboard grid */}
       {!isError && (
         <div className="dashboard-grid" id="dashboard-grid">
-
-          {/* ── Panel 1 — Tracked Materials ──────────────────────── */}
+          {/* Panel 1 — Tracked Materials */}
           <section className="card dashboard-panel" aria-labelledby="panel-materials-heading">
             <div className="card__header dashboard-panel__header">
               <h2 className="card__title" id="panel-materials-heading">Tracked Materials</h2>
@@ -240,13 +253,14 @@ export function DashboardPage() {
                   <MaterialsList
                     items={data?.trackedMaterials ?? []}
                     onNavigate={navigate}
+                    isViewer={isViewer}
                   />
                 )}
               </div>
             </div>
           </section>
 
-          {/* ── Panel 2 — Recent News ────────────────────────────── */}
+          {/* Panel 2 — Recent News */}
           <section className="card dashboard-panel" aria-labelledby="panel-news-heading">
             <div className="card__header dashboard-panel__header">
               <h2 className="card__title" id="panel-news-heading">Recent News</h2>
@@ -265,7 +279,7 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {/* ── Panel 3 — Active Alert Rules ─────────────────────── */}
+          {/* Panel 3 — Active Alert Rules */}
           <section className="card dashboard-panel" aria-labelledby="panel-alert-rules-heading">
             <div className="card__header dashboard-panel__header">
               <h2 className="card__title" id="panel-alert-rules-heading">Active Alert Rules</h2>
@@ -281,13 +295,14 @@ export function DashboardPage() {
                   <AlertRulesList
                     items={data?.activeAlertRules ?? []}
                     onNavigate={navigate}
+                    isViewer={isViewer}
                   />
                 )}
               </div>
             </div>
           </section>
 
-          {/* ── Panel 4 — Recent Alert Events ────────────────────── */}
+          {/* Panel 4 — Recent Alert Events */}
           <section className="card dashboard-panel" aria-labelledby="panel-alert-events-heading">
             <div className="card__header dashboard-panel__header">
               <h2 className="card__title" id="panel-alert-events-heading">Recent Alert Events</h2>
@@ -306,8 +321,7 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {/* ── Panel 5 — Sync Status (full-width row) ───────────── */}
-          {/* sync timestamps are both null in v1 — "Never" is expected, not an error */}
+          {/* Panel 5 — Sync Status */}
           <section
             className="card dashboard-panel dashboard-panel--full"
             aria-labelledby="panel-sync-heading"
@@ -317,12 +331,11 @@ export function DashboardPage() {
               <i
                 className="fa-solid fa-circle-info dashboard-panel__info-icon"
                 aria-hidden="true"
-                title="Automated data sync is pending activation. Prices are entered manually."
+                title="Automated market feeds sync on schedule alongside manual supplier quote logs."
               />
             </div>
             <div className="card__body">
               <div className="sync-bar">
-                {/* Price sync */}
                 <div className="sync-bar__item">
                   <span
                     className={`sync-bar__dot${!data?.sync?.lastPriceSyncAt ? ' sync-bar__dot--inactive' : ''}`}
@@ -332,12 +345,11 @@ export function DashboardPage() {
                   <strong id="sync-price-time" className="sync-bar__value">
                     {isLoading
                       ? '—'
-                      : (data?.sync?.lastPriceSyncAt
-                          ? formatDateTime(data.sync.lastPriceSyncAt)
-                          : 'Never')}
+                      : data?.sync?.lastPriceSyncAt
+                        ? formatDateTime(data.sync.lastPriceSyncAt)
+                        : 'Never'}
                   </strong>
                 </div>
-                {/* News sync */}
                 <div className="sync-bar__item">
                   <span
                     className={`sync-bar__dot${!data?.sync?.lastNewsSyncAt ? ' sync-bar__dot--inactive' : ''}`}
@@ -347,27 +359,25 @@ export function DashboardPage() {
                   <strong id="sync-news-time" className="sync-bar__value">
                     {isLoading
                       ? '—'
-                      : (data?.sync?.lastNewsSyncAt
-                          ? formatDateTime(data.sync.lastNewsSyncAt)
-                          : 'Never')}
+                      : data?.sync?.lastNewsSyncAt
+                        ? formatDateTime(data.sync.lastNewsSyncAt)
+                        : 'Never'}
                   </strong>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* ── Panel 6 — AI Market Intelligence (full-width) ─────── */}
-          {/* Loaded independently — a Gemini error here never affects other panels. */}
+          {/* Panel 6 — AI Market Intelligence (flat inset cards, no duplicate AI pills) */}
           <section
             className="card dashboard-panel dashboard-panel--full"
             aria-labelledby="panel-ai-insights-heading"
           >
             <div className="card__header dashboard-panel__header">
-              <div className="insight-card__title-row">
-                <i className="fa-solid fa-robot insight-card__ai-icon" aria-hidden="true" />
-                <h2 className="card__title" id="panel-ai-insights-heading">AI Market Intelligence</h2>
-                <span className="insight-card__badge-ai" aria-label="AI-generated content">AI</span>
-              </div>
+              <h2 className="card__title" id="panel-ai-insights-heading">AI Market Intelligence</h2>
+              {!aiInsightsLoading && aiInsightsCount > 0 && (
+                <span className="badge badge--neutral font-mono">{aiInsightsCount} active</span>
+              )}
             </div>
             <div className="card__body">
               {aiInsightsLoading && <Skeleton type="panel" rows={3} />}
@@ -381,19 +391,19 @@ export function DashboardPage() {
 
               {!aiInsightsLoading && !aiInsightsError && aiInsights.length === 0 && (
                 <EmptyState
-                  icon="fa-solid fa-robot"
-                  title="No AI insights generated yet"
-                  message="AI market insights are generated automatically each morning once enough price data is available."
+                  icon="fa-solid fa-chart-line"
+                  title="No market insights generated yet"
+                  message="AI market briefings appear here automatically after scheduled price evaluations complete."
                 />
               )}
 
               {!aiInsightsLoading && !aiInsightsError && aiInsights.length > 0 && (
                 <div className="insight-panel-list">
-                  {aiInsights.map(insight => (
+                  {aiInsights.map((insight) => (
                     <InsightCard
                       key={insight.id}
                       insight={insight}
-                      title={`Insight — Material #${insight.tracked_material_id}`}
+                      title={`Material #${insight.tracked_material_id}`}
                       compact
                     />
                   ))}
@@ -401,143 +411,146 @@ export function DashboardPage() {
               )}
             </div>
           </section>
-
-        </div> /* /.dashboard-grid */
+        </div>
       )}
-
-    </div> /* /.page-container */
+    </div>
   );
 }
 
-/* ================================================================
- * PANEL CONTENT COMPONENTS
- * These replace the imperative _render*() functions from dashboard.js.
- * All use identical CSS classes and the same empty/data logic.
- * ================================================================ */
-
-/**
- * Panel 1 — Tracked Materials
- * Fields: { id, name, latestPrice: number | null }
- * latestPrice is a scalar — NOT an object. No unit suffix.
- * significantChange is absent and NEVER referenced.
- */
-function MaterialsList({ items, onNavigate }) {
+function MaterialsList({ items, onNavigate, isViewer }) {
   if (!items || items.length === 0) {
     return (
       <EmptyState
         icon="fa-solid fa-boxes-stacked"
         title="No materials being tracked"
-        message="No materials are being tracked yet."
-        action={{ label: 'Go to Materials', onClick: () => onNavigate('/materials') }}
+        message="Start monitoring key raw materials to track price movements and inventory cover."
+        action={
+          isViewer
+            ? undefined
+            : { label: 'Go to Materials', onClick: () => onNavigate('/materials') }
+        }
       />
     );
   }
 
   return (
     <ul className="dashboard-panel__list" role="list">
-      {items.map(material => (
-        <li key={material.id} className="dashboard-panel__item">
-          <div className="dashboard-panel__item-main">
-            <span className="dashboard-panel__item-name">{material.name}</span>
+      {items.map((material) => {
+        const hasCover = material.daysOfCover != null;
+        const coverPct = hasCover
+          ? Math.max(4, Math.min(100, Math.round((Number(material.daysOfCover) / 30) * 100)))
+          : 0;
+        const coverTone =
+          material.stockoutRisk === 'CRITICAL'
+            ? 'danger'
+            : material.stockoutRisk === 'LOW'
+              ? 'warning'
+              : 'success';
+        const coverBadgeCls =
+          material.stockoutRisk === 'CRITICAL'
+            ? 'badge--danger'
+            : material.stockoutRisk === 'LOW'
+              ? 'badge--warning'
+              : 'badge--success';
 
-            {/* latestPrice with currency, unit, and classification */}
-            <div className="dashboard-panel__item-meta dashboard-material-meta">
-              {material.latestPrice === null || material.latestPrice === undefined ? (
-                <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
-                  No price recorded
-                </span>
-              ) : (
-                <>
-                  <span className="dashboard-panel__item-value font-mono">
-                    {formatPriceDisplay({
-                      price: material.latestPrice,
-                      currency: material.currency,
-                      unitLabel: material.unitLabel,
-                      externalSymbol: material.externalSymbol,
-                    }).text}
+        return (
+          <li key={material.id} className="dashboard-panel__item">
+            <div className="dashboard-panel__item-main">
+              <span className="dashboard-panel__item-name">{material.name}</span>
+
+              <div className="dashboard-panel__item-meta dashboard-material-meta">
+                {material.latestPrice === null || material.latestPrice === undefined ? (
+                  <span className="dashboard-panel__item-value dashboard-panel__item-value--null">
+                    No price recorded
                   </span>
-                  {material.dataClass && (
-                    <span
-                      className={`badge dashboard-badge ${
-                        material.dataClass === 'OFFICIAL_BENCHMARK'
-                          ? 'dashboard-badge--benchmark badge--info'
-                          : material.dataClass === 'MARKET_INDICATIVE'
-                          ? 'dashboard-badge--proxy badge--warning'
-                          : 'dashboard-badge--quote badge--neutral'
-                      }`}
-                    >
-                      {material.dataClass === 'OFFICIAL_BENCHMARK'
-                        ? 'Benchmark'
-                        : material.dataClass === 'MARKET_INDICATIVE'
-                        ? 'Proxy'
-                        : 'Quote'}
+                ) : (
+                  <>
+                    <span className="dashboard-panel__item-value font-mono">
+                      {formatPriceDisplay({
+                        price: material.latestPrice,
+                        currency: material.currency,
+                        unitLabel: material.unitLabel,
+                        externalSymbol: material.externalSymbol,
+                      }).text}
                     </span>
-                  )}
-                </>
-              )}
-              {material.daysOfCover != null && (
-                <span
-                  className={`badge ${
-                    material.stockoutRisk === 'CRITICAL'
-                      ? 'badge--danger'
-                      : material.stockoutRisk === 'LOW'
-                      ? 'badge--warning'
-                      : 'badge--success'
-                  }`}
-                  style={{ fontSize: '11px', padding: '1px 6px', whiteSpace: 'nowrap' }}
-                >
-                  {material.stockoutRisk === 'CRITICAL'
-                    ? `CRITICAL: ${material.daysOfCover}d`
-                    : material.stockoutRisk === 'LOW'
-                    ? `LOW: ${material.daysOfCover}d`
-                    : `${material.daysOfCover}d cover`}
-                </span>
-              )}
-            </div>
-          </div>
+                    {material.dataClass && (
+                      <span
+                        className={`dashboard-badge ${
+                          material.dataClass === 'OFFICIAL_BENCHMARK'
+                            ? 'dashboard-badge--benchmark'
+                            : material.dataClass === 'MARKET_INDICATIVE'
+                              ? 'dashboard-badge--proxy'
+                              : 'dashboard-badge--quote'
+                        }`}
+                      >
+                        {material.dataClass === 'OFFICIAL_BENCHMARK'
+                          ? 'Benchmark'
+                          : material.dataClass === 'MARKET_INDICATIVE'
+                            ? 'Proxy'
+                            : 'Quote'}
+                      </span>
+                    )}
+                  </>
+                )}
 
-          {/* Quick-action links — id is tracked_materials.id (universal material ID) */}
-          <div className="dashboard-panel__item-actions">
-            <Link
-              to={`/prices?materialId=${material.id}`}
-              className="btn btn--sm btn--ghost"
-            >
-              Add Price
-            </Link>
-            <Link
-              to={`/trends?materialId=${material.id}`}
-              className="btn btn--sm btn--ghost"
-            >
-              Trends
-            </Link>
-          </div>
-        </li>
-      ))}
+                {hasCover && (
+                  <div className="dashboard-cover-wrap">
+                    <span className={`badge ${coverBadgeCls} dashboard-cover-badge`}>
+                      {material.stockoutRisk === 'CRITICAL'
+                        ? `CRITICAL: ${material.daysOfCover}d`
+                        : material.stockoutRisk === 'LOW'
+                          ? `LOW: ${material.daysOfCover}d`
+                          : `${material.daysOfCover}d cover`}
+                    </span>
+                    <span className="dashboard-cover-meter" aria-hidden="true">
+                      <span
+                        className={`dashboard-cover-meter__fill dashboard-cover-meter__fill--${coverTone}`}
+                        style={{ width: `${coverPct}%` }}
+                      />
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="dashboard-panel__item-actions">
+              {!isViewer && (
+                <Link
+                  to={`/prices?materialId=${material.id}`}
+                  className="btn btn--sm btn--ghost"
+                >
+                  Add Price
+                </Link>
+              )}
+              <Link
+                to={`/trends?materialId=${material.id}`}
+                className="btn btn--sm btn--ghost"
+              >
+                Trends
+              </Link>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-/**
- * Panel 2 — Recent News
- * Fields: { id, title } — NO url, source, or date in dashboard response.
- * Title is displayed as text only (no link — no URL available here).
- */
 function NewsList({ items }) {
   if (!items || items.length === 0) {
     return (
       <EmptyState
         icon="fa-solid fa-newspaper"
         title="No recent news"
-        message="News will appear here once your industry feed is connected."
+        message="Market and regulatory headlines for your industry will appear here once synced."
       />
     );
   }
 
   return (
     <ul className="dashboard-panel__list" role="list">
-      {items.map(article => (
+      {items.map((article) => (
         <li key={article.id} className="dashboard-panel__item">
-          {/* textContent only — no link (no URL in this endpoint response) */}
           <span className="dashboard-panel__item-name">{article.title}</span>
         </li>
       ))}
@@ -545,27 +558,26 @@ function NewsList({ items }) {
   );
 }
 
-/**
- * Panel 3 — Active Alert Rules
- * Fields: { id, conditionType, thresholdPrice } — NO materialName in this response.
- */
-function AlertRulesList({ items, onNavigate }) {
+function AlertRulesList({ items, onNavigate, isViewer }) {
   if (!items || items.length === 0) {
     return (
       <EmptyState
         icon="fa-solid fa-bell-slash"
         title="No active alert rules"
-        message="No active alert rules."
-        action={{ label: 'Create Alert Rule', onClick: () => onNavigate('/alerts') }}
+        message="Create threshold alerts to catch supplier price spikes early."
+        action={
+          isViewer
+            ? undefined
+            : { label: 'Create Alert Rule', onClick: () => onNavigate('/alerts') }
+        }
       />
     );
   }
 
   return (
     <ul className="dashboard-panel__list" role="list">
-      {items.map(rule => (
+      {items.map((rule) => (
         <li key={rule.id} className="dashboard-panel__item">
-          {/* "Price Above 1,500.00" or "Price Below 90.00" */}
           <span className="dashboard-panel__item-name">
             {formatAlertCondition(rule.conditionType, rule.thresholdPrice, rule.thresholdType)}
           </span>
@@ -575,11 +587,6 @@ function AlertRulesList({ items, onNavigate }) {
   );
 }
 
-/**
- * Panel 4 — Recent Alert Events
- * Fields: { id, triggeredAt } — ONLY triggeredAt is shown.
- * No materialName, no conditionType in this endpoint's response.
- */
 function AlertEventsList({ items }) {
   if (!items || items.length === 0) {
     return (
@@ -593,9 +600,8 @@ function AlertEventsList({ items }) {
 
   return (
     <ul className="dashboard-panel__list" role="list">
-      {items.map(event => (
+      {items.map((event) => (
         <li key={event.id} className="dashboard-panel__item">
-          {/* formatDateTime returns e.g. "Aug 10, 2026, 02:30 PM" or "—" for null */}
           <span className="dashboard-panel__item-name font-mono">
             {formatDateTime(event.triggeredAt)}
           </span>

@@ -1,45 +1,6 @@
 /**
- * MaterialsPage — Materials list with tracking toggle, custom material creation,
- * and external symbol management (Phase C).
+ * MaterialsPage — Raw Materials Tracking, Inventory Cover, Landed Parity & Symbol Mapping
  * Business Market Monitor — React frontend
- *
- * Ported from: frontend/pages/materials.html + frontend/js/pages/materials.js
- *
- * FLOW (preserved exactly from original):
- *  1. Auth + business guard — handled by ProtectedRoute in App.jsx
- *  2. Promise.all([GET /materials, GET /units-of-measurement]) in parallel
- *  3. Render materials table (tablet+) / cards (mobile) — CSS handles responsiveness
- *  4. Filter: All | Tracked Only (client-side, no re-fetch)
- *  5. "Add Custom Material" collapsible panel — POST /materials { customName, unitId }
- *  6. PATCH /materials/:id { isTracked } — toggle tracking in-place
- *  7. PATCH /materials/:id/external-symbol — set/clear EIA symbol (Phase C)
- *
- * BACKEND RESPONSE FIELDS (confirmed from materialTracking.service.js):
- *   material.name    — COALESCE of raw_materials.name / custom_name (display name)
- *   material.unit    — abbreviation (e.g. "kg", "t")
- *   material.isTracked
- *   material.isCustom — rawMaterialId === null
- *   material.externalSymbol — 'WTI' | 'BRENT' | null  (Phase B addition)
- *   NO customName field in responses; NO significantChange field
- *
- * PATCH /materials/:id ONLY accepts { isTracked: boolean }.
- *   Any other field → 400 from backend.
- *
- * MATERIAL ID:
- *   material.id = tracked_materials.id — universal material ID for downstream APIs.
- *   Used in "Log Price" link (/prices?materialId=<id>) and "History" (/trends?materialId=<id>).
- *   Do NOT substitute rawMaterialId.
- *
- * POST /materials body: { customName, unitId } — NOT { name, ... }
- *
- * EXTERNAL SYMBOL:
- *   The external symbol dropdown (None / WTI / BRENT) is only shown for
- *   tracked materials. Selecting a value calls PATCH .../external-symbol.
- *   Selecting "None" sends { externalSymbol: null } to clear the mapping.
- *   On API failure the select reverts to the previous value and a toast is shown.
- *
- * SECURITY:
- *   No userId in requests. No innerHTML. No eval().
  */
 
 import { createContext, useContext, useCallback, useState, useEffect } from 'react';
@@ -52,20 +13,18 @@ import {
   getUnitsOfMeasurement,
 } from '../api/materials.api.js';
 import { getBusiness } from '../api/business.api.js';
-import { useAuth }     from '../hooks/useAuth.js';
-import { Skeleton }   from '../components/ui/Skeleton.jsx';
+import { useAuth } from '../hooks/useAuth.js';
+import { Skeleton } from '../components/ui/Skeleton.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
-import { useToast }   from '../components/ui/Toast.jsx';
+import { useToast } from '../components/ui/Toast.jsx';
 import { StockProfileModal } from '../components/materials/StockProfileModal.jsx';
 import { LandedCostModal } from '../components/materials/LandedCostModal.jsx';
 import { WhatsAppCopilotModal } from '../components/ui/WhatsAppCopilotModal.jsx';
 import '../styles/pages/materials.css';
 
-/* ── Load state ────────────────────────────────────────────── */
 const STATUS = { LOADING: 'loading', SUCCESS: 'success', ERROR: 'error' };
 
-/* ── Supported external symbols (matches backend SUPPORTED_SYMBOLS) ── */
 export const SYMBOL_OPTIONS = [
   { value: '',               label: 'None' },
   { value: 'WTI',            label: 'WTI (Crude Oil Proxy — USD/bbl)' },
@@ -75,29 +34,6 @@ export const SYMBOL_OPTIONS = [
   { value: 'EDIBLE_OIL_GOI', label: 'Mustard Oil (India Mandi — INR/quintal)' },
 ];
 
-/**
- * Filter supported market symbols based on the user's business industry.
- *
- * Rules:
- *  - Plastics / Packaging / Water / Polymer:
- *      Allowed: None + WTI, Brent (EIA petrochemical/energy proxies).
- *      Excludes Indian agricultural mandi crops (Wheat, Sugar, Mustard Oil).
- *  - Food & Beverage / Agriculture / Dairy:
- *      Allowed: None + Wheat, Sugar, Mustard Oil (India Mandi) + WTI, Brent (feedstock/freight proxy).
- *  - FMCG:
- *      Allowed: All symbols.
- *  - Unknown / Generic / Missing industry:
- *      Fallback to all symbols safely.
- *
- * Backward-compatibility:
- *  If currentSymbol is non-empty and excluded by the industry filter,
- *  it is retained in the options list so the select never renders blank
- *  or corrupts the existing assignment.
- *
- * @param {string|{ industrySlug?: string, industry_slug?: string, industryName?: string, industry_name?: string, industry?: string }} industryIdentifier
- * @param {string} [currentSymbol='']
- * @returns {Array<{ value: string, label: string }>}
- */
 export function getFilteredSymbolOptions(industryIdentifier, currentSymbol = '') {
   let rawStr = '';
   if (typeof industryIdentifier === 'string') {
@@ -144,14 +80,13 @@ export function getFilteredSymbolOptions(industryIdentifier, currentSymbol = '')
 
   let options = allowedValues
     ? allowedValues
-        .map(val => SYMBOL_OPTIONS.find(opt => opt.value === val))
+        .map((val) => SYMBOL_OPTIONS.find((opt) => opt.value === val))
         .filter(Boolean)
     : [...SYMBOL_OPTIONS];
 
-  // Backward-compatibility: preserve existing symbol if already assigned
   const activeSym = (currentSymbol || '').toString().trim();
-  if (activeSym && !options.some(opt => opt.value === activeSym)) {
-    const existing = SYMBOL_OPTIONS.find(opt => opt.value === activeSym);
+  if (activeSym && !options.some((opt) => opt.value === activeSym)) {
+    const existing = SYMBOL_OPTIONS.find((opt) => opt.value === activeSym);
     if (existing) {
       options = [...options, existing];
     } else {
@@ -180,6 +115,7 @@ export function getSymbolDescription(symbol) {
 
 const StockModalContext = createContext(null);
 const LandedModalContext = createContext(null);
+const ReadOnlyContext = createContext(false);
 
 export function MaterialsPage() {
   const { business, setBusiness } = useAuth();
@@ -189,49 +125,41 @@ export function MaterialsPage() {
   const currentRole = business?.businessRole || user?.businessRole || 'OWNER';
   const isViewer = currentRole === 'VIEWER';
 
-  /* ── Data state ─────────────────────────────────────────── */
-  const [status,    setStatus]    = useState(STATUS.LOADING);
+  const [status, setStatus] = useState(STATUS.LOADING);
   const [materials, setMaterials] = useState([]);
-  const [units,     setUnits]     = useState([]);
+  const [units, setUnits] = useState([]);
 
-  /* ── Filter state — 'all' | 'tracked' ──────────────────── */
   const [filter, setFilter] = useState('all');
 
-  /* ── Add custom material panel state ───────────────────── */
-  const [panelOpen,   setPanelOpen]   = useState(false);
-  const [cmName,      setCmName]      = useState('');
-  const [cmUnitId,    setCmUnitId]    = useState('');
-  const [cmNameErr,   setCmNameErr]   = useState('');
-  const [cmUnitErr,   setCmUnitErr]   = useState('');
-  const [cmFormErr,   setCmFormErr]   = useState('');
-  const [cmSaving,    setCmSaving]    = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [cmName, setCmName] = useState('');
+  const [cmUnitId, setCmUnitId] = useState('');
+  const [cmNameErr, setCmNameErr] = useState('');
+  const [cmUnitErr, setCmUnitErr] = useState('');
+  const [cmFormErr, setCmFormErr] = useState('');
+  const [cmSaving, setCmSaving] = useState(false);
 
-  /* ── Toggle tracking loading map: { [id]: boolean } ────── */
   const [trackingBusy, setTrackingBusy] = useState({});
-
-  /* ── External symbol loading map: { [id]: boolean } ────── */
   const [symbolBusy, setSymbolBusy] = useState({});
 
-  /* ── Stock profile modal target material (V3-M1) ────────── */
   const [stockModalMaterial, setStockModalMaterial] = useState(null);
-
-  /* ── Landed cost modal target material (V3-M3) ──────────── */
   const [landedModalMaterial, setLandedModalMaterial] = useState(null);
-
-  /* ── WhatsApp Copilot modal open state (V3-M4) ───────────── */
   const [copilotOpen, setCopilotOpen] = useState(false);
 
   const handleStockSaved = (updatedMaterial) => {
-    setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
+    setMaterials((prev) =>
+      prev.map((m) => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m))
+    );
     showToast({ message: `Stock profile updated for ${updatedMaterial.name}`, type: 'success' });
   };
 
   const handleLandedCostSaved = (updatedMaterial) => {
-    setMaterials(prev => prev.map(m => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m)));
+    setMaterials((prev) =>
+      prev.map((m) => (m.id === updatedMaterial.id ? { ...m, ...updatedMaterial } : m))
+    );
     showToast({ message: `Landed cost model updated for ${updatedMaterial.name}`, type: 'success' });
   };
 
-  /* ── Load data ──────────────────────────────────────────── */
   const loadPage = useCallback(async () => {
     setStatus(STATUS.LOADING);
     try {
@@ -245,54 +173,58 @@ export function MaterialsPage() {
   }, []);
 
   useEffect(() => {
-    loadPage();
+    let cancelled = false;
+    Promise.all([getMaterials(), getUnitsOfMeasurement()])
+      .then(([mats, unts]) => {
+        if (cancelled) return;
+        setMaterials(mats ?? []);
+        setUnits(unts ?? []);
+        setStatus(STATUS.SUCCESS);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus(STATUS.ERROR);
+      });
+
     if (!business && typeof setBusiness === 'function') {
       getBusiness().then(setBusiness).catch(() => {});
     }
-  }, [loadPage, business, setBusiness]);
 
-  /* ── Derived: filtered list ─────────────────────────────── */
-  const visible = filter === 'tracked'
-    ? materials.filter(m => m.isTracked)
-    : materials;
+    return () => {
+      cancelled = true;
+    };
+  }, [business, setBusiness]);
 
-  /* ── Tracking toggle ────────────────────────────────────── */
+  const visible = filter === 'tracked' ? materials.filter((m) => m.isTracked) : materials;
+
   async function handleToggleTracking(material) {
     if (isViewer) {
       showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
       return;
     }
     const newState = !material.isTracked;
-    setTrackingBusy(prev => ({ ...prev, [material.id]: true }));
+    setTrackingBusy((prev) => ({ ...prev, [material.id]: true }));
     try {
       const updated = await updateMaterialTracking(material.id, newState);
-      setMaterials(prev =>
-        prev.map(m => m.id === material.id ? updated : m)
-      );
+      setMaterials((prev) => prev.map((m) => (m.id === material.id ? updated : m)));
       showToast({ type: 'success', message: 'Tracking updated.' });
     } catch {
       showToast({ type: 'error', message: 'Failed to update tracking. Please try again.' });
     } finally {
-      setTrackingBusy(prev => ({ ...prev, [material.id]: false }));
+      setTrackingBusy((prev) => ({ ...prev, [material.id]: false }));
     }
   }
 
-  /* ── External symbol change ─────────────────────────────── */
   async function handleSetSymbol(material, newSymbol) {
     if (isViewer) {
       showToast({ type: 'error', message: 'Viewers have read-only permissions.' });
       return;
     }
-    // newSymbol is '' (empty string from select) → send null to clear
     const externalSymbol = newSymbol === '' ? null : newSymbol;
 
-    setSymbolBusy(prev => ({ ...prev, [material.id]: true }));
+    setSymbolBusy((prev) => ({ ...prev, [material.id]: true }));
     try {
       const updated = await setExternalSymbol(material.id, externalSymbol);
-      // Update in-place, preserve order and filter
-      setMaterials(prev =>
-        prev.map(m => m.id === material.id ? updated : m)
-      );
+      setMaterials((prev) => prev.map((m) => (m.id === material.id ? updated : m)));
       showToast({
         type: 'success',
         message: externalSymbol
@@ -300,19 +232,18 @@ export function MaterialsPage() {
           : 'External symbol cleared.',
       });
     } catch {
-      // Revert — the materials array already reflects the old value since we
-      // only update state on success. The select reads from material.externalSymbol
-      // so it naturally reverts when the parent state is unchanged.
       showToast({ type: 'error', message: 'Failed to update external symbol. Please try again.' });
     } finally {
-      setSymbolBusy(prev => ({ ...prev, [material.id]: false }));
+      setSymbolBusy((prev) => ({ ...prev, [material.id]: false }));
     }
   }
 
-  /* ── Add custom material panel toggle ───────────────────── */
   function handleTogglePanel() {
-    setPanelOpen(prev => {
-      if (prev) { _resetAddForm(); }
+    if (isViewer) return;
+    setPanelOpen((prev) => {
+      if (prev) {
+        _resetAddForm();
+      }
       return !prev;
     });
   }
@@ -325,7 +256,6 @@ export function MaterialsPage() {
     setCmFormErr('');
   }
 
-  /* ── Add custom material submit ─────────────────────────── */
   async function handleAddSubmit(e) {
     e.preventDefault();
     if (isViewer) {
@@ -355,7 +285,7 @@ export function MaterialsPage() {
     setCmSaving(true);
     try {
       const newMaterial = await createMaterial({ customName: trimName, unitId });
-      setMaterials(prev => [newMaterial, ...prev]);
+      setMaterials((prev) => [newMaterial, ...prev]);
       setPanelOpen(false);
       _resetAddForm();
       showToast({ type: 'success', message: 'Custom material added.' });
@@ -372,202 +302,235 @@ export function MaterialsPage() {
     }
   }
 
-  /* ── Render ───────────────────────────────────────────────── */
   return (
-    <StockModalContext.Provider value={setStockModalMaterial}>
-    <LandedModalContext.Provider value={setLandedModalMaterial}>
-      <div className="page-container">
-
-        {/* ── Page toolbar: filter + add button ─────────────────── */}
-      <div className="materials-toolbar">
-        <div className="filter-bar" role="group" aria-label="Filter materials">
-          <button
-            type="button"
-            className={`btn btn--sm filter-btn${filter === 'all' ? ' filter-btn--active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`btn btn--sm filter-btn${filter === 'tracked' ? ' filter-btn--active' : ''}`}
-            onClick={() => setFilter('tracked')}
-          >
-            Tracked Only
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
-            id="whatsapp-copilot-btn"
-            className="btn btn--secondary btn--sm"
-            onClick={() => setCopilotOpen(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <i className="fa-brands fa-whatsapp text-success" style={{ color: '#22c55e', fontSize: '14px' }} />
-            WhatsApp Copilot
-          </button>
-
-          <button
-            type="button"
-            id="add-material-toggle-btn"
-            className="btn btn--secondary btn--sm"
-            onClick={handleTogglePanel}
-          >
-            {panelOpen ? 'Cancel' : '+ Add Custom Material'}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Add Custom Material panel ────────────────────────── */}
-      {panelOpen && (
-        <div id="add-material-panel" className="card add-panel">
-          <div className="card__header">
-            <h2 className="card__title">Add Custom Material</h2>
-          </div>
-          <div className="card__body">
-            {cmFormErr && (
-              <div className="form-alert form-alert--error form-alert--visible" role="alert">
-                <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-                <span className="form-alert__message">{cmFormErr}</span>
+    <ReadOnlyContext.Provider value={isViewer}>
+      <StockModalContext.Provider value={setStockModalMaterial}>
+        <LandedModalContext.Provider value={setLandedModalMaterial}>
+          <div className="page-container">
+            {isViewer && (
+              <div className="alert-banner alert-banner--warning" role="status" id="materials-viewer-banner">
+                <i className="fa-solid fa-eye" aria-hidden="true" />
+                <span className="alert-banner__message">
+                  You have <strong>VIEWER</strong> access. Tracking toggles, market symbols, inventory profiles, and quote logging are read-only.
+                </span>
               </div>
             )}
-            <form id="add-material-form" onSubmit={handleAddSubmit} noValidate>
 
-              {/* Custom material name */}
-              <div className="form-group">
-                <label className="form-label form-label--required" htmlFor="cm-name">
-                  Material name
-                </label>
-                <input
-                  type="text"
-                  id="cm-name"
-                  className={`form-control${cmNameErr ? ' form-control--error' : ''}`}
-                  placeholder="e.g. Premium Grade Steel"
-                  maxLength={150}
-                  value={cmName}
-                  onChange={e => { setCmName(e.target.value); setCmNameErr(''); }}
-                  aria-describedby="cm-name-error"
-                  required
-                />
-                {cmNameErr && (
-                  <p id="cm-name-error" className="form-error form-error--visible" role="alert">
-                    {cmNameErr}
-                  </p>
-                )}
-              </div>
-
-              {/* Unit of measurement */}
-              <div className="form-group">
-                <label className="form-label form-label--required" htmlFor="cm-unit">
-                  Unit of measurement
-                </label>
-                <select
-                  id="cm-unit"
-                  className={`form-control${cmUnitErr ? ' form-control--error' : ''}`}
-                  value={cmUnitId}
-                  onChange={e => { setCmUnitId(e.target.value); setCmUnitErr(''); }}
-                  aria-describedby="cm-unit-error"
-                  required
-                >
-                  <option value="">Select a unit…</option>
-                  {units.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.abbreviation})
-                    </option>
-                  ))}
-                </select>
-                {cmUnitErr && (
-                  <p id="cm-unit-error" className="form-error form-error--visible" role="alert">
-                    {cmUnitErr}
-                  </p>
-                )}
-              </div>
-
-              <div className="form-actions">
+            {/* Page toolbar */}
+            <div className="materials-toolbar">
+              <div className="filter-bar" role="group" aria-label="Filter materials">
                 <button
-                  type="submit"
-                  id="cm-submit-btn"
-                  className={`btn btn--primary${cmSaving ? ' btn--loading' : ''}`}
-                  disabled={cmSaving}
+                  type="button"
+                  className={`btn btn--sm filter-btn${filter === 'all' ? ' filter-btn--active' : ''}`}
+                  onClick={() => setFilter('all')}
                 >
-                  Add Material
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn--sm filter-btn${filter === 'tracked' ? ' filter-btn--active' : ''}`}
+                  onClick={() => setFilter('tracked')}
+                >
+                  Tracked Only
                 </button>
               </div>
-            </form>
+
+              <div className="materials-toolbar__actions">
+                <button
+                  type="button"
+                  id="whatsapp-copilot-btn"
+                  className="btn btn--secondary btn--sm materials-copilot-btn"
+                  disabled={isViewer}
+                  title={isViewer ? 'Viewers cannot parse or log supplier quotes' : 'Parse WhatsApp supplier quote'}
+                  onClick={() => !isViewer && setCopilotOpen(true)}
+                >
+                  <i className="fa-brands fa-whatsapp text-success materials-whatsapp-icon" aria-hidden="true" />
+                  <span>WhatsApp Copilot</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="add-material-toggle-btn"
+                  className="btn btn--secondary btn--sm"
+                  disabled={isViewer}
+                  title={isViewer ? 'Viewers cannot add custom materials' : undefined}
+                  onClick={handleTogglePanel}
+                >
+                  {panelOpen ? 'Cancel' : '+ Add Custom Material'}
+                </button>
+              </div>
+            </div>
+
+            {/* Add Custom Material panel */}
+            {panelOpen && !isViewer && (
+              <div id="add-material-panel" className="card add-panel">
+                <div className="card__header">
+                  <h2 className="card__title">Add Custom Material</h2>
+                </div>
+                <div className="card__body">
+                  {cmFormErr && (
+                    <div className="form-alert form-alert--error form-alert--visible" role="alert">
+                      <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
+                      <span className="form-alert__message">{cmFormErr}</span>
+                    </div>
+                  )}
+                  <form id="add-material-form" onSubmit={handleAddSubmit} noValidate>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label form-label--required" htmlFor="cm-name">
+                          Material name
+                        </label>
+                        <input
+                          type="text"
+                          id="cm-name"
+                          className={`form-control${cmNameErr ? ' form-control--error' : ''}`}
+                          placeholder="e.g. Premium Grade Steel"
+                          maxLength={150}
+                          value={cmName}
+                          onChange={(e) => {
+                            setCmName(e.target.value);
+                            setCmNameErr('');
+                          }}
+                          aria-describedby="cm-name-error"
+                          required
+                        />
+                        {cmNameErr && (
+                          <p id="cm-name-error" className="form-error form-error--visible" role="alert">
+                            {cmNameErr}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="form-group materials-form-group--reset">
+                        <label className="form-label form-label--required" htmlFor="cm-unit">
+                          Unit of measurement
+                        </label>
+                        <select
+                          id="cm-unit"
+                          className={`form-control${cmUnitErr ? ' form-control--error' : ''}`}
+                          value={cmUnitId}
+                          onChange={(e) => {
+                            setCmUnitId(e.target.value);
+                            setCmUnitErr('');
+                          }}
+                          aria-describedby="cm-unit-error"
+                          required
+                        >
+                          <option value="">Select a unit…</option>
+                          {units.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.abbreviation})
+                            </option>
+                          ))}
+                        </select>
+                        {cmUnitErr && (
+                          <p id="cm-unit-error" className="form-error form-error--visible" role="alert">
+                            {cmUnitErr}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-actions">
+                      <button
+                        type="submit"
+                        id="cm-submit-btn"
+                        className={`btn btn--primary${cmSaving ? ' btn--loading' : ''}`}
+                        disabled={cmSaving}
+                      >
+                        Add Material
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Main list container */}
+            <div id="materials-list-container">
+              {status === STATUS.LOADING && <Skeleton type="table" rows={5} />}
+
+              {status === STATUS.ERROR && (
+                <ErrorState
+                  title="Failed to load materials"
+                  message="Something went wrong. Please try again."
+                  retry={loadPage}
+                />
+              )}
+
+              {status === STATUS.SUCCESS && (
+                <MaterialsListContent
+                  materials={materials}
+                  visible={visible}
+                  filter={filter}
+                  business={business}
+                  isViewer={isViewer}
+                  trackingBusy={trackingBusy}
+                  symbolBusy={symbolBusy}
+                  onToggleTracking={handleToggleTracking}
+                  onSetSymbol={handleSetSymbol}
+                  onOpenStock={setStockModalMaterial}
+                  onShowAll={() => setFilter('all')}
+                  onOpenAdd={() => !isViewer && setPanelOpen(true)}
+                />
+              )}
+            </div>
+
+            <StockProfileModal
+              material={stockModalMaterial}
+              isOpen={Boolean(stockModalMaterial)}
+              onClose={() => setStockModalMaterial(null)}
+              onSaveSuccess={handleStockSaved}
+              readOnly={isViewer}
+            />
+
+            <LandedCostModal
+              material={landedModalMaterial}
+              isOpen={Boolean(landedModalMaterial)}
+              onClose={() => setLandedModalMaterial(null)}
+              onSaveSuccess={handleLandedCostSaved}
+              readOnly={isViewer}
+            />
+
+            <WhatsAppCopilotModal
+              isOpen={copilotOpen}
+              onClose={() => setCopilotOpen(false)}
+              materials={materials}
+              onQuoteLogged={() => loadPage()}
+              readOnly={isViewer}
+            />
           </div>
-        </div>
-      )}
-
-      {/* ── Main list container ──────────────────────────────── */}
-      <div id="materials-list-container">
-
-        {status === STATUS.LOADING && <Skeleton type="list" rows={5} />}
-
-        {status === STATUS.ERROR && (
-          <ErrorState
-            title="Failed to load materials"
-            message="Something went wrong. Please try again."
-            retry={loadPage}
-          />
-        )}
-
-        {status === STATUS.SUCCESS && (
-          <MaterialsListContent
-            materials={materials}
-            visible={visible}
-            filter={filter}
-            business={business}
-            trackingBusy={trackingBusy}
-            symbolBusy={symbolBusy}
-            onToggleTracking={handleToggleTracking}
-            onSetSymbol={handleSetSymbol}
-            onOpenStock={setStockModalMaterial}
-            onShowAll={() => setFilter('all')}
-          />
-        )}
-      </div>
-
-      <StockProfileModal
-        material={stockModalMaterial}
-        isOpen={Boolean(stockModalMaterial)}
-        onClose={() => setStockModalMaterial(null)}
-        onSaveSuccess={handleStockSaved}
-      />
-
-      <LandedCostModal
-        material={landedModalMaterial}
-        isOpen={Boolean(landedModalMaterial)}
-        onClose={() => setLandedModalMaterial(null)}
-        onSaveSuccess={handleLandedCostSaved}
-      />
-
-      <WhatsAppCopilotModal
-        isOpen={copilotOpen}
-        onClose={() => setCopilotOpen(false)}
-        materials={materials}
-        onQuoteLogged={() => loadPage()}
-      />
-    </div>
-    </LandedModalContext.Provider>
-    </StockModalContext.Provider>
+        </LandedModalContext.Provider>
+      </StockModalContext.Provider>
+    </ReadOnlyContext.Provider>
   );
 }
 
-/* ================================================================
- * MATERIALS LIST CONTENT
- * ================================================================ */
 function MaterialsListContent({
-  materials, visible, filter, business, trackingBusy, symbolBusy,
-  onToggleTracking, onSetSymbol, onOpenStock, onShowAll,
+  materials,
+  visible,
+  filter,
+  business,
+  isViewer,
+  trackingBusy,
+  symbolBusy,
+  onToggleTracking,
+  onSetSymbol,
+  onOpenStock,
+  onShowAll,
+  onOpenAdd,
 }) {
   if (materials.length === 0) {
     return (
       <EmptyState
         icon="fa-solid fa-boxes-stacked"
         title="No materials in your workspace"
-        message="No materials in your workspace."
+        message="Add custom raw materials or configure your industry template to begin monitoring benchmarks."
+        action={
+          isViewer
+            ? undefined
+            : { label: '+ Add Custom Material', onClick: onOpenAdd }
+        }
       />
     );
   }
@@ -585,22 +548,24 @@ function MaterialsListContent({
 
   return (
     <>
-      {/* ── Table (tablet+) ─────────────────────────────────── */}
       <div className="materials-table-wrap">
         <table className="table">
           <thead>
             <tr>
-              {['Name', 'Unit', 'Source', 'Tracking', 'Stock Cover', 'Market Symbol', 'Actions'].map(col => (
-                <th key={col} className="table__header">{col}</th>
-              ))}
+              {['Name', 'Unit', 'Source', 'Tracking', 'Stock Cover', 'Market Symbol', 'Actions'].map(
+                (col) => (
+                  <th key={col}>{col}</th>
+                )
+              )}
             </tr>
           </thead>
           <tbody>
-            {visible.map(m => (
+            {visible.map((m) => (
               <MaterialTableRow
                 key={m.id}
                 material={m}
                 business={business}
+                isViewer={isViewer}
                 busy={!!trackingBusy[m.id]}
                 symbolBusy={!!symbolBusy[m.id]}
                 onToggle={onToggleTracking}
@@ -612,13 +577,13 @@ function MaterialsListContent({
         </table>
       </div>
 
-      {/* ── Cards (mobile) ──────────────────────────────────── */}
       <div className="materials-cards">
-        {visible.map(m => (
+        {visible.map((m) => (
           <MaterialCard
             key={m.id}
             material={m}
             business={business}
+            isViewer={isViewer}
             busy={!!trackingBusy[m.id]}
             symbolBusy={!!symbolBusy[m.id]}
             onToggle={onToggleTracking}
@@ -631,52 +596,58 @@ function MaterialsListContent({
   );
 }
 
-/* ================================================================
- * TABLE ROW (tablet+)
- * ================================================================ */
-function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSetSymbol, onOpenStock }) {
+function MaterialTableRow({
+  material,
+  business,
+  isViewer,
+  busy,
+  symbolBusy,
+  onToggle,
+  onSetSymbol,
+  onOpenStock,
+}) {
   return (
     <tr>
-      <td className="table__cell font-medium">
-        {material.name}
-        {material.landedUnitFactor != null && (
-          <span className="badge badge--info" style={{ fontSize: '10px', padding: '1px 5px', marginLeft: '6px' }} title="Landed parity model active">
-            PARITY
-          </span>
-        )}
+      <td className="font-medium">
+        <div className="materials-name-cell">
+          <span>{material.name}</span>
+          {material.landedUnitFactor != null && (
+            <span className="badge badge--info materials-parity-badge" title="Landed parity model active">
+              PARITY
+            </span>
+          )}
+        </div>
       </td>
-      <td className="table__cell">
+      <td>
         <span className="material-unit-pill">{material.unit}</span>
       </td>
-      <td className="table__cell">
+      <td>
         <SourceBadge isCustom={material.isCustom} />
       </td>
-      <td className="table__cell">
-        <TrackButton material={material} busy={busy} onToggle={onToggle} />
+      <td>
+        <TrackButton material={material} busy={busy} disabled={isViewer} onToggle={onToggle} />
       </td>
-      <td className="table__cell">
-        <StockCoverBadge material={material} onOpenStock={onOpenStock} />
+      <td>
+        <StockCoverBadge material={material} onOpenStock={isViewer ? undefined : onOpenStock} />
       </td>
-      <td className="table__cell">
+      <td>
         {material.isTracked && (
           <div className="material-symbol-cell">
             <ExternalSymbolSelect
               material={material}
               business={business}
               busy={symbolBusy}
+              disabled={isViewer}
               onSetSymbol={onSetSymbol}
             />
             {material.externalSymbol ? (
-              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', maxWidth: '280px', lineHeight: 1.3 }}>
+              <span className="text-xs text-muted materials-symbol-hint">
                 {getSymbolDescription(material.externalSymbol) || 'Automatic market benchmark.'}
               </span>
             ) : (
-              <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px', lineHeight: 1.3 }}>
+              <span className="text-xs text-secondary materials-symbol-hint">
                 No public market ticker — use{' '}
-                <Link
-                  to={`/prices?materialId=${material.id}`}
-                  className="text-accent"
-                >
+                <Link to={`/prices?materialId=${material.id}`} className="materials-quote-link">
                   Log Supplier Quote
                 </Link>{' '}
                 for custom or local grades.
@@ -685,40 +656,44 @@ function MaterialTableRow({ material, business, busy, symbolBusy, onToggle, onSe
           </div>
         )}
       </td>
-      <td className="table__cell">
-        {material.isTracked && <ActionLinks material={material} />}
-      </td>
+      <td>{material.isTracked && <ActionLinks material={material} />}</td>
     </tr>
   );
 }
 
-/* ================================================================
- * MOBILE CARD
- * ================================================================ */
-function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSymbol, onOpenStock }) {
+function MaterialCard({
+  material,
+  business,
+  isViewer,
+  busy,
+  symbolBusy,
+  onToggle,
+  onSetSymbol,
+  onOpenStock,
+}) {
   return (
     <div className="card card--material material-card">
       <div className="material-card__header">
-        <span className="material-card__name">
-          {material.name}
+        <div className="material-card__name">
+          <span>{material.name}</span>
           {material.landedUnitFactor != null && (
-            <span className="badge badge--info" style={{ fontSize: '10px', padding: '1px 5px', marginLeft: '6px' }} title="Landed parity model active">
+            <span className="badge badge--info materials-parity-badge" title="Landed parity model active">
               PARITY
             </span>
           )}
-        </span>
+        </div>
         <SourceBadge isCustom={material.isCustom} />
       </div>
       <p className="material-card__unit">
         <span className="material-unit-pill">{material.unit}</span>
       </p>
       {material.isTracked && (
-        <div className="material-card__stock" style={{ margin: '8px 0' }}>
-          <StockCoverBadge material={material} onOpenStock={onOpenStock} />
+        <div className="material-card__stock">
+          <StockCoverBadge material={material} onOpenStock={isViewer ? undefined : onOpenStock} />
         </div>
       )}
       <div className="material-card__footer">
-        <TrackButton material={material} busy={busy} onToggle={onToggle} />
+        <TrackButton material={material} busy={busy} disabled={isViewer} onToggle={onToggle} />
         {material.isTracked && <ActionLinks material={material} />}
       </div>
       {material.isTracked && (
@@ -727,19 +702,17 @@ function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSym
             material={material}
             business={business}
             busy={symbolBusy}
+            disabled={isViewer}
             onSetSymbol={onSetSymbol}
           />
           {material.externalSymbol ? (
-            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '4px', lineHeight: 1.3 }}>
+            <span className="text-xs text-muted materials-symbol-hint">
               {getSymbolDescription(material.externalSymbol) || 'Automatic market benchmark.'}
             </span>
           ) : (
-            <span className="text-xs text-secondary" style={{ display: 'block', marginTop: '4px', lineHeight: 1.3 }}>
+            <span className="text-xs text-secondary materials-symbol-hint">
               No public market ticker — use{' '}
-              <Link
-                to={`/prices?materialId=${material.id}`}
-                className="text-accent"
-              >
+              <Link to={`/prices?materialId=${material.id}`} className="materials-quote-link">
                 Log Supplier Quote
               </Link>{' '}
               for custom or local grades.
@@ -751,20 +724,13 @@ function MaterialCard({ material, business, busy, symbolBusy, onToggle, onSetSym
   );
 }
 
-/* ── External symbol select ──────────────────────────────────
- * Renders an industry-filtered <select> showing allowed symbols.
- * Only rendered when material.isTracked === true.
- * Sends null to the API when "None" is selected.
- * Disabled while the API call is in flight (symbolBusy).
- * ─────────────────────────────────────────────────────────── */
-function ExternalSymbolSelect({ material, business, busy, onSetSymbol }) {
-  // The select value is '' for null (select can't hold null natively)
+function ExternalSymbolSelect({ material, business, busy, disabled = false, onSetSymbol }) {
   const currentValue = material.externalSymbol ?? '';
   const options = getFilteredSymbolOptions(business, currentValue);
 
   function handleChange(e) {
-    const selected = e.target.value;  // '' | 'WTI' | 'BRENT' | ...
-    if (selected === currentValue) return;  // no change
+    const selected = e.target.value;
+    if (selected === currentValue) return;
     onSetSymbol(material, selected);
   }
 
@@ -774,24 +740,21 @@ function ExternalSymbolSelect({ material, business, busy, onSetSymbol }) {
         className={`form-control symbol-select${busy ? ' symbol-select--loading' : ''}`}
         value={currentValue}
         onChange={handleChange}
-        disabled={busy}
+        disabled={busy || disabled}
         aria-label={`External market symbol for ${material.name}`}
         aria-busy={busy}
       >
-        {options.map(opt => (
+        {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
         ))}
       </select>
-      {busy && (
-        <span className="symbol-select__spinner" aria-hidden="true" />
-      )}
+      {busy && <span className="symbol-select__spinner" aria-hidden="true" />}
     </div>
   );
 }
 
-/* ── Source badge: Custom (badge--neutral) | Industry (badge--info) ── */
 function SourceBadge({ isCustom }) {
   return (
     <span className={`badge ${isCustom ? 'badge--neutral' : 'badge--info'}`}>
@@ -800,16 +763,17 @@ function SourceBadge({ isCustom }) {
   );
 }
 
-/* ── Track/Tracked button ────────────────────────────────────── */
-function TrackButton({ material, busy, onToggle }) {
+function TrackButton({ material, busy, disabled = false, onToggle }) {
   return (
     <button
       type="button"
       className={`btn btn--sm ${material.isTracked ? 'btn--success' : 'btn--secondary'}${busy ? ' btn--loading' : ''}`}
-      aria-label={material.isTracked
-        ? `Disable tracking for ${material.name}`
-        : `Enable tracking for ${material.name}`}
-      disabled={busy}
+      aria-label={
+        material.isTracked
+          ? `Disable tracking for ${material.name}`
+          : `Enable tracking for ${material.name}`
+      }
+      disabled={busy || disabled}
       onClick={() => onToggle(material)}
     >
       {material.isTracked ? 'Tracked' : 'Track'}
@@ -817,34 +781,25 @@ function TrackButton({ material, busy, onToggle }) {
   );
 }
 
-/* ── Action links — shown only when isTracked === true ─────────
- * Links use material.id = tracked_materials.id (universal ID)
- * ──────────────────────────────────────────────────────────── */
 export function ActionLinks({ material, onOpenStock: propOpenStock, onOpenLanded: propOpenLanded }) {
+  const isViewer = useContext(ReadOnlyContext);
   const contextOpenStock = useContext(StockModalContext);
-  const onOpenStock = propOpenStock || contextOpenStock;
+  const onOpenStock = propOpenStock || (isViewer ? null : contextOpenStock);
   const contextOpenLanded = useContext(LandedModalContext);
-  const onOpenLanded = propOpenLanded || contextOpenLanded;
+  const onOpenLanded = propOpenLanded || (isViewer ? null : contextOpenLanded);
   const logLabel = material.externalSymbol ? 'Log Price' : 'Log Quote';
 
   return (
     <div className="materials-actions">
-      <Link
-        to={`/prices?materialId=${material.id}`}
-        className="btn btn--sm btn--ghost"
-      >
-        {logLabel}
-      </Link>
-      <Link
-        to={`/trends?materialId=${material.id}`}
-        className="btn btn--sm btn--ghost"
-      >
+      {!isViewer && (
+        <Link to={`/prices?materialId=${material.id}`} className="btn btn--sm btn--ghost">
+          {logLabel}
+        </Link>
+      )}
+      <Link to={`/trends?materialId=${material.id}`} className="btn btn--sm btn--ghost">
         History
       </Link>
-      <Link
-        to={`/materials/${material.id}/impact`}
-        className="btn btn--sm btn--ghost"
-      >
+      <Link to={`/materials/${material.id}/impact`} className="btn btn--sm btn--ghost">
         Impact
       </Link>
       {onOpenStock && (
@@ -869,14 +824,15 @@ export function ActionLinks({ material, onOpenStock: propOpenStock, onOpenLanded
   );
 }
 
-/* ── Stock Cover Badge (V3-M1) ──────────────────────────────── */
 export function StockCoverBadge({ material, onOpenStock: propOpenStock }) {
+  const isViewer = useContext(ReadOnlyContext);
   const contextOpenStock = useContext(StockModalContext);
-  const onOpenStock = propOpenStock || contextOpenStock;
+  const onOpenStock = propOpenStock || (isViewer ? null : contextOpenStock);
 
   if (!material.isTracked) return <span className="text-xs text-muted">—</span>;
 
-  const hasProfile = material.currentStockQty != null &&
+  const hasProfile =
+    material.currentStockQty != null &&
     material.dailyConsumptionRate != null &&
     Number(material.dailyConsumptionRate) > 0;
 
@@ -895,34 +851,66 @@ export function StockCoverBadge({ material, onOpenStock: propOpenStock }) {
     );
   }
 
-  const cover = Number((Number(material.currentStockQty) / Number(material.dailyConsumptionRate)).toFixed(1));
-  const lead = (material.supplierLeadTimeDays != null && Number(material.supplierLeadTimeDays) >= 0)
-    ? Number(material.supplierLeadTimeDays)
-    : 7;
+  const cover = Number(
+    (Number(material.currentStockQty) / Number(material.dailyConsumptionRate)).toFixed(1)
+  );
+  const lead =
+    material.supplierLeadTimeDays != null && Number(material.supplierLeadTimeDays) >= 0
+      ? Number(material.supplierLeadTimeDays)
+      : 7;
+  const maxDays =
+    material.maxStorageDays != null && Number(material.maxStorageDays) > 0
+      ? Number(material.maxStorageDays)
+      : null;
 
   let badgeClass = 'badge--success';
+  let tone = 'success';
+  let filledCount = 3;
   let label = `${cover}d cover`;
 
   if (cover <= lead) {
     badgeClass = 'badge--danger';
+    tone = 'danger';
+    filledCount = 1;
     label = `CRITICAL: ${cover}d`;
   } else if (cover <= Math.max(lead * 1.5, lead + 5)) {
     badgeClass = 'badge--warning';
+    tone = 'warning';
+    filledCount = 2;
     label = `LOW: ${cover}d`;
+  } else if (maxDays && cover > maxDays) {
+    badgeClass = 'badge--info';
+    tone = 'info';
+    filledCount = 4;
+    label = `${cover}d cover (EXCESS)`;
   }
+
+  const badgeInner = (
+    <span className="stock-cover-badge-inner">
+      <span className={`badge font-mono ${badgeClass}`}>{label}</span>
+      <span className="stock-cover-segments" aria-hidden="true">
+        {[1, 2, 3, 4].map((seg) => (
+          <span
+            key={seg}
+            className={`stock-cover-seg${
+              seg <= filledCount ? ` stock-cover-seg--${tone}` : ''
+            }`}
+          />
+        ))}
+      </span>
+    </span>
+  );
 
   return onOpenStock ? (
     <button
       type="button"
-      className={`badge font-mono stock-cover-btn ${badgeClass}`}
+      className="stock-cover-btn"
       onClick={() => onOpenStock(material)}
       title={`Current stock: ${material.currentStockQty} ${material.unit} (${cover} days cover vs ${lead}d lead time). Click to edit.`}
     >
-      {label}
+      {badgeInner}
     </button>
   ) : (
-    <span className={`badge font-mono ${badgeClass}`}>
-      {label}
-    </span>
+    badgeInner
   );
 }
