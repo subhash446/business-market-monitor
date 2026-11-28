@@ -27,7 +27,7 @@ export function LandingFooter() {
                 />
               </svg>
               <span className="lp-nav__title">
-                Business Market Monitor
+                AI Market Intelligence Agent
               </span>
             </div>
             <p className="lp-footer__tagline">
@@ -79,7 +79,7 @@ export function LandingFooter() {
             sourced from official public registries and authentic mandi modal rates.
           </p>
           <span className="lp-footer__cert font-mono">
-            © 2026 Business Market Monitor · Automated 7:00 AM Briefings
+            © 2026 AI Market Intelligence Agent · Automated 7:00 AM Briefings
           </span>
         </div>
       </div>

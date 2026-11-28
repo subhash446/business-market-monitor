@@ -159,7 +159,7 @@ function buildNewsDigest({
           <div style="display: flex; justify-content: space-between; align-items: baseline;">
             <div>
               <h1 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.025em; color: #ffffff;">
-                Business Market Monitor
+                AI Market Intelligence Agent
               </h1>
               <p style="margin: 4px 0 0; font-size: 13px; color: #94a3b8;">
                 ${escapeHtml(freqLabel)} Market Intelligence &amp; Sourcing Digest
@@ -223,7 +223,7 @@ function buildNewsDigest({
           <!-- CTA Button -->
           <div style="text-align: center; margin: 32px 0 16px;">
             <a href="${escapeHtml(dashboardUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
-              Open BMM Dashboard
+              Open AMIA Dashboard
             </a>
           </div>
         </div>
@@ -244,7 +244,7 @@ function buildNewsDigest({
 
   // Plain-text representation
   const textLines = [
-    `=== BUSINESS MARKET MONITOR — ${freqLabel.toUpperCase()} DIGEST ===`,
+    `=== AI MARKET INTELLIGENCE AGENT — ${freqLabel.toUpperCase()} DIGEST ===`,
     `Date: ${dateStr}`,
     `Business: ${businessName || 'Valued Business'} (${industryName || 'Market'})`,
     '',

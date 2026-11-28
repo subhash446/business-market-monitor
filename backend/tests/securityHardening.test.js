@@ -140,7 +140,7 @@ describe('Security Hardening Audit Checks', () => {
       expect(sendEmailSpy).toHaveBeenCalledTimes(1);
       const callArg = sendEmailSpy.mock.calls[0][0];
       expect(callArg.to).toBe('user@example.com');
-      expect(callArg.subject).toBe('Reset Your Password - Business Market Monitor');
+      expect(callArg.subject).toBe('Reset Your Password - AI Market Intelligence Agent');
       expect(callArg.html).toContain('/reset-password?token=');
       expect(callArg.html).toContain('Reset Password');
     });

@@ -166,7 +166,7 @@ export function DigestPreview({ initialChannel = 'whatsapp' }) {
             />
             <div className="lp-phone-app-info">
               <span className="lp-phone-sender">
-                {channel === 'whatsapp' ? 'BMM Procurement Desk' : 'Morning Brief Inbox'}
+                {channel === 'whatsapp' ? 'AMIA Procurement Desk' : 'Morning Brief Inbox'}
               </span>
               <span className="lp-phone-time font-mono">{fixedDateString}</span>
             </div>
@@ -197,7 +197,7 @@ export function DigestPreview({ initialChannel = 'whatsapp' }) {
                 <div className="lp-mail-header">
                   <div className="lp-mail-meta-line">
                     <span>From:</span>
-                    <strong>Business Market Monitor</strong>
+                    <strong>AI Market Intelligence Agent</strong>
                     <span className="lp-mail-status lp-delivery-shimmer font-mono">
                       Delivered &middot; 07:00 AM
                     </span>

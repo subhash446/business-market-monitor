@@ -5,12 +5,12 @@
  */
 
 function buildPasswordResetEmail({ resetUrl, expiryMinutes = 60 }) {
-  const subject = 'Reset Your Password - Business Market Monitor';
+  const subject = 'Reset Your Password - AI Market Intelligence Agent';
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; line-height: 1.5;">
       <h2 style="margin-bottom: 20px; color: #0f172a; font-size: 22px;">Reset Your Password</h2>
-      <p style="margin-bottom: 16px;">We received a request to reset the password for your Business Market Monitor account.</p>
+      <p style="margin-bottom: 16px;">We received a request to reset the password for your AI Market Intelligence Agent account.</p>
       <p style="margin-bottom: 24px;">Click the button below to choose a new password:</p>
       <div style="margin: 28px 0;">
         <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">

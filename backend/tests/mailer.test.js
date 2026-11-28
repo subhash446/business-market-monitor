@@ -627,8 +627,8 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
     });
 
     test('2. parseBrevoSender formats "Display Name <email>" and plain email with default name', () => {
-      expect(mailer.parseBrevoSender('Business Market Monitor <alerts@bmm.example.com>')).toEqual({
-        name: 'Business Market Monitor',
+      expect(mailer.parseBrevoSender('AI Market Intelligence Agent <alerts@bmm.example.com>')).toEqual({
+        name: 'AI Market Intelligence Agent',
         email: 'alerts@bmm.example.com',
       });
 
@@ -638,7 +638,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
       });
 
       expect(mailer.parseBrevoSender('noreply@bmm.example.com')).toEqual({
-        name: 'Business Market Monitor',
+        name: 'AI Market Intelligence Agent',
         email: 'noreply@bmm.example.com',
       });
 
@@ -648,7 +648,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
 
     test('3. sends via Brevo REST API with parsed sender and returns { provider: "brevo", messageId } on 201', async () => {
       env.email.provider = 'brevo';
-      env.email.from = 'Business Market Monitor <noreply@bmm.example.com>';
+      env.email.from = 'AI Market Intelligence Agent <noreply@bmm.example.com>';
       env.brevo.apiKey = 'xkeysib-secret-test-key-999';
 
       global.fetch = jest.fn().mockResolvedValue({
@@ -659,7 +659,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
 
       const result = await mailer.sendEmail({
         to: 'buyer@packaging.in',
-        subject: 'Your Business Market Monitor verification code: 482910',
+        subject: 'Your AI Market Intelligence Agent verification code: 482910',
         html: '<p>Code: <strong>482910</strong></p>',
         text: 'Code: 482910',
       });
@@ -682,9 +682,9 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
 
       const body = JSON.parse(options.body);
       expect(body).toEqual({
-        sender: { name: 'Business Market Monitor', email: 'noreply@bmm.example.com' },
+        sender: { name: 'AI Market Intelligence Agent', email: 'noreply@bmm.example.com' },
         to: [{ email: 'buyer@packaging.in' }],
-        subject: 'Your Business Market Monitor verification code: 482910',
+        subject: 'Your AI Market Intelligence Agent verification code: 482910',
         htmlContent: '<p>Code: <strong>482910</strong></p>',
         textContent: 'Code: 482910',
       });
@@ -710,7 +710,7 @@ describe('Resend Mailer Provider (src/email/mailer.js)', () => {
       expect(result).toEqual({ provider: 'brevo', messageId: '<msg-plain-sender>' });
       const [, options] = global.fetch.mock.calls[0];
       const body = JSON.parse(options.body);
-      expect(body.sender).toEqual({ name: 'Business Market Monitor', email: 'otp@bmm.example.com' });
+      expect(body.sender).toEqual({ name: 'AI Market Intelligence Agent', email: 'otp@bmm.example.com' });
       expect(body.textContent).toBeUndefined();
     });
 

@@ -50,9 +50,10 @@ describe('Google OAuth 2.0 & 6-Digit Email OTP Authentication (Migration 036)', 
   describe('1. Email OTP Template', () => {
     test('renders subject with OTP and Zinc-styled HTML', () => {
       const emailObj = buildEmailOtpEmail({ otp: '849201', purpose: 'LOGIN_OTP', expiryMinutes: 10 });
-      expect(emailObj.subject).toBe('Your Business Market Monitor verification code: 849201');
+      expect(emailObj.subject).toBe('Your AI Market Intelligence Agent verification code: 849201');
       expect(emailObj.html).toContain('849201');
-      expect(emailObj.html).toContain('Business Market Monitor');
+      expect(emailObj.html).toContain('AI Market Intelligence Agent');
+      expect(emailObj.html).toContain('AMIA');
       expect(emailObj.html).toContain('10 minutes');
     });
 
@@ -163,7 +164,7 @@ describe('Google OAuth 2.0 & 6-Digit Email OTP Authentication (Migration 036)', 
       expect(mailer.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'procurement@factory.com',
-          subject: expect.stringContaining('Your Business Market Monitor verification code'),
+          subject: expect.stringContaining('Your AI Market Intelligence Agent verification code'),
         })
       );
     });

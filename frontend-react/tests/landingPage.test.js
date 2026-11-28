@@ -384,7 +384,8 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
         React.createElement(MemoryRouter, null, React.createElement(DigestPreview, { initialChannel: 'email' }))
       );
       assert.ok(emailHtml.includes('digest-email-view'), 'Email mode must render inbox envelope card');
-      assert.ok(emailHtml.includes('From:') && emailHtml.includes('Business Market Monitor'), 'Must show Business Market Monitor sender');
+      assert.ok(emailHtml.includes('From:') && emailHtml.includes('AI Market Intelligence Agent'), 'Must show AI Market Intelligence Agent sender');
+      assert.ok(waHtml.includes('AMIA Procurement Desk'), 'WhatsApp view must show AMIA Procurement Desk');
       assert.ok(
         emailHtml.includes('Subject: Morning Procurement Digest · Tue 17 Nov'),
         'Email view must show exact Subject header without unowned domain'
@@ -427,10 +428,11 @@ describe('Landing Page — Geometry, Editorial Polish, Interactive Telemetry & S
       );
       assert.ok(!html.includes('lp-copy-email-row'));
       assert.ok(!html.includes('mailto:'));
-      assert.ok(html.includes('Business Market Monitor'));
+      assert.ok(html.includes('AI Market Intelligence Agent'));
+      assert.ok(html.includes('lp-nav__title-compact') && html.includes('>AMIA<'), 'Navbar must include compact AMIA mark for 360px mobile');
       assert.ok(
-        html.includes('© 2026 Business Market Monitor · Automated 7:00 AM Briefings') ||
-        html.includes('&copy; 2026 Business Market Monitor · Automated 7:00 AM Briefings')
+        html.includes('© 2026 AI Market Intelligence Agent · Automated 7:00 AM Briefings') ||
+        html.includes('&copy; 2026 AI Market Intelligence Agent · Automated 7:00 AM Briefings')
       );
 
       // Honesty boundaries

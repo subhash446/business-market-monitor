@@ -273,6 +273,15 @@
   letter-spacing: -0.02em;
   color: var(--lp-text-primary);
   white-space: nowrap;
+  min-width: 0;
+}
+
+.lp-nav__title-full {
+  display: inline;
+}
+
+.lp-nav__title-compact {
+  display: none;
 }
 
 .lp-nav__links {
@@ -336,9 +345,14 @@
     width: 21px;
     height: 21px;
   }
-  .lp-nav__title {
-    font-size: 12.5px;
-    letter-spacing: -0.025em;
+  .lp-nav__title-full {
+    display: none;
+  }
+  .lp-nav__title-compact {
+    display: inline;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
   }
   .lp-nav__actions {
     gap: 8px;
@@ -352,6 +366,21 @@
   }
   .lp-nav__cta-mid {
     display: none;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 639px) {
+  .lp-nav__title {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lp-nav__actions {
+    gap: 10px;
+  }
+  .lp-nav .lp-btn--sm {
+    padding: 6px 11px;
+    font-size: 12.5px;
   }
 }
 

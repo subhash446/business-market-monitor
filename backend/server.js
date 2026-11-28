@@ -108,7 +108,7 @@ async function start() {
   await testConnection(); // logs connectivity; does not block startup (Phase 1 skeleton)
 
   server = app.listen(env.port, () => {
-    logger.info(`[server] Business Market Monitor API running on port ${env.port} (${env.nodeEnv})`);
+    logger.info(`[server] AI Market Intelligence Agent API running on port ${env.port} (${env.nodeEnv})`);
     logger.info(`[server] Health check: http://localhost:${env.port}/api/v1/health`);
 
     // Start cron jobs after the server is confirmed listening — ensures

@@ -46,7 +46,7 @@ export function SilentSlope() {
           <p className="lp-section-desc">
             When upstream benchmarks surge, vendors cite crude and mandi shortages to hike
             rates within days. But when commodity costs drop, quotes linger high for
-            weeks. BMM gives procurement teams benchmark proof before negotiating.
+            weeks. AI Market Intelligence Agent gives procurement teams benchmark proof before negotiating.
           </p>
         </div>
 

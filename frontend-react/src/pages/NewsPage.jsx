@@ -370,7 +370,7 @@ export function NewsPage() {
               {digestTab === 'whatsapp' && (
                 <div className="digest-wa-shell" role="tabpanel">
                   <pre className="digest-wa-bubble font-mono">
-{`*Business Market Monitor — ${digestPreview.frequency || 'Weekly'} Digest*
+{`*AI Market Intelligence Agent — ${digestPreview.frequency || 'Weekly'} Digest*
 *${digestPreview.businessName}* (${digestPreview.industryName})
 
 *7-Day Price Movers:*
@@ -388,7 +388,7 @@ ${(digestPreview.topNews && digestPreview.topNews.length > 0)
   ? digestPreview.topNews.slice(0, 3).map(n => `- *${n.title}* (${n.sourceName})`).join('\n')
   : '- No fresh articles.'}
 
-_Open BMM dashboard for live trends, graphs & supplier benchmarks._`}
+_Open AMIA dashboard for live trends, graphs & supplier benchmarks._`}
                   </pre>
                 </div>
               )}

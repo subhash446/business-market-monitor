@@ -53,18 +53,18 @@ export function AcceptInvitePage() {
       </a>
 
       <main id="main-content" className="auth-container">
-        <Link to="/" className="auth-brand auth-brand-link" aria-label="Business Market Monitor Home">
+        <Link to="/" className="auth-brand auth-brand-link" aria-label="AI Market Intelligence Agent Home">
           <div className="auth-logo-mark" aria-hidden="true">
             <i className="fa-solid fa-chart-column" />
           </div>
-          <span className="auth-brand__name">Business Market Monitor</span>
+          <span className="auth-brand__name">AI Market Intelligence Agent</span>
         </Link>
 
         <div className="auth-card">
           <div className="auth-card__header">
             <h1 className="auth-card__title">Workspace Invitation</h1>
             <p className="auth-card__subtitle">
-              You have been invited to join a collaborative procurement workspace on Business Market Monitor.
+              You have been invited to join a collaborative procurement workspace on AI Market Intelligence Agent.
             </p>
           </div>
 

@@ -2,7 +2,7 @@ const { Resend } = require('resend');
 const env = require('../config/env');
 const logger = require('../utils/logger');
 
-const DEFAULT_SENDER_NAME = 'Business Market Monitor';
+const DEFAULT_SENDER_NAME = 'AI Market Intelligence Agent';
 
 let clientInstance = null;
 

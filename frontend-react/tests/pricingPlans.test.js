@@ -194,7 +194,8 @@ describe('V3-M5 SaaS Layer — 3-Column Pricing & Early Access Experience', () =
 
       // Title & Chips
       assert.ok(html.includes('Early Access — Paid Plans Launching Soon'), 'Must render title');
-      assert.ok(html.includes('BMM Growth · ₹2,499 / mo'), 'Must render plan price chip');
+      assert.ok(html.includes('AMIA Growth · ₹2,499 / mo'), 'Must render plan price chip');
+      assert.ok(html.includes('AI Market Intelligence Agent'), 'Must include AI Market Intelligence Agent modal copy');
       assert.ok(html.includes('All Features Unlocked'), 'Must render All Features Unlocked chip');
 
       // Executive copy

@@ -185,11 +185,11 @@ export function LoginPage() {
 
       <main id="main-content" className="auth-container">
         {/* Clean Brand Wordmark */}
-        <Link to="/" className="auth-brand auth-brand-link" aria-label="Business Market Monitor Home">
+        <Link to="/" className="auth-brand auth-brand-link" aria-label="AI Market Intelligence Agent Home">
           <div className="auth-logo-mark" aria-hidden="true">
             <i className="fa-solid fa-chart-column" />
           </div>
-          <span className="auth-brand__name">Business Market Monitor</span>
+          <span className="auth-brand__name">AI Market Intelligence Agent</span>
         </Link>
 
         {/* Login Card */}
@@ -448,7 +448,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="auth-footer">&copy; 2026 Business Market Monitor</p>
+        <p className="auth-footer">&copy; 2026 AI Market Intelligence Agent</p>
       </main>
     </div>
   );

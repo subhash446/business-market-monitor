@@ -78,7 +78,7 @@ export function Sidebar({ isOpen = false, onClose = () => {} }) {
           <NavLink
             to="/dashboard"
             className="sidebar__logo-link"
-            aria-label="Business Market Monitor — Dashboard"
+            aria-label="AI Market Intelligence Agent — Dashboard"
             onClick={onClose}
           >
             <span className="sidebar__logo" aria-hidden="true">
@@ -90,7 +90,7 @@ export function Sidebar({ isOpen = false, onClose = () => {} }) {
                 <line x1="6" y1="22" x2="27" y2="22" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="sidebar__app-name">Business Market Monitor</span>
+            <span className="sidebar__app-name">AI Market Intelligence Agent</span>
           </NavLink>
         </div>
 

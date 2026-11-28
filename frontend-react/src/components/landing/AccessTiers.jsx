@@ -1,10 +1,10 @@
 import { PricingPlansSection } from '../billing/PricingPlansSection.jsx';
 
 const ENTERPRISE_EMAIL = 'subhashyadav25177@gmail.com';
-const INQUIRY_SUBJECT = 'Business Market Monitor — Multi-Plant & ERP Inquiry';
+const INQUIRY_SUBJECT = 'AI Market Intelligence Agent — Multi-Plant & ERP Inquiry';
 const INQUIRY_BODY = `Hi Subhash,
 
-We are interested in Multi-Plant & ERP Sync for Business Market Monitor.
+We are interested in Multi-Plant & ERP Sync for AI Market Intelligence Agent.
 
 - Company Name:
 - Number of Plants / Locations:

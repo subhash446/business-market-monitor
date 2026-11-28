@@ -138,7 +138,7 @@ export function ImpactFlow() {
     <section
       id="how-it-works"
       className="lp-section lp-reveal"
-      aria-label="How BMM Impact Chains Work"
+      aria-label="How AI Market Intelligence Agent Impact Chains Work"
     >
       <div className="lp-container">
         {/* Numbered Left-Aligned Editorial Chapter Header */}
@@ -154,7 +154,7 @@ export function ImpactFlow() {
           </div>
 
           <p className="lp-section-desc">
-            Raw material price hikes rarely occur in isolation. BMM maps structural
+            Raw material price hikes rarely occur in isolation. AI Market Intelligence Agent maps structural
             feedstock dependencies and calculates empirical lag correlations so you see
             cost pressures 10&ndash;14 days before your supplier calls.
           </p>

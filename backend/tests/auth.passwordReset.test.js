@@ -48,7 +48,7 @@ describe('Password Reset Service & Email Dispatch (FR-AUTH-07)', () => {
       const resetUrl = 'https://app.example.com/reset-password?token=abc123xyz';
       const result = buildPasswordResetEmail({ resetUrl, expiryMinutes: 45 });
 
-      expect(result.subject).toBe('Reset Your Password - Business Market Monitor');
+      expect(result.subject).toBe('Reset Your Password - AI Market Intelligence Agent');
       expect(result.html).toContain('href="https://app.example.com/reset-password?token=abc123xyz"');
       expect(result.html).toContain('45 minutes');
       expect(result.html).toContain('Reset Password');
@@ -81,7 +81,7 @@ describe('Password Reset Service & Email Dispatch (FR-AUTH-07)', () => {
       expect(mailer.sendEmail).toHaveBeenCalledTimes(1);
       const mailArgs = mailer.sendEmail.mock.calls[0][0];
       expect(mailArgs.to).toBe('owner@bellecure.com');
-      expect(mailArgs.subject).toBe('Reset Your Password - Business Market Monitor');
+      expect(mailArgs.subject).toBe('Reset Your Password - AI Market Intelligence Agent');
       expect(mailArgs.html).toContain('/reset-password?token=');
 
       // 4. Logger must log user ID only, NEVER raw token or reset URL

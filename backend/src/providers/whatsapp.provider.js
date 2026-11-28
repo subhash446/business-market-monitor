@@ -78,13 +78,13 @@ function formatAlertMessage({
   const timeStr = dt.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 
   return (
-    `🔔 *Business Market Monitor Alert*\n\n` +
+    `🔔 *AI Market Intelligence Agent Alert*\n\n` +
     `*Material:* ${materialName}\n` +
     `• *Condition:* ${conditionLabel}\n` +
     `• *Triggered Price:* ${formattedTriggered}\n` +
     `• *Threshold:* ${formattedThreshold} (${thresholdType})${changeLine}\n` +
     `• *Time:* ${timeStr}\n\n` +
-    `_Log in to Business Market Monitor for real-time market impact analysis._`
+    `_Log in to AI Market Intelligence Agent for real-time market impact analysis._`
   );
 }
 
@@ -107,7 +107,7 @@ function formatNewsDigestMessage({
   const dateStr = dt.toISOString().slice(0, 10);
 
   const lines = [
-    `📰 *Business Market Monitor — ${freqLabel} Digest*`,
+    `📰 *AI Market Intelligence Agent — ${freqLabel} Digest*`,
     `🏢 *${safeBusiness}* (${safeIndustry}) | ${dateStr}`,
     '',
     `📊 *7-Day Price Movers:*`,
@@ -140,7 +140,7 @@ function formatNewsDigestMessage({
     });
   }
 
-  lines.push('', `_Open BMM dashboard for live trends, graphs & supplier benchmarks._`);
+  lines.push('', `_Open AMIA dashboard for live trends, graphs & supplier benchmarks._`);
 
   return lines.join('\n');
 }

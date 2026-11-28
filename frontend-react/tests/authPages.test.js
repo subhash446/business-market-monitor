@@ -43,10 +43,10 @@ describe('Auth Pages — Linear/Stripe Dark Polish, Default Password Sign-In & 2
   });
 
   // =========================================================================
-  // 1. Clean Brand Header (No BMM Badge) & Link to /
+  // 1. Clean Brand Header (No Legacy BMM Badge) & Link to /
   // =========================================================================
-  describe('1. Clean Business Market Monitor Branding Across All Auth Pages', () => {
-    test('LoginPage renders "Business Market Monitor" WITHOUT BMM badge and links to /', async () => {
+  describe('1. Clean AI Market Intelligence Agent Branding Across All Auth Pages', () => {
+    test('LoginPage renders "AI Market Intelligence Agent" WITHOUT BMM badge and links to /', async () => {
       const { LoginPage } = await viteServer.ssrLoadModule('/src/pages/auth/LoginPage.jsx');
       const { AuthContext } = await viteServer.ssrLoadModule('/src/context/AuthContext.jsx');
 
@@ -58,13 +58,13 @@ describe('Auth Pages — Linear/Stripe Dark Polish, Default Password Sign-In & 2
         )
       );
 
-      assert.ok(html.includes('Business Market Monitor'), 'LoginPage must display "Business Market Monitor"');
+      assert.ok(html.includes('AI Market Intelligence Agent'), 'LoginPage must display "AI Market Intelligence Agent"');
       assert.ok(!html.includes('auth-brand__badge'), 'LoginPage must NOT render BMM badge class');
       assert.ok(!html.includes('>BMM<'), 'LoginPage must NOT display BMM pill text');
       assert.ok(html.includes('href="/"'), 'LoginPage brand header must link back to /');
     });
 
-    test('RegisterPage renders "Business Market Monitor" WITHOUT BMM badge and links to /', async () => {
+    test('RegisterPage renders "AI Market Intelligence Agent" WITHOUT BMM badge and links to /', async () => {
       const { RegisterPage } = await viteServer.ssrLoadModule('/src/pages/auth/RegisterPage.jsx');
       const { AuthContext } = await viteServer.ssrLoadModule('/src/context/AuthContext.jsx');
 
@@ -76,13 +76,13 @@ describe('Auth Pages — Linear/Stripe Dark Polish, Default Password Sign-In & 2
         )
       );
 
-      assert.ok(html.includes('Business Market Monitor'), 'RegisterPage must display "Business Market Monitor"');
+      assert.ok(html.includes('AI Market Intelligence Agent'), 'RegisterPage must display "AI Market Intelligence Agent"');
       assert.ok(!html.includes('auth-brand__badge'), 'RegisterPage must NOT render BMM badge class');
       assert.ok(!html.includes('>BMM<'), 'RegisterPage must NOT display BMM pill text');
       assert.ok(html.includes('href="/"'), 'RegisterPage brand header must link back to /');
     });
 
-    test('ForgotPasswordPage and ResetPasswordPage render "Business Market Monitor" WITHOUT BMM badge', async () => {
+    test('ForgotPasswordPage and ResetPasswordPage render "AI Market Intelligence Agent" WITHOUT BMM badge', async () => {
       const { ForgotPasswordPage } = await viteServer.ssrLoadModule('/src/pages/auth/ForgotPasswordPage.jsx');
       const { ResetPasswordPage } = await viteServer.ssrLoadModule('/src/pages/auth/ResetPasswordPage.jsx');
       const { AuthContext } = await viteServer.ssrLoadModule('/src/context/AuthContext.jsx');
@@ -103,7 +103,7 @@ describe('Auth Pages — Linear/Stripe Dark Polish, Default Password Sign-In & 2
       );
 
       for (const [label, html] of [['ForgotPasswordPage', fpHtml], ['ResetPasswordPage', rpHtml]]) {
-        assert.ok(html.includes('Business Market Monitor'), `${label} must display "Business Market Monitor"`);
+        assert.ok(html.includes('AI Market Intelligence Agent'), `${label} must display "AI Market Intelligence Agent"`);
         assert.ok(!html.includes('auth-brand__badge'), `${label} must NOT render BMM badge class`);
         assert.ok(!html.includes('>BMM<'), `${label} must NOT display BMM pill text`);
         assert.ok(html.includes('href="/"'), `${label} brand header must link back to /`);

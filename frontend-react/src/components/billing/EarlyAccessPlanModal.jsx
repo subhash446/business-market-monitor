@@ -119,7 +119,7 @@ function EarlyAccessPlanModalContent({
           <div>
             <div className="early-access-badge-row">
               <span className="early-access-plan-chip">
-                BMM {planName} · {planPrice}
+                AMIA {planName} · {planPrice}
               </span>
               <span className="early-access-unlocked-chip">
                 <i className="fa-solid fa-unlock-keyhole mr-1" aria-hidden="true" />
@@ -143,7 +143,7 @@ function EarlyAccessPlanModalContent({
         {/* Body */}
         <div className="modal__body modal-body early-access-modal__body">
           <p id={descId} className="early-access-copy">
-            Thank you for your interest in BMM <strong>{planName}</strong> ({billingCycleLabel}).
+            Thank you for your interest in AI Market Intelligence Agent <strong>{planName}</strong> ({billingCycleLabel}).
             Automated subscription billing is rolling out shortly. As an Early Access workspace, all core
             procurement intelligence features are currently unlocked for your team at no cost.
             Request priority access below to lock in early-adopter pricing when billing goes live.

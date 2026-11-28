@@ -139,7 +139,7 @@ describe('Periodic News Digest Service & Templates (T-08 / FR-ALERT-06)', () => 
       expect(html).toContain('Crude rallies as global refining capacity tightens');
 
       // Check plain text representation
-      expect(text).toContain('=== BUSINESS MARKET MONITOR — WEEKLY DIGEST ===');
+      expect(text).toContain('=== AI MARKET INTELLIGENCE AGENT — WEEKLY DIGEST ===');
       expect(text).toContain('• PET Resin Bottle Grade: INR 115.50 (+6.25%) [UP]');
       expect(text).toContain('• PET Resin Bottle Grade [ACCELERATE PURCHASE]');
     });
@@ -147,7 +147,7 @@ describe('Periodic News Digest Service & Templates (T-08 / FR-ALERT-06)', () => 
     test('formatNewsDigestMessage formats structured WhatsApp chat message', () => {
       const waText = formatNewsDigestMessage(samplePayload);
 
-      expect(waText).toContain('📰 *Business Market Monitor — Weekly Digest*');
+      expect(waText).toContain('📰 *AI Market Intelligence Agent — Weekly Digest*');
       expect(waText).toContain('*Apex Polychem Ltd <script>*');
       expect(waText).toContain('📊 *7-Day Price Movers:*');
       expect(waText).toContain('• *PET Resin Bottle Grade*: INR 115.50/kg (+6.3%) [UP]');

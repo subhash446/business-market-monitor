@@ -221,7 +221,7 @@ async function handleInboundWebhook(req, res) {
               : '';
 
             const replyText =
-              `✅ *BMM Copilot: Quote Captured*\n\n` +
+              `✅ *AMIA Copilot: Quote Captured*\n\n` +
               `• *Material:* ${parsed.matchedMaterial.name}\n` +
               `• *Logged Quote:* ₹${drafts.effectiveQuotedPrice}/${drafts.materialUnit} ${parsed.supplierName ? `(${parsed.supplierName})` : ''}\n` +
               (benchmarkRef ? `• *${benchmarkRef}${varianceText}*\n` : '') +

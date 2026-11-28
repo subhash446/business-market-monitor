@@ -95,14 +95,14 @@ describe('Stage A — App Shell, Obsidian-Zinc Tokens & Shared UI Primitives', (
   });
 
   describe('2. Shell & Shared UI Primitives SSR Contracts', () => {
-    test('Sidebar renders full Business Market Monitor wordmark and safe role fallback without AuthProvider', async () => {
+    test('Sidebar renders full AI Market Intelligence Agent wordmark and safe role fallback without AuthProvider', async () => {
       const { Sidebar } = await viteServer.ssrLoadModule('/src/components/layout/Sidebar.jsx');
       const { AuthContext } = await viteServer.ssrLoadModule('/src/context/AuthContext.jsx');
 
       const fallbackHtml = renderToStaticMarkup(
         React.createElement(MemoryRouter, null, React.createElement(Sidebar))
       );
-      assert.ok(fallbackHtml.includes('Business Market Monitor'));
+      assert.ok(fallbackHtml.includes('AI Market Intelligence Agent'));
       assert.ok(fallbackHtml.includes('nav-settings-btn'));
       assert.equal(fallbackHtml.includes('nav-workspace-role'), false);
 

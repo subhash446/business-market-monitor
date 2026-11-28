@@ -200,7 +200,7 @@ export const SILENT_SLOPE = {
 export const DIGEST_PREVIEW_SAMPLE = {
   fixedDateString: 'Tue 17 Nov · 7:00 AM',
   recipient: '+91 98200 12345 · Factory Procurement',
-  title: 'BMM Morning Procurement Digest',
+  title: 'AMIA Morning Procurement Digest',
   materials: [
     {
       name: 'PET Resin (Injection Grade)',
